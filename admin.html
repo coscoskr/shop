@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>後台管理</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#4B3B37;--mute:#8C7771;--line:#F0DFD9;--acc:#A95B4D;--soft:#FAEEEA;--pink:#E8AEA0;--ok:#2F7D5B}
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.5 "Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;color:var(--ink)}
+button,input,select,textarea{font:inherit;color:inherit}
+.btn{border:1px solid var(--ink);background:var(--ink);color:#fff;padding:6px 14px;border-radius:2px;cursor:pointer}
+.btn.l{background:none;color:var(--ink)}.btn.a{background:var(--acc);border-color:var(--acc)}
+.btn.s{padding:2px 10px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.tab{border:0;border-bottom:2px solid transparent;background:none;padding:6px 10px;cursor:pointer}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+[hidden]{display:none!important}
+#app{display:grid;grid-template-columns:200px 1fr;min-height:100vh}
+#side{position:sticky;top:0;height:100vh;border-right:1px solid var(--line);padding:20px 12px;display:flex;flex-direction:column;gap:4px;background:var(--soft)}
+#side b{padding:0 8px 16px;font-size:16px}
+#side .tab{text-align:left;border:0;border-left:3px solid transparent;padding:10px 12px;font-size:15px}
+#side .tab.on{border-left-color:var(--acc);background:#fff;font-weight:700}
+#side #out{margin-top:auto}
+.w{padding:24px 32px;overflow-x:auto;min-width:0}
+.fb{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px}
+.fb label{margin:0;display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--mute)}
+.fb input,.fb select{width:auto;min-width:120px}
+.sum{margin-left:auto;color:var(--mute)}
+table{border-collapse:collapse;width:100%;min-width:760px}
+th,td{border-bottom:1px solid var(--line);padding:9px 12px;text-align:left;white-space:nowrap}
+thead th{position:sticky;top:0;background:#fff;z-index:1}
+tbody tr[data-a]{cursor:pointer}tbody tr[data-a]:hover{background:var(--soft)}
+input:not([type=checkbox]),select,textarea{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:2px;background:#fff}
+#lg{max-width:320px;margin:15vh auto;padding:16px}
+label{display:block;margin:10px 0;font-size:13px}
+label>select,label>textarea,label>input:not([type=checkbox]):not([type=radio]){margin-top:5px}
+input[type=checkbox],input[type=radio]{margin:0 7px 0 0;vertical-align:middle}
+th,td{line-height:1.6}
+.ln td select{margin:0}
+.bt .btn,p>.btn{margin-right:4px}
+.g{display:grid;grid-template-columns:repeat(3,1fr);gap:4px 22px}.g .f{grid-column:1/-1}
+.ck label{display:inline-block;margin-right:10px}
+dialog{border:0;border-radius:2px;padding:24px;width:min(1500px,98vw);max-height:96vh;overflow:auto;color:var(--ink)}
+#dq{width:min(460px,92vw);padding:20px}
+#dq::backdrop{background:rgba(42,31,37,.6)}
+#busy{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;background:rgba(42,31,37,.35)}#busy.on{display:flex}#busy div{background:#fff;color:var(--ink);padding:18px 28px;border-radius:4px;font-weight:700;box-shadow:0 4px 20px rgba(0,0,0,.2)}
+.rp{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:10px 0}.rp div{background:var(--soft);padding:12px;border-radius:4px}.rp b{display:block;font-size:20px;margin-top:4px}
+@media print{#app,#lg,#dq,#busy,.noprint{display:none!important}body{background:#fff}dialog{position:absolute!important;left:0!important;top:0!important;margin:0!important;width:100%!important;max-height:none!important;overflow:visible!important;padding:0!important}.pg{page-break-after:always}.pg:last-child{page-break-after:auto}}
+dialog::backdrop{background:rgba(42,31,37,.5)}
+dialog h3{margin:0 0 10px}dialog h4{margin:18px 0 6px}
+.er{color:var(--acc)}.m{color:var(--mute)}
+fieldset{border:1px solid var(--line);border-radius:2px;margin:14px 0;padding:10px 14px}
+.chip{display:inline-block;border-radius:12px;padding:0 10px;font-size:12px;font-weight:700;background:var(--soft);color:var(--acc)}
+.chip.d{background:#E6F2EC;color:var(--ok)}
+.bt{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 12px}
+.ln td input{width:90px}
+.warn{background:#FFF6E5;border:1px solid #F1D9A5;padding:8px 12px;margin:8px 0;border-radius:2px;white-space:pre-wrap}
+.itm{width:100%;table-layout:fixed}.itm th,.itm td{padding:4px 3px;font-size:13px;vertical-align:middle}.itm input,.itm select{width:100%;min-width:0;padding:4px;font-size:13px;box-sizing:border-box}.itm th:nth-child(1){width:15%}.itm th:nth-child(2),.itm th:nth-child(6){width:7%}.itm th:nth-child(3),.itm th:nth-child(4),.itm th:nth-child(5),.itm th:nth-child(10){width:5.5%}.itm th:nth-child(7){width:10%}.itm th:nth-child(8),.itm th:nth-child(11){width:9%}.itm th:nth-child(9){width:6.5%}.itm th:nth-child(12){width:7%}.itm th:nth-child(13){width:5%}
+.ig{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0}.ig .it{width:96px;text-align:center;font-size:12px}.ig img{width:96px;height:96px;object-fit:cover;border:1px solid var(--line)}
+</style>
+</head>
+<body>
+<div id="lg">
+  <h2>後台登入</h2>
+  <form id="lf"><label>帳號<input name="a" required autocomplete="off"></label><label>密碼<input name="p" type="password" required autocomplete="new-password"></label>
+  <p class="er" id="le" role="alert"></p><button class="btn a">登入</button></form>
+</div>
+<div id="app" hidden>
+  <aside id="side"><div style="display:flex;align-items:center;gap:8px;padding:0 8px 6px"><img src="data:image/png;base64,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" alt="" style="height:30px;width:auto"><span style="font-family:'Cormorant Garamond',serif;font-size:20px">coscos</span></div><b id="who"></b><div class="m" style="font-size:11px">版本 2026-11-05 ac</div>
+    <button class="tab on" data-t="o">訂單明細</button><button class="tab" data-t="s">出貨單列表</button><button class="tab" data-t="k">庫存表</button><button class="tab" data-t="r">報表</button><button class="tab" data-t="p">商品</button><button class="tab" data-t="m">會員</button><button class="tab" data-t="c">活動</button><button class="tab" data-t="d">折扣碼</button><button class="tab" data-t="g">設定</button><button class="tab" data-t="a">管理員</button>
+    <button class="btn l" id="out">登出</button></aside>
+  <div class="w" id="v"></div>
+</div>
+<dialog id="dlg"></dialog>
+<dialog id="dq"></dialog>
+<div id="busy" role="status" aria-live="polite"><div>網站運轉中,請稍候…</div></div>
+
+<script src="api.js"></script>
+<script>
+var BL = [], T = '', P = [], C = [], A = [], O = null, VL = [], FL = {}, tab = 'o', SEL = {};
+var OF = { from: '', to: '', q: '', st: '', pay: '' }, SF = { from: '', to: '', q: '', st: '', pay: '' }, PF = { q: '', type: '', lock: '' };
+var ALLST = ['待刷卡', '已刷卡待出貨', '待匯款', '已匯款待查帳', '已查帳待出貨', '待出貨', '已出貨待送達', '已出貨待收貨', '已送達', '已收貨付款'];
+var $ = function (s) { return document.querySelector(s); };
+function vopt(cur, blank) {
+  var l = VL.slice(); cur = cur || ''; if (cur && l.indexOf(cur) < 0) l.unshift(cur);
+  return '<option value="">' + blank + '</option>' + l.map(function (x) { return '<option' + (x === cur ? ' selected' : '') + '>' + esc(x) + '</option>'; }).join('');
+}
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+function money(n) { return 'NT$ ' + Number(n || 0).toLocaleString('en-US'); }
+var BUSY = 0, BT = 0;
+function busy(d) {
+  BUSY += d; if (BUSY < 0) BUSY = 0; clearTimeout(BT);
+  if (BUSY > 0) BT = setTimeout(function () { $('#busy').classList.add('on'); }, 400); else $('#busy').classList.remove('on');
+}
+function call(fn) {
+  var a = [].slice.call(arguments, 1);
+  busy(1);
+  return new Promise(function (ok, no) {
+    var r = google.script.run.withSuccessHandler(function (x) { busy(-1); ok(x); }).withFailureHandler(function (e) { busy(-1); if (/登入已過期/.test(e.message)) logout(); no(e); });
+    r[fn].apply(r, a);
+  });
+}
+function logout() { T = ''; try { sessionStorage.removeItem('t'); } catch (e) {} $('#app').hidden = true; $('#lg').hidden = false; if ($('#dlg').open) $('#dlg').close(); }
+function ask(msg, yes) {
+  var d = $('#dq'); d.innerHTML = '<p style="white-space:pre-line;margin-top:0">' + esc(msg) + '</p><p style="margin-bottom:0"><button class="btn a" id="dqy">確定</button> <button class="btn l" id="dqn">取消</button></p>';
+  d.showModal(); $('#dqy').onclick = function () { d.close(); yes(); }; $('#dqn').onclick = function () { d.close(); };
+}
+function tell(msg) {
+  var d = $('#dq'); d.innerHTML = '<p style="white-space:pre-line;margin-top:0">' + esc(msg) + '</p><p style="margin-bottom:0"><button class="btn a" id="dqy">知道了</button></p>';
+  d.showModal(); $('#dqy').onclick = function () { d.close(); };
+}
+function fail(id) { return function (e) { var el = $(id); if (el) el.textContent = e.message; else tell(e.message); }; }
+function start(tk, name) {
+  T = tk; O = null; PV = null; try { sessionStorage.setItem('t', tk); sessionStorage.setItem('n', name); } catch (e) {}
+  call('adminInit', T).then(function (d) { P = d.products; C = d.cats; A = d.admins; VL = d.vendors || []; BL = d.brands || []; $('#who').textContent = name; $('#lg').hidden = true; $('#app').hidden = false; render(); }).catch(function () {});
+}
+try { var st0 = sessionStorage.getItem('t'), sn0 = sessionStorage.getItem('n'); if (st0) { $('#lg').hidden = true; call('adminInit', st0).then(function (d) { T = st0; O = null; PV = null; P = d.products; C = d.cats; A = d.admins; VL = d.vendors || []; BL = d.brands || []; $('#who').textContent = sn0 || ''; $('#app').hidden = false; render(); }).catch(function () { $('#lg').hidden = false; try { sessionStorage.removeItem('t'); sessionStorage.removeItem('n'); } catch (e) {} }); } } catch (e) {}
+
+$('#lf').addEventListener('submit', function (e) {
+  e.preventDefault(); $('#le').textContent = '';
+  if (!this.a.value.trim() || !this.p.value) { $('#le').textContent = '請輸入帳號與密碼'; return; }
+  call('adminLogin', this.a.value, this.p.value).then(function (r) { if (r.ok) start(r.token, r.name); else $('#le').textContent = r.msg; }).catch(function (er) { $('#le').textContent = er.message; });
+});
+$('#out').onclick = logout;
+$('#side').addEventListener('click', function (e) {
+  var b = e.target.closest('.tab'); if (!b) return;
+  tab = b.dataset.t; document.querySelectorAll('#side .tab').forEach(function (x) { x.classList.toggle('on', x === b); }); render();
+});
+
+function render() { ({ o: purchView, s: shipView, p: prodView, k: stockPage, r: reportPage, m: memberView, c: actView, d: codeView, g: setView, a: adminView, l: logView })[tab](); }
+var OT = 0;
+function loadOrders(cb, force) {
+  if (!force && O && Date.now() - OT < 60000) { cb(); return; }
+  $('#v').innerHTML = '<p class="m">載入中…</p>';
+  call('adminOrders', T).then(function (d) { O = d.orders; FL = d.flow; OT = Date.now(); cb(); }).catch(function (e) { $('#v').innerHTML = '<p class="er">' + esc(e.message) + '</p>'; });
+}
+function setO(d) { O = d.orders; FL = d.flow; OT = Date.now(); PVDIRTY = true; }
+function fld(l, n, v, t, ph) { return '<label>' + l + '<input name="' + n + '" type="' + (t || 'text') + '" value="' + esc(v) + '"' + (ph ? ' placeholder="' + ph + '"' : '') + '></label>'; }
+function opts(list, cur, all) { return (all ? '<option value="">' + all + '</option>' : '') + list.map(function (x) { return '<option' + (x === cur ? ' selected' : '') + '>' + esc(x) + '</option>'; }).join(''); }
+function ordById(id) { return (O || []).filter(function (o) { return o.id === id; })[0]; }
+function filterBar(id, f, withPay, statuses) {
+  return '<div class="fb" id="' + id + '"><label>日期從<input type="date" data-k="from" value="' + esc(f.from) + '"></label><label>到<input type="date" data-k="to" value="' + esc(f.to) + '"></label>' +
+    '<label>關鍵字<input data-k="q" placeholder="編號、姓名、電話" value="' + esc(f.q) + '"></label>' +
+    '<label>狀態<select data-k="st">' + opts(statuses, f.st, '全部') + '</select></label>' +
+    (withPay ? '<label>付款方式<select data-k="pay">' + opts(['刷卡', '匯款', '賣貨便'], f.pay, '全部') + '</select></label>' : '') +
+    '<button class="btn l" data-a="reset">清除篩選</button><span class="sum" id="sum"></span></div>';
+}
+function bindFilter(id, f, redraw) {
+  var el = $('#' + id);
+  el.addEventListener('input', function (e) { var k = e.target.dataset.k; if (k) { f[k] = e.target.value; redraw(); } });
+  el.addEventListener('change', function (e) { var k = e.target.dataset.k; if (k) { f[k] = e.target.value; redraw(); } });
+  el.querySelector('[data-a=reset]').onclick = function () { Object.keys(f).forEach(function (k) { f[k] = ''; }); el.querySelectorAll('[data-k]').forEach(function (x) { x.value = ''; }); redraw(); };
+}
+function inRange(d, f) { d = String(d).slice(0, 10); return (!f.from || d >= f.from) && (!f.to || d <= f.to); }
+
+/* ---------- 訂單 ---------- */
+function orderView() { loadOrders(function () { $('#v').innerHTML = '<h2 style="margin-top:0">訂單明細</h2>' + filterBar('ofb', OF, false, ['待到貨', '已到貨']) + '<div id="tb"></div>'; bindFilter('ofb', OF, orderRows); orderRows(); }); }
+function orderRows() { if (tab === 'o') purchView(); }
+function openOrder(id) {
+  if (!O || !ordById(id)) { call('adminOrders', T).then(function (d) { setO(d); PVDIRTY = false; openOrder(id); }).catch(function (e) { tell(e.message); }); return; }
+  var o = ordById(id); if (!o) return;
+  var d = $('#dlg');
+  var h = '<h3>訂單 ' + esc(o.id) + ' <span class="m">' + esc(o.at) + ' · <span class="chip">' + esc(o.st) + '</span></span></h3>' +
+    '<form id="of" data-id="' + esc(o.id) + '"><div class="g">' + fld('姓名', 'name', o.name) + fld('電話', 'phone', o.phone) + '<div class="f">' + fld('備註', 'note', o.note) + '</div></div>' +
+    '<p class="er" id="oe" role="alert"></p><button class="btn a">儲存訂單資料</button></form>';
+  h += '<h4>訂單品項 <span class="m">商品 ' + money(o.sub) + (o.disc ? ' − 優惠 ' + money(o.disc) : '') + (o.cred ? ' − 購物金 ' + money(o.cred) : '') + ' = ' + money(o.total) + '(運費在出貨單計算)</span></h4>' +
+    '<label class="ck"><input type="checkbox" id="ntf" checked> 把「到貨狀態」改成已到貨時,用 LINE 通知客人</label>' +
+    '<table class="itm"><thead><tr><th>品名</th><th>規格</th><th>現貨/預購</th><th>單價</th><th>數量</th><th>複價</th><th>到貨狀態</th><th>到貨日期</th><th>廠商</th><th>成本</th><th>稅</th><th>貨源</th><th>出貨單</th><th></th></tr></thead><tbody>' +
+    o.items.map(function (i) {
+      var lock = !!i.sid, dis = lock ? ' disabled' : '';
+      return '<tr class="ln" data-pid="' + esc(i.pid) + '"><td><input class="ln_n" value="' + esc(i.name) + '"></td><td><input class="ln_p" value="' + esc(i.spec || '') + '" placeholder="顏色/尺寸"></td>' +
+        '<td><select class="ln_t"' + dis + '>' + opts(['現貨', '預購'], i.typ) + '</select></td>' +
+        '<td><input class="lu" type="number" min="0" value="' + i.unit + '"' + dis + '></td><td><input class="lq" type="number" min="1" value="' + i.qty + '"' + dis + '></td><td>' + i.sub + '</td>' +
+        '<td><select class="ln_a"' + dis + '>' + opts(['待到貨', '已到貨'], i.arr) + '</select></td>' +
+        '<td><input class="ln_e" type="date" value="' + esc(i.eta || '') + '"></td><td><select class="ln_v">' + vopt(i.vendor, '—') + '</select></td>' +
+        '<td><input class="ln_c" type="number" min="0" value="' + (i.cost === '' || i.cost == null ? '' : i.cost) + '"></td><td><select class="ln_x">' + opts(['未稅', '含稅'], i.tax ? '含稅' : '未稅') + '</select></td>' +
+        '<td><input class="ln_s" value="' + esc(i.src || '') + '"></td><td>' + esc(i.sid || '—') + '</td>' +
+        '<td><button class="btn a s" data-a="sl" data-oid="' + esc(o.id) + '" data-pid="' + esc(i.pid) + '">儲存</button></td></tr>';
+    }).join('') + '</tbody></table><p class="m">每列右邊按「儲存」。廠商、成本、稅、貨源只記在這一筆訂單明細(到貨日期仍是商品共用)。已記錄付款的品項,廠商/成本/貨源要先到「廠商付款紀錄」刪除付款紀錄才能改。已建立出貨單的品項,數量、單價、到貨狀態不能改。</p>';
+  if (o.ships.length) h += '<h4>相關出貨單</h4><table><tbody>' + o.ships.map(function (s) { return '<tr data-a="ship" data-id="' + esc(s.id) + '"><td>' + esc(s.id) + '</td><td>' + esc(s.it) + '</td><td>' + esc(s.pay) + ' ' + money(s.total) + '</td><td><span class="chip d">' + esc(s.st) + '</span></td></tr>'; }).join('') + '</tbody></table>';
+  h += '<p style="margin-top:18px"><button class="btn l" data-a="x">關閉</button> <button class="btn l" data-a="dord" data-id="' + esc(o.id) + '">刪除訂單</button></p>';
+  d.innerHTML = h; if (!d.open) d.showModal();
+}
+
+/* ---------- 出貨單 ---------- */
+function shipList() {
+  var l = [], seen = {};
+  O.forEach(function (o) { o.ships.forEach(function (s) { if (!seen[s.id]) { seen[s.id] = 1; l.push({ s: s, o: o }); } }); });
+  return l.sort(function (a, b) { return a.s.id < b.s.id ? 1 : -1; });
+}
+function shipView() { loadOrders(function () { $('#v').innerHTML = '<h2 style="margin-top:0">出貨單列表</h2>' + filterBar('sfb', SF, true, ALLST) + '<div id="tb"></div>'; bindFilter('sfb', SF, shipRows); shipRows(); }); }
+var SSEL = {};
+function shipRows() {
+  var k = SF.q.toLowerCase();
+  var rows = shipList().filter(function (x) { var s = x.s; return inRange(s.cr, SF) && (!SF.st || s.st === SF.st) && (!SF.pay || s.pay === SF.pay) && (!k || (s.id + s.oids.join(',') + s.name + s.phone + s.no + s.last5).toLowerCase().indexOf(k) >= 0); });
+  var sum = rows.reduce(function (t, x) { return t + x.s.total; }, 0);
+  var pend = 0; O.forEach(function (o) { o.items.forEach(function (i) { if (i.arr === '已到貨' && !i.sid) pend++; }); });
+  $('#sum').textContent = '共 ' + rows.length + ' 張,合計 ' + money(sum) + ';待處理(已到貨、客人尚未出貨)' + pend + ' 項';
+  var allOn = rows.length > 0 && rows.every(function (x) { return SSEL[x.s.id]; });
+  $('#tb').innerHTML = '<div class="bt"><span class="m">已勾選 <b id="ssn">' + selShips().length + '</b> 張:</span><button class="btn l" data-a="sbq">改為「已查帳待出貨」</button> <label style="display:inline-block;margin:0">改為 <select id="sbst">' + ALLST.map(function (x) { return '<option>' + esc(x) + '</option>'; }).join('') + '</select></label><button class="btn l" data-a="sbgo">套用狀態</button><button class="btn a" data-a="sbp">批次列印訂購單</button><button class="btn l" data-a="sbd">批次刪除</button></div>' +
+    '<table><thead><tr><th><input type="checkbox" id="sall" aria-label="全選目前清單"' + (allOn ? ' checked' : '') + '></th><th>出貨單</th><th>訂單編號</th><th>姓名</th><th>電話</th><th>品項</th><th>付款</th><th>匯款後五碼</th><th>應付</th><th>狀態</th><th>物流/單號</th><th>建立</th><th>出貨</th></tr></thead><tbody>' +
+    rows.map(function (x) { var s = x.s; return '<tr data-a="ship" data-id="' + esc(s.id) + '"><td><input type="checkbox" class="ssel" data-id="' + esc(s.id) + '"' + (SSEL[s.id] ? ' checked' : '') + '></td><td>' + esc(s.id) + '</td><td>' + esc(s.oids.join(',')) + '</td><td>' + esc(s.name) + '</td><td>' + esc(s.phone) + '</td><td style="white-space:normal;min-width:160px">' + esc(s.it) + '</td><td>' + esc(s.pay) + '</td><td>' + (s.last5 ? '<b>' + esc(s.last5) + '</b>' : '<span class="m">—</span>') + '</td><td>' + s.total + '</td><td><span class="chip ' + ((FL[s.pay] || []).indexOf(s.st) <= 0 ? '' : 'd') + '">' + esc(s.st) + '</span></td><td>' + esc(s.co) + ' ' + esc(s.no) + '</td><td>' + esc(s.cr.slice(0, 16)) + '</td><td>' + esc(s.at.slice(0, 16)) + '</td></tr>'; }).join('') + '</tbody></table>' +
+    (rows.length ? '' : '<p class="m">沒有符合的出貨單。客人在前台勾選已到貨商品並按「確定出貨」後會出現在這裡。</p>');
+  window.SROWS = rows.map(function (x) { return x.s.id; });
+}
+function selShips() { return Object.keys(SSEL).filter(function (k) { return SSEL[k]; }); }
+function openShip(sid) {
+  var x = shipList().filter(function (y) { return y.s.id === sid; })[0]; if (!x) return;
+  var s = x.s, d = $('#dlg');
+  d.innerHTML = '<h3>出貨單 ' + esc(s.id) + ' <span class="m">訂單 ' + esc(s.oids.join('、')) + ' · ' + esc(s.name) + ' · ' + esc(s.pay) + '</span></h3>' +
+    '<p><button type="button" class="btn a" data-a="po" data-id="' + esc(s.id) + '">開啟訂購單(列印給倉庫)</button></p><p>' + esc(s.it) + '</p><p class="m">商品 ' + money(s.sub) + (s.disc ? ' − 優惠 ' + money(s.disc) : '') + (s.cred ? ' − 購物金 ' + money(s.cred) : '') + ' + 運費 ' + money(s.fee) + ' = <b>' + money(s.total) + '</b></p>' +
+    '<form id="shf" data-id="' + esc(s.id) + '"><div class="g"><label>狀態<select name="st">' + opts(FL[s.pay] || [s.st], s.st) + '</select></label>' + fld('物流', 'co', s.co) + fld('物流單號', 'no', s.no) +
+    fld('運費', 'fee', s.fee, 'number') + fld('電話', 'phone', s.phone) + fld('匯款後五碼', 'last5', s.last5) + '<div class="f">' + fld('付款連結(https,客人刷卡用)', 'link', s.link) + '</div><div class="f">' + fld('收件資訊', 'ship', s.ship) + '</div><div class="f">' + fld('備註', 'note', s.note) + '</div></div>' +
+    '<p class="m">狀態依付款方式走流程;改成「已出貨…」會記錄出貨時間;出貨單全部走到最後一個狀態時,訂單自動變「已完成」。</p><p class="er" id="se" role="alert"></p>' +
+    '<button class="btn a">儲存</button> <button type="button" class="btn l" data-a="x">關閉</button> <button type="button" class="btn l" data-a="dship" data-id="' + esc(s.id) + '">刪除出貨單</button></form>' +
+    '<h4>狀態紀錄</h4><div id="shh" data-id="' + esc(s.id) + '" class="m">載入中…</div>';
+  if (!d.open) d.showModal();
+  call('adminShipHistory', T, s.id).then(function (r) {
+    var el = $('#shh'); if (!el || el.dataset.id !== s.id) return;
+    el.className = '';
+    el.innerHTML = r.events.map(function (e) {
+      if (e.kind === 'note') return '<div class="m" style="margin:3px 0">' + esc(e.at) + ' ' + esc(e.text) + (e.who ? '(' + esc(e.who) + ')' : '') + '</div>';
+      return '<div style="margin:3px 0"><b>' + esc(e.at) + '</b> ' + (e.kind === 'up' ? '更新為' : '') + '<b>' + esc(e.st) + '</b>' + (e.text ? ' <span class="m">' + esc(e.text) + '</span>' : '') + (e.who ? ' <span class="m">(' + esc(e.who) + ')</span>' : '') + '</div>';
+    }).join('') || '<span class="m">沒有紀錄</span>';
+  }).catch(function () { var el = $('#shh'); if (el) el.textContent = '紀錄載入失敗'; });
+}
+
+/* ---------- 商品 ---------- */
+function prodView() {
+  var k = PF.q.toLowerCase();
+  var rows = P.filter(function (p) { return (!k || (p.id + p.name + p.brand + p.cats.join() + p.vendor).toLowerCase().indexOf(k) >= 0) && (!PF.type || p.type === PF.type); });
+
+  $('#v').innerHTML = '<h2 style="margin-top:0">商品</h2><div class="fb" id="pfb"><label>搜尋<input data-k="q" placeholder="編號、品名、品牌、類別、廠商" value="' + esc(PF.q) + '"></label>' +
+    '<label>型態<select data-k="type">' + opts(['現貨', '預購'], PF.type, '全部') + '</select></label>' +
+    '<button class="btn a" data-a="np">新增商品</button></div>' +
+    '<div class="bt"><span class="m">已勾選 <b id="sn">' + selIds().length + '</b> 項:</span><button class="btn l" data-a="pon">批次上架</button><button class="btn l" data-a="poff">批次下架</button><button class="btn l" data-a="pdel">批次刪除</button></div>' +
+
+    '<table><thead><tr><th><input type="checkbox" id="pall" aria-label="全選目前清單"></th><th>編號</th><th>品牌</th><th>品名</th><th>大分類</th><th>小分類</th><th>型態</th><th>單價</th><th>數量</th><th>到貨日</th><th>上架</th><th>廠商</th><th>成本</th><th>貨源</th></tr></thead><tbody>' +
+    rows.map(function (p) {
+      return '<tr data-a="pe" data-id="' + esc(p.id) + '"><td><input type="checkbox" class="sel" data-id="' + esc(p.id) + '"' + (SEL[p.id] ? ' checked' : '') + '></td><td>' + esc(p.id) + '</td><td>' + esc(p.brand) + '</td><td>' + esc(p.name) + '</td><td>' + esc(catBig(p.cats)) + '</td><td>' + esc(catSub(p.cats)) + '</td><td>' + esc(p.type) + '</td><td>' + p.price + '</td><td>' + (p.stock === '' ? '不限' : p.stock) + '</td><td>' + esc(p.arrival) + '</td><td>' + (p.on ? '是' : '否') + '</td><td>' + esc(p.vendor) + '</td><td>' + (p.cost === '' ? '' : p.cost + (p.taxIncl ? '(含稅)' : '(未稅)')) + '</td><td>' + esc(p.source) + '</td></tr>';
+    }).join('') + '</tbody></table>' + (rows.length ? '' : '<p class="m">沒有符合的商品。</p>');
+  var pa = $('#pall'); pa.checked = rows.length > 0 && rows.every(function (p) { return SEL[p.id]; });
+  pa.onchange = function () { var on = this.checked; rows.forEach(function (p) { SEL[p.id] = on; }); document.querySelectorAll('.sel').forEach(function (c) { c.checked = on; }); $('#sn').textContent = selIds().length; };
+  var fb = $('#pfb');
+  fb.addEventListener('input', function (e) { var k2 = e.target.dataset.k; if (!k2 || e.target.tagName !== 'INPUT') return; PF[k2] = e.target.value; var pos = e.target.selectionStart; prodView(); var el = document.querySelector('#pfb [data-k=' + k2 + ']'); if (el) { el.focus(); try { el.setSelectionRange(pos, pos); } catch (x) {} } });
+  fb.addEventListener('change', function (e) { var k2 = e.target.dataset.k; if (k2 && e.target.tagName === 'SELECT') { PF[k2] = e.target.value; prodView(); } });
+}
+function brOpts(cur) { return '<option value="">(不指定品牌)</option>' + BL.map(function (x) { return '<option' + (x === cur ? ' selected' : '') + '>' + esc(x) + '</option>'; }).join(''); }
+function brandAdd() {
+  var inp = $('#brnew'), v = inp.value.trim(), msg = $('#brmsg'); if (!v) { msg.className = 'er'; msg.textContent = '請先輸入新品牌'; return; }
+  var k = v.replace(/\s+/g, '').toLowerCase(), hit = BL.filter(function (x) { return x.replace(/\s+/g, '').toLowerCase() === k; })[0];
+  function ok(name, text) { $('#brsel').innerHTML = brOpts(name); inp.value = ''; msg.className = 'tg'; msg.textContent = text; }
+  if (hit) { ok(hit, '清單已有「' + hit + '」,已幫你選好'); return; }
+  call('adminAddBrand', T, v).then(function (r) { BR = r; BL = r.map(function (x) { return x.name; }); var nm = BL.filter(function (x) { return x.replace(/\s+/g, '').toLowerCase() === k; })[0] || v; ok(nm, '新增成功,已選取「' + nm + '」'); }).catch(function (er) { msg.className = 'er'; msg.textContent = er.message; });
+}
+document.addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target.id === 'brnew') { e.preventDefault(); brandAdd(); } });
+function catBig(cs) { var o = []; cs.forEach(function (c) { var k = c.split('/')[0]; if (o.indexOf(k) < 0) o.push(k); }); return o.join('、'); }
+function catSub(cs) { return cs.filter(function (c) { return c.indexOf('/') >= 0; }).map(function (c) { return c.split('/').slice(1).join('/'); }).join('、'); }
+function selIds() { return Object.keys(SEL).filter(function (x) { return SEL[x]; }); }
+function batchDone(r, title) {
+  P = r.products;
+  var m = title + ':成功 ' + r.done.length + ' 件' + (r.skip.length ? '\n略過 ' + r.skip.length + ' 件:\n' + r.skip.join('\n') : '') +
+    (r.notify ? '\nLINE 通知:已送出 ' + r.notify.sent + ' 位' + (r.notify.noLine ? ',' + r.notify.noLine + ' 筆訂單沒有 LINE 登入' : '') + (r.notify.failed ? ',' + r.notify.failed + ' 位送出失敗(可能尚未加好友,或 LINE_MSG_TOKEN 未設定)' : '') : '');
+  SEL = {}; prodView();
+  var d = $('#dlg'); d.innerHTML = '<h3>' + esc(title) + '</h3><div class="warn">' + esc(m) + '</div><button class="btn l" data-a="x">關閉</button>'; if (!d.open) d.showModal();
+}
+function runBatch(op, data, title, confirmMsg) {
+  var ids = selIds(); if (!ids.length) { tell('請先勾選商品'); return; }
+  var go = function () { call('adminBatch', T, ids, op, data).then(function (r) { batchDone(r, title); }).catch(function (e) { tell(e.message); }); };
+  if (confirmMsg) ask(confirmMsg.replace('{n}', ids.length), go); else go();
+}
+function batchInfo() {
+  var ids = selIds(); if (!ids.length) { tell('請先勾選商品'); return; }
+  var d = $('#dlg');
+  d.innerHTML = '<h3>批次修改 ' + ids.length + ' 項商品</h3><p class="m">只會修改有填寫的欄位,空白欄位保持不變。</p><form id="bf"><div class="g">' + '<label>廠商<select name="vendor">' + vopt('', '(不修改)') + '</select></label>' + fld('貨源', 'source', '') + fld('成本', 'cost', '', 'number') +
+    '<label>成本是否含稅<select name="tax"><option value="">不修改</option><option value="N">未稅</option><option value="Y">含稅</option></select></label></div>' +
+    '<p class="er" id="be" role="alert"></p><button class="btn a">套用</button> <button type="button" class="btn l" data-a="x">取消</button></form>';
+  d.showModal();
+}
+var CUR = '';
+function catGroups(sel) {
+  var g = {}, order = [], self = {};
+  C.forEach(function (c) { var k = c.split('/')[0]; if (!g[k]) { g[k] = []; order.push(k); } if (c === k) self[k] = 1; else g[k].push(c); });
+  return order.map(function (k) {
+    var subs = g[k].map(function (c) { return '<label style="margin-right:14px"><input type="checkbox" name="cat" value="' + esc(c) + '"' + (sel.indexOf(c) >= 0 ? ' checked' : '') + '> ' + esc(c.slice(k.length + 1)) + '</label>'; }).join('');
+    var whole = self[k] ? '<label style="margin-right:14px"><input type="checkbox" name="cat" value="' + esc(k) + '"' + (sel.indexOf(k) >= 0 ? ' checked' : '') + '> ' + (subs ? '不分小分類' : esc(k)) + '</label>' : '';
+    return '<div style="display:flex;gap:10px;margin:6px 0;padding:6px 0;border-top:1px solid var(--line)"><div style="width:110px;flex:none"><span class="m">大分類</span><br><b>' + esc(k) + '</b></div><div style="flex:1"><span class="m">小分類</span><br>' + (subs + whole || '<span class="m">(尚無小分類)</span>') + '</div></div>';
+  }).join('');
+}
+var SPL = [];
+function drawSpecs() {
+  var b = $('#spl'); if (!b) return;
+  b.innerHTML = SPL.map(function (x, i) { return '<div style="display:flex;gap:6px;margin:4px 0"><input class="spi" data-i="' + i + '" value="' + esc(x) + '" maxlength="30" placeholder="例:黑色 / M"><button type="button" class="btn l s" data-a="sprm" data-i="' + i + '">移除</button></div>'; }).join('') || '<span class="m">沒有規格</span>';
+}
+function editProd(id) {
+  CUR = id;
+  var p = id ? P.filter(function (x) { return x.id === id; })[0] : { name: '', cats: [], type: '現貨', price: '', stock: '', arrival: '', desc: '', tiers: '', img: '', on: true, vendor: '', cost: '', taxIncl: false, source: '', specs: [] };
+  var d = $('#dlg');
+  d.innerHTML = '<h3>' + (id ? '編輯 ' + esc(p.id) : '新增商品') + '</h3><form id="pf"><div class="g">' +
+    '<div class="f"><span class="m">品牌(從清單選;清單沒有就在右邊空白格輸入新品牌,按「新增」)</span><div style="display:flex;gap:8px;margin-top:4px"><select name="brand" id="brsel" style="flex:1">' + brOpts(p.brand) + '</select><input name="newBrand" id="brnew" placeholder="新品牌:直接輸入" maxlength="40" autocomplete="off" style="flex:1"><button type="button" class="btn a" data-a="bradd">新增</button></div><span class="m" id="brmsg">輸入的品牌若和清單裡的只差大小寫(例:lloyd / LLOYD),會自動用清單裡的寫法。</span></div>' +
+    '<div class="f">' + fld('品名', 'name', p.name) + '</div>' +
+    fld('單價', 'price', p.price, 'number') + '<label>銷售型態<select name="type">' + opts(['現貨', '預購'], p.type) + '</select></label>' +
+    '<label>數量(必填)<input name="stock" type="number" min="0" step="1" value="' + (p.stock === '' ? '' : p.stock) + '"' + (p.stock === '' && id ? ' disabled' : '') + '></label><label class="ck" style="align-self:end"><input type="checkbox" name="unlimited"' + (id && p.stock === '' ? ' checked' : '') + '> 無限數量</label>' + fld('預計到貨日(預購商品前台顯示「預計xx/xx左右」)', 'arrival', p.arrival, 'date') +
+    '<div class="f"><span class="m">規格(可新增,沒有上限;沒有規格就留空)</span><div id="spl"></div><button type="button" class="btn l s" data-a="spadd">+ 新增規格</button></div>' +
+    '<div class="f">' + fld('多數量優惠', 'tiers', p.tiers, 'text', '3=450,5=400 (買3件起每件450、買5件起每件400)') + '</div>' +
+    '<div class="f"><span class="m">商品圖片(第一張是封面,最多 8 張)</span><div id="imgs" class="ig"></div><input type="file" id="imf" multiple accept="image/jpeg,image/png,image/webp"> <span id="ims" class="m"></span>' + fld('或貼上圖片網址(按 Enter 加入)', 'imgurl', '') + '<input type="hidden" name="img" value="' + esc(p.img) + '"></div>' +
+    '<label class="f">說明<textarea name="desc" rows="3">' + esc(p.desc) + '</textarea></label>' +
+    '<div class="f ck"><span class="m">類別(可複選)</span><br>' + catGroups(p.cats) + '</div>' +
+    '<label class="f"><input type="checkbox" name="on"' + (p.on ? ' checked' : '') + '> 上架(前台可見)</label></div>' +
+    '<fieldset><legend>內部資料(前台看不到)</legend><div class="g">' + '<label>廠商<select name="vendor">' + vopt(p.vendor, '(未指定)') + '</select></label>' + fld('貨源', 'source', p.source) + fld('成本', 'cost', p.cost, 'number') +
+    '<label>成本是否含稅<select name="tax"><option value="N"' + (p.taxIncl ? '' : ' selected') + '>未稅</option><option value="Y"' + (p.taxIncl ? ' selected' : '') + '>含稅</option></select></label>' +
+    '</div></fieldset>' +
+    '<p class="er" id="pe" role="alert"></p><button class="btn a">儲存</button> <button type="button" class="btn l" data-a="x">取消</button>' +
+    (id ? ' <button type="button" class="btn l" data-a="dp" data-id="' + esc(id) + '">刪除</button>' : '') + '</form>';
+  SPL = (p.specs || []).slice(); d.showModal(); drawImgs(); drawSpecs();
+  var f = $('#pf');
+  f.elements.unlimited.onchange = function () { f.elements.stock.disabled = this.checked; if (this.checked) f.elements.stock.value = ''; };
+}
+
+/* ---------- 管理員 / 紀錄 ---------- */
+function adminView() {
+  $('#v').innerHTML = '<h2 style="margin-top:0">管理員</h2><table><thead><tr><th>帳號</th><th>顯示名稱</th><th>狀態</th></tr></thead><tbody>' +
+    A.map(function (a) { return '<tr data-a="ae" data-acc="' + esc(a.acc) + '"><td>' + esc(a.acc) + '</td><td>' + esc(a.name) + '</td><td>' + (a.on ? '啟用' : '停用') + '</td></tr>'; }).join('') + '</tbody></table>' +
+    '<form id="af" style="max-width:360px;margin-top:16px"><h3>新增或修改管理員</h3><p class="m">點選上方帳號可帶入資料;密碼留空表示不修改。</p>' +
+    '<label>帳號<input name="acc" required></label><label>顯示名稱<input name="name"></label><label>密碼(至少 8 碼)<input name="pw" type="password" autocomplete="new-password"></label>' +
+    '<label><input type="checkbox" name="on" checked> 啟用</label><p class="er" id="ae" role="alert"></p><button class="btn a">儲存</button></form>';
+}
+function logView() {
+  $('#v').innerHTML = '<p class="m">載入中…</p>';
+  call('adminLogs', T).then(function (r) {
+    $('#v').innerHTML = '<h2 style="margin-top:0">操作紀錄</h2><table><thead><tr><th>時間</th><th>帳號</th><th>動作</th><th>對象</th><th>內容</th></tr></thead><tbody>' +
+      r.map(function (x) { return '<tr>' + x.map(function (c) { return '<td style="white-space:normal">' + esc(c) + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table>';
+  }).catch(function (e) { $('#v').innerHTML = '<p class="er">' + esc(e.message) + '</p>'; });
+}
+
+
+/* ---------- 會員 / 活動 / 設定 ---------- */
+var MB = { members: [], levels: [] }, MF = { q: '', lv: '' }, AC = [], LV = [], SG = null;
+function memberView() {
+  $('#v').innerHTML = '<p class="m">載入中…</p>';
+  call('adminMembers', T).then(function (d) { MB = d; drawMembers(); }).catch(function (e) { $('#v').innerHTML = '<p class="er">' + esc(e.message) + '</p>'; });
+}
+function drawMembers() {
+  $('#v').innerHTML = '<h2 style="margin-top:0">會員</h2><div class="fb" id="mfb"><label>搜尋暱稱<input data-k="q" value="' + esc(MF.q) + '"></label><label>等級<select data-k="lv">' + opts(MB.levels, MF.lv, '全部') + '</select></label><span class="sum" id="sum"></span></div><div id="tb"></div>';
+  bindFilter2('mfb', MF, memberRows); memberRows();
+}
+function bindFilter2(id, f, redraw) {
+  var el = $('#' + id);
+  el.addEventListener('input', function (e) { var k = e.target.dataset.k; if (k) { f[k] = e.target.value; redraw(); } });
+  el.addEventListener('change', function (e) { var k = e.target.dataset.k; if (k) { f[k] = e.target.value; redraw(); } });
+}
+function memberRows() {
+  var k = MF.q.toLowerCase();
+  var rows = MB.members.filter(function (m) { return (!MF.lv || m.level === MF.lv) && (!k || m.name.toLowerCase().indexOf(k) >= 0); });
+  $('#sum').textContent = '共 ' + rows.length + ' 位會員';
+  $('#tb').innerHTML = '<table><thead><tr><th>暱稱</th><th>等級</th><th>購物金</th><th>訂單數</th><th>累計消費</th><th>加好友</th><th>最近登入</th></tr></thead><tbody>' +
+    rows.map(function (m) { return '<tr data-a="mb" data-id="' + esc(m.lid) + '"><td>' + esc(m.name) + '</td><td><span class="chip">' + esc(m.level) + '</span></td><td>' + m.balance + '</td><td>' + m.orders + '</td><td>' + m.spent + '</td><td>' + (m.friend ? '是' : '<span class="er">否</span>') + '</td><td>' + esc(m.last.slice(0, 16)) + '</td></tr>'; }).join('') + '</tbody></table>' +
+    (rows.length ? '' : '<p class="m">還沒有會員。客人用 LINE 登入後就會出現在這裡。</p>');
+}
+function openMember(lid) {
+  var m = MB.members.filter(function (x) { return x.lid === lid; })[0]; if (!m) return;
+  var d = $('#dlg');
+  d.innerHTML = '<h3>' + esc(m.name) + ' <span class="m">購物金餘額 ' + m.balance + ' 元 · 訂單 ' + m.orders + ' 筆 · ' + (m.friend ? '已加好友' : '尚未加好友') + '</span></h3>' +
+    '<form id="lvf" data-id="' + esc(lid) + '"><div class="g"><label>會員等級<select name="lv">' + opts(MB.levels, m.level) + '</select></label><div class="f" style="grid-column:span 2">' + fld('備註', 'note', m.note) + '</div></div><p class="er" id="le2" role="alert"></p><button class="btn a">儲存等級</button></form>' +
+    '<h4>發放購物金</h4><form id="gf" data-id="' + esc(lid) + '"><div class="g">' + fld('金額', 'amt', '', 'number') + fld('有效天數', 'days', '90', 'number') + fld('備註', 'note', '') + '</div><p class="er" id="ge" role="alert"></p><button class="btn a">發放</button></form>' +
+    '<h4>購物金紀錄</h4><div id="gl"><p class="m">載入中…</p></div><p style="margin-top:14px"><button class="btn l" data-a="x">關閉</button></p>';
+  if (!d.open) d.showModal();
+  loadGrants(lid);
+}
+function loadGrants(lid) {
+  call('adminMemberGrants', T, lid).then(function (r) {
+    var t = new Date().toISOString().slice(0, 10);
+    $('#gl').innerHTML = r.length ? '<table><thead><tr><th>時間</th><th>來源</th><th>金額</th><th>剩餘</th><th>到期日</th><th>備註</th><th></th></tr></thead><tbody>' + r.map(function (g) {
+      return '<tr><td>' + esc(g.at.slice(0, 16)) + '</td><td>' + esc(g.src) + '</td><td>' + g.amt + '</td><td>' + g.rem + (g.rem > 0 && g.exp < t ? ' <span class="m">(已過期)</span>' : '') + '</td><td>' + esc(g.exp) + '</td><td style="white-space:normal">' + esc(g.note) + (g.oid ? ' ' + esc(g.oid) : '') + '</td><td>' + (g.rem > 0 ? '<button class="btn l s" data-a="gvoid" data-id="' + esc(g.seq) + '" data-lid="' + esc(lid) + '">作廢</button>' : '') + '</td></tr>';
+    }).join('') + '</tbody></table>' : '<p class="m">還沒有購物金紀錄。</p>';
+  }).catch(function (e) { $('#gl').innerHTML = '<p class="er">' + esc(e.message) + '</p>'; });
+}
+
+function actView() {
+  $('#v').innerHTML = '<p class="m">載入中…</p>';
+  call('adminActivities', T).then(function (r) { AC = r; drawActs(); }).catch(function (e) { $('#v').innerHTML = '<p class="er">' + esc(e.message) + '</p>'; });
+}
+function actDesc(a) { return a.type === '折數' ? (a.num / 10) + ' 折' : a.type === '折金額' ? '折 ' + a.num + ' 元' : a.type === '送購物金' ? '送購物金 ' + a.num + ' 元' : '送購物金 ' + a.num + '%'; }
+function drawActs() {
+  var t = new Date().toISOString().slice(0, 10);
+  $('#v').innerHTML = '<h2 style="margin-top:0">活動</h2><div class="fb"><button class="btn a" data-a="nact">新增活動</button></div><table><thead><tr><th>名稱</th><th>期間(依下單日)</th><th>範圍</th><th>適用等級</th><th>優惠</th><th>時機</th><th>最低消費</th><th>狀態</th></tr></thead><tbody>' +
+    AC.map(function (a) {
+      var st = !a.on ? '停用' : (a.from && a.from > t) ? '尚未開始' : (a.to && a.to < t) ? '已結束' : '進行中';
+      return '<tr data-a="act" data-id="' + esc(a.id) + '"><td>' + esc(a.name) + '</td><td>' + esc(a.from || '不限') + ' ~ ' + esc(a.to || '不限') + '</td><td>' + esc(a.scope) + (a.val ? ':' + esc(a.val) : '') + '</td><td>' + esc(a.lv || '全部') + '</td><td>' + esc(actDesc(a)) + '</td><td>' + esc(a.when) + '</td><td>' + (a.min === '' ? '' : a.min) + '</td><td><span class="chip ' + (st === '進行中' ? 'd' : '') + '">' + st + '</span></td></tr>';
+    }).join('') + '</tbody></table>' + (AC.length ? '' : '<p class="m">還沒有活動。折扣類活動會在下單時直接折抵;送購物金類活動會在付款後或出貨完成時自動發放。</p>') +
+    '<p class="m">同一筆訂單的折扣(會員等級與下單折扣類活動)只取最優惠的一個,不疊加;送購物金類活動可以和折扣並用。</p>';
+}
+function editAct(id) {
+  var a = id ? AC.filter(function (x) { return x.id === id; })[0] : { name: '', from: '', to: '', scope: '全館', val: '', lv: '', type: '折金額', num: '', min: '', when: '付款後', days: '', on: true };
+  var d = $('#dlg');
+  d.innerHTML = '<h3>' + (id ? '編輯活動 ' + esc(id) : '新增活動') + '</h3><form id="acf" data-id="' + esc(id) + '"><div class="g"><div class="f">' + fld('活動名稱', 'name', a.name) + '</div>' +
+    fld('開始日期(依下單日,空白=不限)', 'from', a.from, 'date') + fld('結束日期(含當天)', 'to', a.to, 'date') + '<label>啟用<select name="on"><option value="1"' + (a.on ? ' selected' : '') + '>啟用</option><option value="0"' + (a.on ? '' : ' selected') + '>停用</option></select></label>' +
+    '<label>適用範圍<select name="scope">' + opts(['全館', '類別', '商品'], a.scope) + '</select></label><div style="grid-column:span 2">' + fld('類別名稱或商品編號(多個用逗號分隔)', 'val', a.val, 'text', '例:包包,鞋子 或 P001,P002') + '</div>' +
+    '<div class="f">' + fld('適用會員等級(多個用逗號分隔,空白=全部)', 'lv', a.lv, 'text', '例:群友') + '</div>' +
+    '<label>優惠類型<select name="type">' + opts(['折數', '折金額', '送購物金', '送購物金%'], a.type) + '</select></label>' + fld('數值(折數填 90=9折;折金額/送購物金填元;% 填比例)', 'num', a.num, 'number') + fld('最低消費(適用範圍內的金額,空白=不限)', 'min', a.min, 'number') +
+    '<label>發放時機(送購物金才需要)<select name="when">' + opts(['付款後', '出貨完成'], a.when === '下單' ? '付款後' : a.when) + '</select></label>' + fld('購物金有效天數(空白=用預設)', 'days', a.days, 'number') + '</div>' +
+    '<p class="er" id="ace" role="alert"></p><button class="btn a">儲存</button> <button type="button" class="btn l" data-a="x">取消</button>' + (id ? ' <button type="button" class="btn l" data-a="dact" data-id="' + esc(id) + '">刪除</button>' : '') + '</form>';
+  d.showModal(); actToggle();
+}
+function actToggle() {
+  var f = $('#acf'); if (!f) return;
+  var reward = f.type.value.indexOf('送購物金') === 0;
+  f.when.disabled = !reward; f.days.disabled = !reward;
+  f.val.disabled = f.scope.value === '全館';
+}
+
+function setView() {
+  $('#v').innerHTML = '<p class="m">載入中…</p>';
+  Promise.all([call('adminSettings', T), call('adminLevels', T), call('adminVendors', T), call('adminCats', T), call('adminBrands', T)]).then(function (r) { SG = r[0]; LV = r[1]; VL = r[2]; CL = r[3]; BR = r[4]; BL = BR.map(function (x) { return x.name; }); C = CL.map(function (x) { return x.name; }); drawSettings(); }).catch(function (e) { $('#v').innerHTML = '<p class="er">' + esc(e.message) + '</p>'; });
+}
+var CL = [], BR = [];
+function drawSettings() {
+  var v = SG.values, l = SG.line;
+  function ta(k, rows) { return '<label class="f">' + k + '<textarea name="' + k + '" rows="' + rows + '">' + esc(v[k]) + '</textarea></label>'; }
+  $('#v').innerHTML = '<h2 style="margin-top:0">設定</h2>' +
+    '<div class="warn">LINE 登入:' + (l.login ? '已設定' : '尚未設定(缺 LINE_LOGIN_SECRET)') + ';LINE 推播:' + (l.msg ? '已設定' : '尚未設定(缺 LINE_MSG_TOKEN)') + '\n網站網址(LINE Callback URL 要填這個):' + esc(l.url) + '</div>' +
+    '<form id="stf" style="max-width:760px"><div class="g">' + fld('店名', '店名', v.店名) + fld('店到店運費', '店到店運費', v.店到店運費, 'number') + fld('宅配運費', '宅配運費', v.宅配運費, 'number') + fld('免運門檻(訂單金額扣掉優惠後滿多少免運)', '免運門檻', v.免運門檻, 'number') +
+    fld('購物金使用門檻(訂單滿多少才能用)', '購物金使用門檻', v.購物金使用門檻, 'number') + fld('購物金折抵上限(每筆最多折幾元,空白=不限)', '購物金折抵上限', v.購物金折抵上限, 'number') + fld('購物金預設有效天數', '購物金預設有效天數', v.購物金預設有效天數, 'number') +
+    '<div class="f">' + fld('加好友連結', '加好友連結', v.加好友連結) + '</div>' + ta('匯款資訊', 3) + ta('公告', 2) + ta('到貨通知內容', 3) + ta('出貨通知內容', 7) + ta('送達通知內容', 4) + ta('物流追蹤連結', 4) + '</div>' +
+    '<p class="m">到貨通知可用:{姓名} {品名} {訂單} {連結}<br>出貨通知(出貨單改成「已出貨」時自動用 LINE 發送)可用:{出貨單號} {物流} {物流單號} {追蹤連結} {姓名} {連結};某個變數沒有值時,那一整行會自動省略。<br>送達通知(出貨單改成「已送達」或「已收貨付款」時自動發送,LINE 或 Email)可用:{出貨單號} {物流} {物流單號} {姓名} {連結}。<br>物流追蹤連結:每行一個,寫法「物流名稱=網址」,網址裡的 {單號} 會換成物流單號。例:黑貓=https://網址?no={單號}。物流欄位包含該名稱就會套用。</p><p class="er" id="ste" role="alert"></p><button class="btn a">儲存設定</button></form>' +
+    '<h3 style="margin-top:28px">廠商管理</h3><p class="m">商品與訂單明細的「廠商」都從這裡的清單選。刪除廠商不會改動已經存在的商品和訂單。</p><table style="max-width:420px;min-width:0"><tbody>' +
+    (VL.map(function (x) { return '<tr><td>' + esc(x) + '</td><td><button class="btn l s" data-vd="del" data-name="' + esc(x) + '">刪除</button></td></tr>'; }).join('') || '<tr><td class="m">還沒有廠商</td></tr>') + '</tbody></table>' +
+    '<form id="vdf" style="max-width:420px;margin-top:10px"><div class="g">' + fld('新增廠商', 'name', '') + '</div><p class="er" id="vde" role="alert"></p><button class="btn a">新增</button></form>' +
+    '<h3 style="margin-top:28px">商品分類(兩層:大分類 → 小分類)</h3><p class="m">前台客人點大分類後,會再出現第二層的小分類。先新增大分類,再到它底下新增小分類。改名、刪除會同步商品、會員等級與活動;刪除只會把分類從商品上拿掉,商品不會被刪。</p>' + catTree() +
+    '<form id="ctf" style="max-width:620px;margin-top:10px"><div class="g">' + fld('新增大分類(例:精品)', 'name', '') + '</div><p class="er" id="cte" role="alert"></p><button class="btn a">新增大分類</button></form>' +
+    '<h3 style="margin-top:28px">品牌</h3><p class="m">品牌是在「商品上架/編輯」時直接新增(用選的,沒有就在旁邊空白格輸入),這裡只管理已有的品牌;大小寫不同(Lloyd、LLOYD)會視為同一個。改名會同步更新所有該品牌的商品;刪除只會把商品的品牌清空。</p><table style="max-width:620px;min-width:0"><tbody>' +
+    (BR.map(function (x) { return '<tr><td><input class="bin" value="' + esc(x.name) + '" maxlength="40" style="width:100%" aria-label="品牌名稱"></td><td class="m" style="white-space:nowrap">' + x.n + ' 項商品</td><td style="white-space:nowrap"><button class="btn l s" data-bt="ren" data-name="' + esc(x.name) + '">改名</button> <button class="btn l s" data-bt="del" data-name="' + esc(x.name) + '" data-n="' + x.n + '">刪除</button></td></tr>'; }).join('') || '<tr><td class="m">還沒有品牌</td></tr>') + '</tbody></table>' +
+    '<h3 style="margin-top:28px">會員等級</h3><table style="max-width:760px;min-width:0"><thead><tr><th>等級</th><th>折扣率</th><th>適用類別</th><th></th></tr></thead><tbody>' +
+    LV.map(function (x) { return '<tr data-a="lvedit" data-id="' + esc(x.name) + '"><td>' + esc(x.name) + '</td><td>' + (x.rate >= 100 ? '無折扣' : (x.rate / 10) + ' 折') + '</td><td>' + esc(x.cats || '全館') + '</td><td>' + (x.name === '一般會員' ? '' : '<button class="btn l s" data-a="lvdel" data-id="' + esc(x.name) + '">刪除</button>') + '</td></tr>'; }).join('') + '</tbody></table>' +
+    '<form id="lvl" style="max-width:760px;margin-top:12px"><div class="g">' + fld('等級名稱', 'name', '') + fld('折扣率(100=無折扣,90=9折)', 'rate', '100', 'number') + fld('適用類別(空白=全館,多個用逗號)', 'cats', '') + '</div><p class="m">點上方等級可帶入資料修改;等級名稱相同會覆蓋原設定。折扣只對 LINE 登入的會員生效。</p><p class="er" id="lve" role="alert"></p><button class="btn a">新增或儲存等級</button></form>';
+}
+
+/* ---------- 事件 ---------- */
+function refreshOpen(d, id) { setO(d); PVDIRTY = true; if (tab === 'o') orderRows(); else if (tab === 's') shipRows(); openOrder(id); }
+document.addEventListener('click', function (e) {
+  var ssl = e.target.closest('.ssel');
+  if (ssl) { SSEL[ssl.dataset.id] = ssl.checked; $('#ssn').textContent = selShips().length; var sa = $('#sall'); if (sa) sa.checked = window.SROWS.length > 0 && window.SROWS.every(function (x) { return SSEL[x]; }); e.stopPropagation(); return; }
+  var sel = e.target.closest('.sel');
+  if (sel) { SEL[sel.dataset.id] = sel.checked; $('#sn').textContent = selIds().length; e.stopPropagation(); return; }
+  if (e.target.closest('.ln input')) return;
+  var b = e.target.closest('[data-a]'); if (!b || b.dataset.a === 'reset') return;
+  var a = b.dataset.a, id = b.dataset.id;
+  if (a === 'x') $('#dlg').close();
+  else if (a === 'ord') openOrder(id);
+  else if (a === 'ship') openShip(id);
+  else if (a === 'pe') editProd(id);
+  else if (a === 'np') editProd('');
+  else if (a === 'ae') { var ac = A.filter(function (x) { return x.acc === b.dataset.acc; })[0], f = $('#af'); f.acc.value = ac.acc; f.name.value = ac.name; f.on.checked = ac.on; f.pw.value = ''; }
+  else if (a === 'barr') runBatch('arrive', { notify: true }, '標示到貨', '確定將 {n} 項商品標示為「已到貨」?\n商品會改為現貨,相關訂單的品項變成已到貨,並用 LINE 通知有登入的客人。');
+  else if (a === 'barr2') runBatch('arrive', { notify: false }, '標示到貨', '確定將 {n} 項商品標示為「已到貨」?(不發送通知)');
+  else if (a === 'binfo') batchInfo();
+  else if (a === 'imrm') { var l = imgGet(); l.splice(Number(b.dataset.i), 1); imgSet(l); }
+  else if (a === 'imfirst') { var l2 = imgGet(), it = l2.splice(Number(b.dataset.i), 1)[0]; l2.unshift(it); imgSet(l2); }
+  else if (a === 'dp') {
+    var p = P.filter(function (x) { return x.id === id; })[0];
+    ask('確定刪除「' + p.name + '」?此動作無法復原。\n(已成立的訂單會保留品名與金額,不受影響。)', function () {
+      call('adminDeleteProduct', T, id).then(function (r) { P = r; $('#dlg').close(); prodView(); }).catch(fail('#pe'));
+    });
+  } else if (a === 'sl') {
+    var tr = b.closest('tr');
+    var q = function (c) { return tr.querySelector(c).value; };
+    call('adminEditLineFull', T, b.dataset.oid, b.dataset.pid, { name: q('.ln_n'), spec: q('.ln_p'), type: q('.ln_t'), qty: q('.lq'), unit: q('.lu'), arr: q('.ln_a'), eta: q('.ln_e'), vendor: q('.ln_v'), cost: q('.ln_c'), tax: q('.ln_x') === '含稅', src: q('.ln_s'), notify: !!($('#ntf') && $('#ntf').checked) }).then(function (d) { refreshOpen(d, b.dataset.oid); if (d.notify) tell('已用 LINE 通知:送出 ' + d.notify.sent + ' 位' + (d.notify.noLine ? ',' + d.notify.noLine + ' 筆訂單沒有 LINE 登入' : '') + (d.notify.failed ? ',' + d.notify.failed + ' 位失敗(可能還沒加好友)' : '')); }).catch(function (er) { tell(er.message); });
+  } else if (a === 'dord') {
+    var o = ordById(id);
+    ask('確定刪除訂單 ' + id + '(' + o.name + ',' + money(o.total) + ')?\n商品庫存會加回去,此動作無法復原。', function () {
+      call('adminDeleteOrder', T, id).then(function (d) { setO(d); $('#dlg').close(); render(); }).catch(function (er) { tell(er.message); });
+    });
+  } else if (a === 'dship') {
+    ask('確定刪除出貨單 ' + id + '?品項會回到「未出貨」。', function () {
+      call('adminDeleteShip', T, id).then(function (d) { setO(d); $('#dlg').close(); render(); }).catch(function (er) { tell(er.message); });
+    });
+  }
+});
+function imgGet() { var h = document.querySelector('#pf [name=img]') || document.querySelector('[name=img]'); return h.value ? h.value.split('|') : []; }
+function imgSet(l) { (document.querySelector('#pf [name=img]') || document.querySelector('[name=img]')).value = l.join('|'); drawImgs(); }
+function drawImgs() {
+  var box = $('#imgs'); if (!box) return;
+  box.innerHTML = imgGet().map(function (u, k) {
+    return '<span class="it"><img src="' + esc(u) + '" alt=""><br>' + (k === 0 ? '<b class="m">封面</b>' : '<button type="button" class="btn l s" data-a="imfirst" data-i="' + k + '">設為封面</button>') + ' <button type="button" class="btn l s" data-a="imrm" data-i="' + k + '">移除</button></span>';
+  }).join('') || '<span class="m">還沒有圖片</span>';
+}
+function shrink(file) {
+  return new Promise(function (ok, no) {
+    var im = new Image(), rd = new FileReader();
+    rd.onload = function () { im.onload = function () {
+      var r = Math.min(1, 900 / Math.max(im.width, im.height)), c = document.createElement('canvas');
+      c.width = Math.round(im.width * r); c.height = Math.round(im.height * r);
+      c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+      ok(c.toDataURL('image/jpeg', 0.85).split(',')[1]);
+    }; im.onerror = function () { no(new Error('無法讀取圖片 ' + file.name)); }; im.src = rd.result; };
+    rd.readAsDataURL(file);
+  });
+}
+document.addEventListener('change', function (e) {
+  if (e.target.id !== 'imf' || !e.target.files.length) return;
+  var files = [].slice.call(e.target.files), st = $('#ims'), k = 0;
+  e.target.value = '';
+  (function next() {
+    if (k >= files.length) { st.textContent = '上傳完成,記得按儲存商品'; return; }
+    if (imgGet().length >= 8) { st.textContent = '最多 8 張'; return; }
+    st.textContent = '上傳中 ' + (k + 1) + '/' + files.length + '…';
+    shrink(files[k]).then(function (b64) { return call('adminUploadImage', T, files[k].name, 'image/jpeg', b64); })
+      .then(function (u) { imgSet(imgGet().concat([u])); k++; next(); })
+      .catch(function (er) { st.textContent = er.message; });
+  })();
+});
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Enter' || !e.target.name || e.target.name !== 'imgurl') return;
+  e.preventDefault();
+  var v = e.target.value.trim(); if (!v) return;
+  if (imgGet().length >= 8) { tell('最多 8 張'); return; }
+  imgSet(imgGet().concat([v])); e.target.value = '';
+});
+document.addEventListener('submit', function (e) {
+  var f = e.target; if (!f.id) return; e.preventDefault();
+  if (f.id === 'of') {
+    $('#oe').textContent = '';
+    call('adminUpdateOrder', T, f.dataset.id, { name: f.name.value, phone: f.phone.value, note: f.note.value })
+      .then(function (d) { refreshOpen(d, f.dataset.id); }).catch(fail('#oe'));
+  } else if (f.id === 'shf') {
+    $('#se').textContent = '';
+    call('adminUpdateShip', T, f.dataset.id, { st: f.st.value, co: f.co.value, no: f.no.value, fee: f.fee.value, phone: f.phone.value, last5: f.last5.value, link: f.link.value, ship: f.ship.value, note: f.note.value }).then(function (d) { setO(d); if (tab === 's') shipRows(); else if (tab === 'o') orderRows(); openShip(f.dataset.id); if (d.shipNotify) tell(d.shipNotify); }).catch(fail('#se'));
+  } else if (f.id === 'bf') {
+    $('#be').textContent = '';
+    var ids = selIds(), data = { vendor: f.vendor.value, source: f.source.value, cost: f.cost.value, tax: f.tax.value };
+    call('adminBatch', T, ids, 'info', data).then(function (r) { batchDone(r, '批次修改'); }).catch(fail('#be'));
+  } else if (f.id === 'pf') {
+    var g = function (n) { return f.elements[n]; };
+    var o2 = { id: CUR, name: g('name').value, price: g('price').value, stock: g('stock').value, arrival: g('arrival').value, tiers: g('tiers').value, unlimited: g('unlimited').checked, brand: g('brand').value, newBrand: g('newBrand').value, specs: SPL.map(function (x) { return x.trim(); }).filter(Boolean), img: g('img').value, desc: g('desc').value, type: g('type').value, on: g('on').checked,
+      cats: [].slice.call(f.querySelectorAll('input[name=cat]:checked')).map(function (x) { return x.value; }),
+      vendor: g('vendor').value, source: g('source').value, cost: g('cost').value, taxIncl: g('tax').value === 'Y'};
+    call('adminSaveProduct', T, o2).then(function (r) { P = r; if (o2.newBrand.trim()) call('adminBrands', T).then(function (b) { BR = b; BL = b.map(function (x) { return x.name; }); }); $('#dlg').close(); prodView(); }).catch(fail('#pe'));
+  } else if (f.id === 'af') {
+    call('adminSaveAdmin', T, { acc: f.acc.value, name: f.name.value, pw: f.pw.value, on: f.on.checked }).then(function (r) { A = r; adminView(); }).catch(fail('#ae'));
+  }
+});
+
+document.addEventListener('click', function (e) {
+  var b = e.target.closest('[data-a]'); if (!b) return;
+  var a = b.dataset.a, id = b.dataset.id;
+  if (a === 'sbq' || a === 'sbgo') {
+    var ids = selShips(); if (!ids.length) { tell('請先勾選出貨單'); return; }
+    var st = a === 'sbq' ? '已查帳待出貨' : $('#sbst').value;
+    ask('將 ' + ids.length + ' 張出貨單改為「' + st + '」?\n該付款方式沒有這個狀態的會略過;改成「已出貨…」或最後一個狀態時,會自動通知客人。', function () {
+      call('adminBatchShipStatus', T, ids, st).then(function (d) { setO(d); SSEL = {}; shipRows(); tell(d.msg); }).catch(function (er) { tell(er.message); });
+    }); return;
+  }
+  if (a === 'sbp') { var ids2 = selShips(); if (!ids2.length) { tell('請先勾選出貨單'); return; } openPO(ids2); return; }
+  if (a === 'bradd') { brandAdd(); return; }
+  if (a === 'pon' || a === 'poff' || a === 'pdel') {
+    var pids = selIds().filter(function (x) { return P.some(function (p) { return p.id === x; }); }); if (!pids.length) { tell('請先勾選商品'); return; }
+    var op = a === 'pon' ? 'on' : a === 'poff' ? 'off' : 'delete', lab = { on: '上架', off: '下架', delete: '刪除' }[op];
+    ask('確定' + lab + '勾選的 ' + pids.length + ' 項商品?' + (op === 'delete' ? '\n已存在的訂單不受影響;刪除是重大事件,會記錄在試算表的「重大事件」工作表(含刪除前資料)。' : ''), function () {
+      call('adminBatchProducts', T, pids, op).then(function (r) { P = r.products; SEL = {}; prodView(); tell(r.msg); }).catch(function (er) { tell(er.message); });
+    }); return;
+  }
+  if (a === 'sbd') {
+    var ids3 = selShips(); if (!ids3.length) { tell('請先勾選出貨單'); return; }
+    ask('確定刪除勾選的 ' + ids3.length + ' 張出貨單?\n已出貨的不能刪(會略過);購物金會退回,品項回到「訂單明細」可重新出貨。\n這是重大事件,會記錄在 Google 試算表的「重大事件」工作表(含刪除前資料)。', function () {
+      call('adminBatchDeleteShips', T, ids3).then(function (d) { setO(d); SSEL = {}; shipRows(); tell(d.msg); }).catch(function (er) { tell(er.message); });
+    }); return;
+  }
+  if (a === 'po') { openPO([id]); return; }
+  if (a === 'poprint') { window.print(); return; }
+  if (a === 'spadd') { SPL.push(''); drawSpecs(); var ins = document.querySelectorAll('.spi'); if (ins.length) ins[ins.length - 1].focus(); return; }
+  if (a === 'sprm') { SPL.splice(Number(b.dataset.i), 1); drawSpecs(); return; }
+  if (a === 'mb') openMember(id);
+  else if (a === 'gvoid') { var lidv = b.dataset.lid; ask('確定作廢這筆購物金的剩餘金額?', function () { call('adminVoidGrant', T, id).then(function (r) { MB = r; memberRows(); openMember(lidv); }).catch(function (er) { tell(er.message); }); }); }
+  else if (a === 'nact') editAct('');
+  else if (a === 'act') editAct(id);
+  else if (a === 'dact') { ask('確定刪除這個活動?已發放的購物金不會收回。', function () { call('adminDeleteActivity', T, id).then(function (r) { AC = r; $('#dlg').close(); drawActs(); }).catch(function (er) { tell(er.message); }); }); }
+  else if (a === 'lvedit') { var x = LV.filter(function (y) { return y.name === id; })[0], f = $('#lvl'); f.name.value = x.name; f.rate.value = x.rate; f.cats.value = x.cats; }
+  else if (a === 'lvdel') { e.stopPropagation(); ask('確定刪除「' + id + '」等級?', function () { call('adminDeleteLevel', T, id).then(function (r) { LV = r; drawSettings(); }).catch(function (er) { tell(er.message); }); }); }
+});
+document.addEventListener('change', function (e) { if (e.target.closest('#acf')) actToggle(); });
+document.addEventListener('submit', function (e) {
+  var f = e.target;
+  if (f.id === 'lvf') {
+    $('#le2').textContent = '';
+    call('adminSetLevel', T, f.dataset.id, f.lv.value, f.note.value).then(function (r) { MB = r; memberRows(); openMember(f.dataset.id); }).catch(fail('#le2'));
+  } else if (f.id === 'gf') {
+    $('#ge').textContent = '';
+    call('adminGrant', T, f.dataset.id, f.amt.value, f.days.value, f.note.value).then(function (r) { MB = r; memberRows(); openMember(f.dataset.id); }).catch(fail('#ge'));
+  } else if (f.id === 'acf') {
+    $('#ace').textContent = '';
+    call('adminSaveActivity', T, { id: f.dataset.id, name: f.name.value, from: f.from.value, to: f.to.value, on: f.on.value === '1', scope: f.scope.value, val: f.val.value, lv: f.lv.value, type: f.type.value, num: f.num.value, min: f.min.value, when: f.when.value, days: f.days.value })
+      .then(function (r) { AC = r; $('#dlg').close(); drawActs(); }).catch(fail('#ace'));
+  } else if (f.id === 'stf') {
+    $('#ste').textContent = '';
+    var o = {}; ['店名', '店到店運費', '宅配運費', '免運門檻', '匯款資訊', '公告', '購物金使用門檻', '購物金折抵上限', '購物金預設有效天數', '到貨通知內容', '出貨通知內容', '物流追蹤連結', '加好友連結', '折扣碼'].forEach(function (k) { o[k] = f.elements[k].value; });
+    call('adminSaveSettings', T, o).then(function (r) { SG = r; drawSettings(); $('#ste').textContent = '已儲存'; $('#ste').className = 'm'; }).catch(fail('#ste'));
+  } else if (f.id === 'lvl') {
+    $('#lve').textContent = '';
+    call('adminSaveLevel', T, { name: f.name.value, rate: f.rate.value, cats: f.cats.value }).then(function (r) { LV = r; drawSettings(); }).catch(fail('#lve'));
+  }
+});
+
+/* ===== 進貨付款 ===== */
+var PVT = 0, PVDIRTY = false, PV = null, VF = { vendor: '', pay: '', arr: '', q: '', from: '', to: '' }, PSEL = {}, PVIEW = 'lines';
+function purchView() {
+  if (PV && Date.now() - PVT < 60000 && !PVDIRTY) { PSEL = {}; pvDraw(); return; }
+  $('#v').innerHTML = '<p class="m">載入中…</p>';
+  call('adminPurchaseList', T).then(function (d) { PV = d; VL = d.vlist || VL; PVT = Date.now(); PVDIRTY = false; PSEL = {}; pvDraw(); }).catch(function (e) { $('#v').innerHTML = '<p class="er">' + esc(e.message) + '</p>'; });
+}
+function pvLines() {
+  var f = VF, q = f.q.toLowerCase();
+  return PV.lines.filter(function (l) {
+    if (f.vendor === '__none') { if (l.vendor) return false; } else if (f.vendor && l.vendor !== f.vendor) return false;
+    if (f.pay === 'paid' && !l.pay) return false; if (f.pay === 'unpaid' && l.pay) return false;
+    if (f.arr && l.arr !== f.arr) return false;
+    if (f.from && l.at < f.from) return false; if (f.to && l.at > f.to) return false;
+    if (q && (l.oid + ' ' + l.buyer + ' ' + l.name + ' ' + l.spec + ' ' + l.vendor + ' ' + l.src).toLowerCase().indexOf(q) < 0) return false;
+    return true;
+  });
+}
+function pvDraw() {
+  var h = '<h2 style="margin-top:0">訂單明細</h2><p><button class="btn ' + (PVIEW === 'lines' ? 'a' : 'l') + '" data-pv="vl">訂單明細</button> <button class="btn ' + (PVIEW === 'pays' ? 'a' : 'l') + '" data-pv="vp">廠商付款紀錄(' + PV.payments.length + ')</button> <button class="btn l" data-pv="rf">重新整理</button></p>';
+  if (PVIEW === 'pays') {
+    h += '<table><thead><tr><th>付款ID</th><th>日期</th><th>廠商</th><th>金額</th><th>品項成本合計</th><th>差額</th><th>匯款備註</th><th>品項</th><th></th></tr></thead><tbody>' +
+      (PV.payments.map(function (p) { return '<tr><td>' + esc(p.id) + '</td><td>' + esc(p.date) + '</td><td>' + esc(p.vendor) + '</td><td>' + money(p.amount) + '</td><td>' + money(p.expect) + '</td><td>' + (p.amount - p.expect) + '</td><td style="white-space:normal">' + esc(p.note) + '</td><td style="white-space:normal;min-width:260px">' + esc(p.items) + '</td><td><button class="btn l s" data-pv="pe" data-id="' + esc(p.id) + '">編輯</button> <button class="btn l s" data-pv="pdt" data-id="' + esc(p.id) + '">明細</button> <button class="btn l s" data-pv="pd" data-id="' + esc(p.id) + '">刪除</button></td></tr>'; }).join('') || '<tr><td colspan="9" class="m">還沒有付款紀錄</td></tr>') + '</tbody></table>';
+    $('#v').innerHTML = h; return;
+  }
+  var arrs = {}; PV.lines.forEach(function (l) { if (l.arr) arrs[l.arr] = 1; });
+  h += '<div class="fb" id="pvf"><label>廠商<select data-k="vendor">' + opts(PV.vendors, VF.vendor, '全部') + '</select></label>' +
+    '<label>付款<select data-k="pay"><option value="">全部</option><option value="unpaid"' + (VF.pay === 'unpaid' ? ' selected' : '') + '>未付款</option><option value="paid"' + (VF.pay === 'paid' ? ' selected' : '') + '>已付款</option></select></label>' +
+    '<label>到貨<select data-k="arr">' + opts(Object.keys(arrs), VF.arr, '全部') + '</select></label>' +
+    '<label>下單從<input type="date" data-k="from" value="' + esc(VF.from) + '"></label><label>到<input type="date" data-k="to" value="' + esc(VF.to) + '"></label>' +
+    '<label>關鍵字<input data-k="q" placeholder="訂單、訂購人、品名、廠商、貨源" value="' + esc(VF.q) + '"></label><button class="btn l" data-pv="rs">清除篩選</button></div>' +
+    '<p style="margin:8px 0"><button class="btn a" data-pv="info">批次修改(到貨/成本/廠商/貨源)</button> <button class="btn a" data-pv="pay">廠商付款紀錄</button> <button class="btn l" data-pv="bdel">批次刪除</button> <span class="sum" id="pvsum"></span></p>' +
+    '<div id="pvt"></div>';
+  $('#v').innerHTML = h; pvRows();
+}
+function pvRows() {
+  var L = pvLines(), tot = 0, cost = 0, profit = 0, nc = 0;
+  L.forEach(function (l) { if (l.stock) return; tot += l.qty * l.unit; if (l.cost === '') nc++; else { cost += l.cost * l.qty; profit += (l.unit - l.cost) * l.qty; } });
+  $('#pvt').innerHTML = '<p class="m">共 ' + L.length + ' 項,複價 ' + money(tot) + ',成本 ' + money(cost) + ',利潤 ' + money(profit) + (nc ? '(' + nc + ' 項未填成本,未計入成本與利潤)' : '') + '</p>' +
+    '<table><thead><tr><th><input type="checkbox" id="pvall"></th><th>訂購日期</th><th>訂購人</th><th>品名</th><th>規格</th><th>數量</th><th>成本</th><th>單價</th><th>複價</th><th>利潤</th><th>到貨狀態</th><th>廠商</th><th>付款狀態</th><th>訂單紀錄 / 編輯</th></tr></thead><tbody>' +
+    (L.map(function (l) {
+      var hc = l.cost !== '';
+      return '<tr><td><input type="checkbox" class="pvk" data-k="' + esc(l.key) + '"' + (PSEL[l.key] ? ' checked' : '') + '></td><td>' + esc(l.at) + '</td><td>' + (l.stock ? '<span class="chip">庫存</span>' : esc(l.buyer)) + '</td><td style="white-space:normal">' + esc(l.name) + '</td><td>' + esc(l.spec) + '</td><td>' + l.qty + '</td><td>' + (hc ? l.cost : '<span class="m">未填</span>') + '</td><td>' + (l.stock ? '—' : l.unit) + '</td><td>' + (l.stock ? '—' : l.qty * l.unit) + '</td><td>' + (hc && !l.stock ? (l.unit - l.cost) * l.qty : '<span class="m">—</span>') + '</td><td><span class="chip ' + (l.arr === '已到貨' ? 'd' : '') + '">' + esc(l.arr) + '</span></td><td>' + (l.vendor ? esc(l.vendor) : '<span class="m">—</span>') + '</td><td>' + (l.pay ? '已付 ' + esc(l.pay) : '<span class="m">未付</span>') + '</td><td><button class="btn l s" data-pv="hist" data-k="' + esc(l.key) + '">紀錄</button> ' + (l.stock ? '<button class="btn l s" data-sk="del" data-id="' + esc(l.oid) + '">刪除</button>' : '<button class="btn a s" data-a="ord" data-id="' + esc(l.oid) + '">編輯</button>') + '</td></tr>';
+    }).join('') || '<tr><td colspan="14" class="m">沒有符合的品項</td></tr>') + '</tbody></table><p class="m">按右邊「紀錄」可看這個品項的操作紀錄(誰、什麼時候做了什麼)。</p>';
+  pvSum(); pvAllState();
+}
+function pvAllState() { var L = pvLines(), a = $('#pvall'); if (a) a.checked = L.length > 0 && L.every(function (l) { return PSEL[l.key]; }); }
+function pvSel() { return Object.keys(PSEL).filter(function (k) { return PSEL[k]; }); }
+function pvSum() {
+  var ks = pvSel(), c = 0, n = 0, miss = 0;
+  PV.lines.forEach(function (l) { if (PSEL[l.key]) { n++; if (l.cost === '') miss++; else c += l.cost * l.qty; } });
+  var el = $('#pvsum'); if (el) el.textContent = '已勾選 ' + n + ' 項,成本合計 ' + money(c) + (miss ? '(' + miss + ' 項未填成本)' : '');
+}
+document.addEventListener('input', function (e) { if (e.target.classList && e.target.classList.contains('spi')) SPL[Number(e.target.dataset.i)] = e.target.value; });
+document.addEventListener('input', function (e) {
+  var k = e.target.dataset && e.target.dataset.k, f = e.target.closest && e.target.closest('#pvf'); if (!f || !k) return;
+  VF[k] = e.target.value; if (e.target.type === 'date' || e.target.tagName === 'SELECT' || k === 'q') pvRows();
+});
+document.addEventListener('change', function (e) {
+  if (e.target.id === 'sall') { var on = e.target.checked; (window.SROWS || []).forEach(function (x) { SSEL[x] = on; }); document.querySelectorAll('.ssel').forEach(function (c) { c.checked = on; }); $('#ssn').textContent = selShips().length; }
+});
+document.addEventListener('change', function (e) {
+  if (e.target.id === 'pvall') { pvLines().forEach(function (l) { PSEL[l.key] = e.target.checked; }); pvRows(); return; }
+  if (e.target.classList && e.target.classList.contains('pvk')) { PSEL[e.target.dataset.k] = e.target.checked; pvSum(); pvAllState(); }
+});
+function pvSet(d, msg) { var m = d.msg; OT = 0; PVT = Date.now(); PV = d; VL = d.vlist || VL; PSEL = {}; pvDraw(); if (msg || m) tell(msg || m); }
+document.addEventListener('click', function (e) {
+  var b = e.target.closest('[data-pv]'); if (!b) return;
+  var a = b.dataset.pv, id = b.dataset.id, d = $('#dlg');
+  if (a === 'rf') { PVDIRTY = true; OT = 0; purchView(); }
+  else if (a === 'vl') { PVIEW = 'lines'; pvDraw(); }
+  else if (a === 'vp') { PVIEW = 'pays'; pvDraw(); }
+  else if (a === 'bdel') {
+    var kd = pvSel(); if (!kd.length) { tell('請先勾選品項'); return; }
+    var ords = {}, stk = 0; kd.forEach(function (k) { var o = k.split('|')[0]; if (/^K/.test(o)) stk++; else ords[o] = 1; });
+    var no = Object.keys(ords).length;
+    ask('確定刪除?\n' + (no ? '・客訂品項:會刪除 ' + no + ' 張「整張訂單」(含該訂單其他品項),庫存與購物金會退回;已建立出貨單的訂單會略過。\n' : '') + (stk ? '・庫存進貨:' + stk + ' 筆(已到貨的會從庫存扣回;已記錄廠商付款的會略過)。\n' : '') + '這是重大事件,會記錄在 Google 試算表的「重大事件」工作表(含刪除前資料)。', function () {
+      call('adminBatchDeleteLines', T, kd).then(function (r) { OT = 0; PVDIRTY = true; O = null; pvSet(r); }).catch(function (er) { tell(er.message); });
+    });
+  }
+  else if (a === 'rs') { VF = { vendor: '', pay: '', arr: '', q: '', from: '', to: '' }; pvDraw(); }
+  else if (a === 'pay') {
+    var ks = pvSel(); if (!ks.length) { tell('請先勾選要付款的品項'); return; }
+    var sel = PV.lines.filter(function (l) { return PSEL[l.key]; }), vs = {}, exp = 0, miss = 0, paid = 0;
+    sel.forEach(function (l) { vs[l.vendor || '(未填)'] = 1; if (l.pay) paid++; if (l.cost === '') miss++; else exp += l.cost * l.qty; });
+    var vn = Object.keys(vs);
+    if (paid) { tell('勾選的品項中有 ' + paid + ' 項已記錄付款,請取消勾選'); return; }
+    if (vn.length !== 1 || vn[0] === '(未填)') { tell(vn.length > 1 ? '一筆付款只能對同一家廠商,目前勾選了:' + vn.join('、') : '勾選的品項還沒有填廠商,請先用「批次修改」補上'); return; }
+    var today = new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10);
+    PIMG = [];
+    d.innerHTML = '<h3>廠商付款紀錄 — ' + esc(vn[0]) + '</h3><p class="m">共 ' + sel.length + ' 項,成本合計 ' + money(exp) + (miss ? '(' + miss + ' 項未填成本)' : '') + '</p><form id="pvpay"><label>付款日期<input type="date" name="date" value="' + today + '" required></label><label>實付總額<input name="amount" type="number" min="1" step="any" value="' + exp + '" required></label><label>匯款備註<input name="note" placeholder="例:末五碼 12345、匯款給 xxx"></label>' + pimBox() + '<p class="er" id="pve" role="alert"></p><button class="btn a">確定記錄</button> <button type="button" class="btn l" data-a="x">取消</button></form>';
+    d.showModal(); pimDraw();
+  }
+  else if (a === 'info') {
+    var ks2 = pvSel(); if (!ks2.length) { tell('請先勾選品項'); return; }
+    d.innerHTML = '<h3>批次修改(' + ks2.length + ' 項)</h3><p class="m">只會修改有填的欄位,空白的保持原樣。已記錄付款的品項不能改廠商/成本/貨源;已建立出貨單的品項不能改到貨狀態。</p><form id="pvinfo"><label>到貨狀態<select name="arr"><option value="">(不修改)</option><option>已到貨</option><option>待到貨</option></select></label><label class="ck"><input type="checkbox" name="ntf" checked> 改成已到貨時,通知客人(LINE 或 Email)</label><label>廠商<select name="vendor">' + vopt('', '(不修改)') + '</select></label><label>單件成本<input name="cost" type="number" min="0" step="any"></label><label>成本是否含稅<select name="tax"><option value="">不修改</option><option value="Y">含稅</option><option value="N">未稅</option></select></label><label>貨源<input name="src"></label><p class="er" id="pve" role="alert"></p><button class="btn a">套用</button> <button type="button" class="btn l" data-a="x">取消</button></form>';
+    d.showModal();
+  }
+  else if (a === 'pe') {
+    var p = PV.payments.filter(function (x) { return x.id === id; })[0];
+    PIMG = p.imgs.slice();
+    d.innerHTML = '<h3>編輯廠商付款 ' + esc(p.id) + ' — ' + esc(p.vendor) + '</h3><p class="m">品項成本合計 ' + money(p.expect) + '</p><form id="pvedit" data-id="' + esc(p.id) + '"><label>付款日期<input type="date" name="date" value="' + esc(p.date) + '" required></label><label>實付總額<input name="amount" type="number" min="1" step="any" value="' + p.amount + '" required></label><label>匯款備註<input name="note" value="' + esc(p.note) + '"></label>' + pimBox() + '<p class="er" id="pve" role="alert"></p><button class="btn a">儲存</button> <button type="button" class="btn l" data-a="x">取消</button></form>';
+    d.showModal(); pimDraw();
+  }
+  else if (a === 'pdt') {
+    var q = PV.payments.filter(function (x) { return x.id === id; })[0];
+    d.innerHTML = '<h3>廠商付款明細 ' + esc(q.id) + ' — ' + esc(q.vendor) + '</h3>' +
+      '<p>付款日期:<b>' + esc(q.date) + '</b> · 實付:<b>' + money(q.amount) + '</b> · 品項成本合計:' + money(q.expect) + ' · 差額:' + (q.amount - q.expect) + '</p>' +
+      '<p>匯款備註:' + (esc(q.note) || '<span class="m">無</span>') + '</p><p class="m">建立:' + esc(q.by) + ' ' + esc(q.at) + '</p>' +
+      '<h4>包含品項(' + q.count + ')</h4><ul style="margin-top:0">' + q.items.split(';').filter(Boolean).map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>' +
+      '<h4>圖片(' + q.imgs.length + ')</h4><div class="pimg">' + (q.imgs.map(function (u) { return '<a href="' + esc(u) + '" target="_blank" rel="noopener"><img src="' + esc(u) + '" alt="" style="max-width:220px;max-height:220px;margin:0 8px 8px 0;border:1px solid var(--line)"></a>'; }).join('') || '<span class="m">沒有上傳圖片</span>') + '</div>' +
+      '<p style="margin-top:14px"><button class="btn a" data-pv="pe" data-id="' + esc(q.id) + '">編輯</button> <button class="btn l" data-a="x">關閉</button></p>';
+    if (!d.open) d.showModal();
+  }
+  else if (a === 'pd') {
+    ask('刪除付款 ' + id + '?其中的品項會回復為「未付款」。', function () {
+      call('adminDeletePayment', T, id).then(function (r) { pvSet(r, '已刪除'); }).catch(function (er) { tell(er.message); });
+    });
+  }
+});
+document.addEventListener('submit', function (e) {
+  var f = e.target, v = function (n) { return f[n] ? f[n].value : ''; };
+  var done = function (r) { $('#dlg').close(); pvSet(r); }, bad = fail('#pve');
+  if (f.id === 'pvpay') call('adminRecordPayment', T, pvSel(), { date: v('date'), amount: v('amount'), note: v('note'), imgs: PIMG }).then(done).catch(bad);
+  else if (f.id === 'pvinfo') call('adminLineInfo', T, pvSel(), { arr: v('arr'), notify: !!(f.ntf && f.ntf.checked), vendor: v('vendor'), cost: v('cost'), tax: v('tax'), src: v('src') }).then(done).catch(bad);
+  else if (f.id === 'pvedit') call('adminUpdatePayment', T, f.dataset.id, { date: v('date'), amount: v('amount'), note: v('note'), imgs: PIMG }).then(function (r) { $('#dlg').close(); OT = 0; PV = r; PVT = Date.now(); pvDraw(); }).catch(bad);
+});
+
+document.addEventListener('click', function (e) {
+  var hb = e.target.closest('[data-pv="hist"]'); if (!hb) return;
+  var p = hb.dataset.k.split('|'), d = $('#dlg');
+  d.innerHTML = '<p class="m">載入中…</p>'; d.showModal();
+  call('adminLineHistory', T, p[0], p[1]).then(function (r) {
+    d.innerHTML = '<h3>' + esc(r.name) + ' <span class="m">訂單 ' + esc(r.oid) + '</span></h3>' +
+      '<p>到貨狀態:<b>' + esc(r.arr) + '</b>' + (r.arrBy ? ' · 由 <b>' + esc(r.arrBy) + '</b> 於 ' + esc(r.arrAt) + ' 設定' : ' · <span class="m">(尚無到貨操作紀錄,可能是下單時現貨自動到貨)</span>') + '</p>' +
+      '<p>廠商:' + esc(r.vendor || '—') + ' · 付款:' + (r.pay ? esc(r.pay) : '未付') + '</p>' +
+      '<h4>操作紀錄</h4><table><thead><tr><th>時間</th><th>管理員</th><th>動作</th><th>內容</th></tr></thead><tbody>' +
+      (r.logs.map(function (x) { return '<tr><td>' + esc(x.at) + '</td><td>' + esc(x.acc) + '</td><td>' + esc(x.act) + '</td><td style="white-space:normal">' + esc(x.note) + '</td></tr>'; }).join('') || '<tr><td colspan="4" class="m">沒有紀錄</td></tr>') + '</tbody></table>' +
+      '<p style="margin-top:14px"><button class="btn a" data-a="ord" data-id="' + esc(r.oid) + '">開啟訂單編輯</button> <button class="btn l" data-a="x">關閉</button></p>';
+  }).catch(function (er) { d.close(); tell(er.message); });
+});
+
+document.addEventListener('click', function (e) {
+  var b = e.target.closest('[data-vd="del"]'); if (!b) return;
+  var n = b.dataset.name;
+  ask('刪除廠商「' + n + '」?已存在的商品與訂單仍保留這個廠商名稱,只是之後選單裡不會再出現。', function () {
+    call('adminDeleteVendor', T, n).then(function (r) { VL = r; PVDIRTY = true; drawSettings(); }).catch(function (er) { tell(er.message); });
+  });
+});
+document.addEventListener('submit', function (e) {
+  var f = e.target; if (f.id !== 'vdf') return;
+  call('adminAddVendor', T, f.name.value).then(function (r) { VL = r; PVDIRTY = true; drawSettings(); }).catch(fail('#vde'));
+});
+
+function catTree() {
+  var big = [], g = {}, self = {};
+  CL.forEach(function (x) { var k = x.name.split('/')[0]; if (!g[k]) { g[k] = []; big.push(k); } if (x.name === k) self[k] = x; else g[k].push(x); });
+  var out = big.map(function (k) {
+    var subs = g[k], total = (self[k] ? self[k].n : 0) + subs.reduce(function (t, x) { return t + x.n; }, 0);
+    return '<div style="border:1px solid var(--line);border-radius:4px;padding:10px 12px;margin:10px 0;max-width:620px">' +
+      '<div class="r" style="display:flex;gap:6px;align-items:center"><input class="cin" data-big="" data-old="' + esc(k) + '" value="' + esc(k) + '" maxlength="40" style="flex:1;font-weight:700" aria-label="大分類名稱"><button class="btn l s" data-ct="renbig" data-name="' + esc(k) + '">改名</button><button class="btn l s" data-ct="delbig" data-name="' + esc(k) + '" data-n="' + total + '">刪除整個大分類</button></div>' +
+      (self[k] ? '<div class="m" style="margin:6px 0 0 4px">「' + esc(k) + '」本身有 ' + self[k].n + ' 項商品直接選了大分類(不屬於任何小分類)</div>' : '') +
+      '<div style="margin:8px 0 0 18px">' + (subs.map(function (x) { var sub = x.name.slice(k.length + 1); return '<div class="r" style="display:flex;gap:6px;align-items:center;margin:4px 0">└ <input class="cin" data-big="' + esc(k) + '" data-old="' + esc(x.name) + '" value="' + esc(sub) + '" maxlength="40" style="flex:1" aria-label="小分類名稱"><span class="m" style="white-space:nowrap">' + x.n + ' 項</span><button class="btn l s" data-ct="ren" data-name="' + esc(x.name) + '">改名</button><button class="btn l s" data-ct="del" data-name="' + esc(x.name) + '" data-n="' + x.n + '">刪除</button></div>'; }).join('') || '<div class="m">還沒有小分類</div>') +
+      '<div class="r" style="display:flex;gap:6px;margin-top:8px"><input class="csub" data-big="' + esc(k) + '" placeholder="在「' + esc(k) + '」底下新增小分類" maxlength="40" style="flex:1"><button class="btn a s" data-ct="addsub" data-name="' + esc(k) + '">新增小分類</button></div></div></div>';
+  }).join('');
+  return out || '<p class="m">還沒有分類</p>';
+}
+function catSet(r) { CL = r; C = r.map(function (x) { return x.name; }); drawSettings(); }
+function catRefresh() { call('adminInit', T).then(function (d) { P = d.products; }); }
+document.addEventListener('click', function (e) {
+  var b = e.target.closest('[data-ct]'); if (!b) return;
+  var n = b.dataset.name, t = b.dataset.ct, row = b.parentNode;
+  var fail2 = function (er) { tell(er.message); };
+  if (t === 'ren' || t === 'renbig') {
+    var inp = row.querySelector('.cin'), v = inp.value.trim();
+    if (t === 'ren') { if (v.indexOf('/') >= 0) { tell('小分類名稱不能包含「/」'); return; } call('adminRenameCat', T, n, inp.dataset.big + '/' + v).then(function (r) { catSet(r); catRefresh(); }).catch(fail2); }
+    else call('adminRenameBig', T, n, v).then(function (r) { catSet(r); catRefresh(); }).catch(fail2);
+  } else if (t === 'addsub') {
+    var si = row.querySelector('.csub'), sv = si.value.trim();
+    if (!sv) { tell('請輸入小分類名稱'); return; }
+    if (sv.indexOf('/') >= 0) { tell('小分類名稱不能包含「/」'); return; }
+    call('adminAddCat', T, n + '/' + sv).then(catSet).catch(fail2);
+  } else if (t === 'del') {
+    ask('刪除小分類「' + n + '」?目前有 ' + b.dataset.n + ' 項商品使用,刪除後會從這些商品上移除(商品不會被刪)。', function () { call('adminDeleteCat', T, n).then(function (r) { catSet(r); catRefresh(); }).catch(fail2); });
+  } else if (t === 'delbig') {
+    ask('刪除整個大分類「' + n + '」,包含底下所有小分類?共 ' + b.dataset.n + ' 項商品使用,會從這些商品上移除(商品不會被刪)。', function () { call('adminDeleteBig', T, n).then(function (r) { catSet(r); catRefresh(); }).catch(fail2); });
+  }
+});
+document.addEventListener('submit', function (e) {
+  var f = e.target; if (f.id !== 'ctf') return; e.preventDefault();
+  if (f.name.value.indexOf('/') >= 0) { $('#cte').textContent = '大分類名稱不能包含「/」;小分類請在大分類底下新增'; return; }
+  call('adminAddCat', T, f.name.value).then(catSet).catch(fail('#cte'));
+});
+
+/* ---------- 折扣碼 ---------- */
+var CD = [], CDE = '';
+function codeView() {
+  $('#v').innerHTML = '<p class="m">載入中…</p>';
+  call('adminCodes', T).then(function (r) { CD = r; CDE = ''; drawCodes(); }).catch(function (e) { $('#v').innerHTML = '<p class="er">' + esc(e.message) + '</p>'; });
+}
+function drawCodes() {
+  var cur = CD.filter(function (x) { return x.code === CDE; })[0] || { code: '', type: '百分比', value: '', note: '', on: true, limit: '', start: '', end: '' };
+  $('#v').innerHTML = '<h2 style="margin-top:0">折扣碼</h2><p class="m">客人在前台購物車輸入折扣碼就能折抵(遊客也可用)。每個折扣碼擇一:折百分比,或折固定金額;大小寫不分。和會員、活動優惠不疊加,系統自動取最划算的一個。</p>' +
+    '<form id="cdf" style="max-width:760px;border:1px solid var(--line);padding:12px;border-radius:4px"><h3 style="margin:0 0 8px">' + (CDE ? '編輯折扣碼:' + esc(CDE) : '新增折扣碼') + '</h3><div class="g">' +
+    fld('折扣碼名稱(客人要輸入的文字)', 'code', cur.code) +
+    '<label>折扣方式<select name="type" id="cdt"><option' + (cur.type === '百分比' ? ' selected' : '') + '>百分比</option><option' + (cur.type === '金額' ? ' selected' : '') + '>金額</option></select></label>' +
+    '<label><span id="cdl">' + (cur.type === '金額' ? '折扣金額(元)' : '折扣 %(例:10 = 折抵 10%,打九折)') + '</span><input name="value" type="number" min="1" step="1" value="' + esc(cur.value) + '" inputmode="numeric"></label>' +
+    '<label>使用數量上限(選填,空白=不限)<input name="limit" type="number" min="1" step="1" inputmode="numeric" value="' + (cur.limit || '') + '"></label>' +
+    '<label>開始日(選填)<input name="start" type="date" value="' + esc(cur.start || '') + '"></label>' +
+    '<label>截止日(選填,當天可用到 23:59)<input name="end" type="date" value="' + esc(cur.end || '') + '"></label>' +
+    fld('備註(選填,只有你看得到)', 'note', cur.note) + '</div>' +
+    '<label class="ck"><input type="checkbox" name="on"' + (cur.on ? ' checked' : '') + '> 啟用</label><p class="er" id="cde" role="alert"></p><button class="btn a">' + (CDE ? '儲存' : '新增') + '</button>' + (CDE ? ' <button type="button" class="btn l" data-cd="cancel">取消編輯</button>' : '') + '</form>' +
+    '<table style="margin-top:16px"><thead><tr><th>折扣碼</th><th>內容</th><th>狀態</th><th>已使用</th><th>使用期限</th><th>備註</th><th></th></tr></thead><tbody>' +
+    (CD.map(function (x) { return '<tr><td><b>' + esc(x.code) + '</b></td><td>' + (x.type === '百分比' ? '折 ' + x.value + '%' : '折 ' + money(x.value)) + '</td><td>' + (x.state === '可用' ? '<span class="chip d">可使用</span>' : '<span class="chip">' + esc(x.state) + '</span>') + '</td><td>' + x.used + (x.limit ? ' / ' + x.limit : '') + ' 次</td><td>' + (x.start || x.end ? esc((x.start || '') + ' ~ ' + (x.end || '不限')) : '不限') + '</td><td style="white-space:normal">' + esc(x.note) + '</td><td style="white-space:nowrap"><button class="btn l s" data-cd="edit" data-c="' + esc(x.code) + '">編輯</button> <button class="btn l s" data-cd="tog" data-c="' + esc(x.code) + '">' + (x.on ? '停用' : '啟用') + '</button> <button class="btn l s" data-cd="del" data-c="' + esc(x.code) + '">刪除</button></td></tr>'; }).join('') || '<tr><td colspan="7" class="m">還沒有折扣碼</td></tr>') + '</tbody></table>';
+}
+document.addEventListener('change', function (e) { if (e.target.id === 'cdt') $('#cdl').textContent = e.target.value === '金額' ? '折扣金額(元)' : '折扣 %(例:10 = 折抵 10%,打九折)'; });
+document.addEventListener('submit', function (e) {
+  var f = e.target; if (f.id !== 'cdf') return; e.preventDefault();
+  call('adminSaveCode', T, { old: CDE, code: f.code.value, type: f.type.value, value: f.value.value, note: f.note.value, limit: f.limit.value, start: f.start.value, end: f.end.value, on: f.on.checked }).then(function (r) { CD = r; CDE = ''; drawCodes(); }).catch(fail('#cde'));
+});
+document.addEventListener('click', function (e) {
+  var b = e.target.closest('[data-cd]'); if (!b) return;
+  var c = b.dataset.c, t = b.dataset.cd;
+  if (t === 'edit') { CDE = c; drawCodes(); window.scrollTo(0, 0); }
+  else if (t === 'cancel') { CDE = ''; drawCodes(); }
+  else if (t === 'tog') { var on = !(CD.filter(function (x) { return x.code === c; })[0] || {}).on; call('adminSetCodeOn', T, c, on).then(function (r) { CD = r; drawCodes(); }).catch(function (er) { tell(er.message); }); }
+  else if (t === 'del') ask('刪除折扣碼「' + c + '」?已經下的訂單不受影響。', function () { call('adminDeleteCode', T, c).then(function (r) { CD = r; if (CDE === c) CDE = ''; drawCodes(); }).catch(function (er) { tell(er.message); }); });
+});
+var PIMG = [];
+function pimBox() { return '<div style="margin:8px 0"><div class="m">匯款截圖/單據(最多 8 張)</div><div id="pimgs"></div><input type="file" id="pvimf" accept="image/*" multiple> <span class="m" id="pims"></span></div>'; }
+function pimDraw() {
+  var box = $('#pimgs'); if (!box) return;
+  box.innerHTML = PIMG.map(function (u, k) { return '<span style="display:inline-block;margin:0 8px 8px 0;text-align:center"><img src="' + esc(u) + '" alt="" style="height:70px;display:block"><button type="button" class="btn l s" data-pv="pimrm" data-i="' + k + '">移除</button></span>'; }).join('') || '<span class="m">還沒有圖片</span>';
+}
+document.addEventListener('click', function (e) {
+  var b = e.target.closest('[data-pv="pimrm"]'); if (!b) return;
+  PIMG.splice(Number(b.dataset.i), 1); pimDraw();
+});
+document.addEventListener('change', function (e) {
+  if (e.target.id !== 'pvimf' || !e.target.files.length) return;
+  var files = [].slice.call(e.target.files), st = $('#pims'), k = 0;
+  e.target.value = '';
+  (function next() {
+    if (k >= files.length) { st.textContent = '上傳完成'; return; }
+    if (PIMG.length >= 8) { st.textContent = '最多 8 張'; return; }
+    st.textContent = '上傳中 ' + (k + 1) + '/' + files.length + '…';
+    shrink(files[k]).then(function (b64) { return call('adminUploadImage', T, files[k].name, 'image/jpeg', b64); })
+      .then(function (u) { PIMG.push(u); pimDraw(); k++; next(); })
+      .catch(function (er) { st.textContent = er.message; });
+  })();
+});
+/* ---------- 訂購單 ---------- */
+function poHtml(sid) {
+  var x = shipList().filter(function (y) { return y.s.id === sid; })[0]; if (!x) return '';
+  var s = x.s, items = [];
+  O.forEach(function (o) { o.items.forEach(function (i) { if (i.sid === sid) items.push(i); }); });
+  return '<div class="pg" style="font-size:14px;padding:6px 2px 18px"><h2 style="margin:0 0 4px;text-align:center">訂 購 單</h2><p style="text-align:center;margin:0 0 12px" class="m">coscos韓國選物店 · 出貨單 ' + esc(s.id) + '</p>' +
+    '<table style="min-width:0;width:100%;margin-bottom:10px"><tbody><tr><td style="width:90px">收件人</td><td>' + esc(s.name) + '</td><td style="width:90px">電話</td><td>' + esc(s.phone) + '</td></tr>' +
+    '<tr><td>配送/收件</td><td colspan="3" style="white-space:normal">' + esc(s.ship) + '</td></tr><tr><td>付款方式</td><td>' + esc(s.pay) + (s.last5 ? ' (後五碼 ' + esc(s.last5) + ')' : '') + '</td><td>建立時間</td><td>' + esc(s.cr.slice(0, 16)) + '</td></tr>' +
+    '<tr><td>訂單</td><td colspan="3">' + esc(s.oids.join('、')) + '</td></tr></tbody></table>' +
+    '<table style="min-width:0;width:100%"><thead><tr><th>品名</th><th>規格</th><th style="text-align:right">數量</th><th style="text-align:right">單價</th><th style="text-align:right">小計</th><th>檢貨</th></tr></thead><tbody>' +
+    items.map(function (i) { return '<tr><td style="white-space:normal">' + esc(i.name) + '</td><td>' + esc(i.spec) + '</td><td style="text-align:right">' + i.qty + '</td><td style="text-align:right">' + i.unit + '</td><td style="text-align:right">' + i.sub + '</td><td>☐</td></tr>'; }).join('') + '</tbody></table>' +
+    '<table style="min-width:0;width:260px;margin:10px 0 0 auto"><tbody><tr><td>商品合計</td><td style="text-align:right">' + money(s.sub) + '</td></tr>' + (s.disc ? '<tr><td>優惠</td><td style="text-align:right">-' + money(s.disc) + '</td></tr>' : '') + (s.cred ? '<tr><td>購物金</td><td style="text-align:right">-' + money(s.cred) + '</td></tr>' : '') +
+    '<tr><td>運費</td><td style="text-align:right">' + money(s.fee) + '</td></tr><tr><td><b>應付</b></td><td style="text-align:right"><b>' + money(s.total) + '</b></td></tr></tbody></table>' +
+    (s.note ? '<p>備註:' + esc(s.note) + '</p>' : '') + '</div>';
+}
+function openPO(sids) {
+  var d = $('#dlg'), h = sids.map(poHtml).join('');
+  if (!h) return;
+  d.innerHTML = '<div id="po">' + h + '</div><p class="noprint" style="margin-top:14px"><button class="btn a" data-a="poprint">列印(' + sids.length + ' 張)</button> ' + (sids.length === 1 ? '<button class="btn l" data-a="ship" data-id="' + esc(sids[0]) + '">返回出貨單</button> ' : '') + '<button class="btn l" data-a="x">關閉</button></p>';
+  if (!d.open) d.showModal();
+}
+
+/* ---------- 報表 ---------- */
+var RF = { oFrom: '', oTo: '', sFrom: '', sTo: '', status: '', pay: '', q: '' }, RD = null;
+function reportPage() {
+  $('#v').innerHTML = '<h2 style="margin-top:0">報表</h2><div class="fb" id="rpf"><label>訂貨日期從<input type="date" data-r="oFrom" value="' + esc(RF.oFrom) + '"></label><label>到<input type="date" data-r="oTo" value="' + esc(RF.oTo) + '"></label>' +
+    '<label>出貨日期從<input type="date" data-r="sFrom" value="' + esc(RF.sFrom) + '"></label><label>到<input type="date" data-r="sTo" value="' + esc(RF.sTo) + '"></label>' +
+    '<label>結帳狀態<select data-r="status" id="rst"><option value="">全部</option></select></label><label>付款方式<select data-r="pay">' + opts(['匯款', '賣貨便', '刷卡'], RF.pay, '全部') + '</select></label>' +
+    '<label>關鍵字<input data-r="q" value="' + esc(RF.q) + '" placeholder="訂單、姓名、品名"></label><button class="btn l" data-rp="clr">清除</button></div><div id="rpb"><p class="m">載入中…</p></div>';
+  loadReport();
+}
+function loadReport() {
+  call('adminReport', T, RF).then(function (r) {
+    RD = r; var st = $('#rst'); if (st) st.innerHTML = '<option value="">全部</option>' + r.statuses.map(function (x) { return '<option' + (x === RF.status ? ' selected' : '') + '>' + esc(x) + '</option>'; }).join('');
+    var m = r.sum;
+    $('#rpb').innerHTML = '<div class="rp"><div>總營收(商品小計)<b>' + money(m.revenue) + '</b></div><div>利潤<b>' + money(m.profit) + '</b></div><div>銷售數量<b>' + m.qty + '</b></div><div>下單筆數<b>' + m.orders + '</b></div><div>出貨單數<b>' + m.ships + '</b></div><div>成本<b>' + money(m.cost) + '</b></div></div>' +
+      '<p class="m">營收為商品小計(未扣優惠、購物金,未含運費);' + (m.noCost ? m.noCost + ' 項未填成本,未計入成本與利潤。' : '') + '出貨日期篩選只會包含已建立出貨單的品項。</p>' +
+      '<table><thead><tr><th>商品</th><th>數量</th><th>營收</th><th>成本</th><th>利潤</th></tr></thead><tbody>' + (r.prods.map(function (p) { return '<tr><td style="white-space:normal">' + esc(p.name) + '</td><td>' + p.qty + '</td><td>' + p.revenue + '</td><td>' + p.cost + '</td><td>' + p.profit + '</td></tr>'; }).join('') || '<tr><td colspan="5" class="m">沒有資料</td></tr>') + '</tbody></table>';
+  }).catch(function (e) { $('#rpb').innerHTML = '<p class="er">' + esc(e.message) + '</p>'; });
+}
+document.addEventListener('change', function (e) { var k = e.target.dataset && e.target.dataset.r; if (!k || !e.target.closest('#rpf')) return; RF[k] = e.target.value; loadReport(); });
+document.addEventListener('click', function (e) { if (e.target.dataset && e.target.dataset.rp === 'clr') { RF = { oFrom: '', oTo: '', sFrom: '', sTo: '', status: '', pay: '', q: '' }; reportPage(); } });
+
+/* ---------- 庫存表 ---------- */
+var SK = null;
+function stockPage() {
+  $('#v').innerHTML = '<p class="m">載入中…</p>';
+  call('adminStockView', T).then(function (d) { SK = d; VL = d.vlist || VL; drawStock(); }).catch(function (e) { $('#v').innerHTML = '<p class="er">' + esc(e.message) + '</p>'; });
+}
+function drawStock() {
+  var P2 = SK.products;
+  $('#v').innerHTML = '<h2 style="margin-top:0">庫存表</h2><p class="m">一批貨到了,一部分是客人訂的、一部分是要放庫存:客訂在「訂單明細」,庫存部分在這裡新增「庫存進貨」。兩種都會出現在「訂單明細」(庫存的訂購人顯示【庫存】),可以一起勾選做廠商付款。庫存進貨改成「已到貨」時才會增加商品數量。</p>' +
+    '<table><thead><tr><th>商品</th><th>型態</th><th>目前數量</th><th>待到貨(客訂)</th><th>待到貨(庫存進貨)</th><th>預設廠商</th><th>成本</th></tr></thead><tbody>' +
+    P2.map(function (p) { return '<tr><td style="white-space:normal">' + esc(p.name) + ' <span class="m">' + esc(p.id) + '</span></td><td>' + esc(p.type) + '</td><td>' + (p.stock === '' ? '無限' : p.stock) + '</td><td>' + p.waitOrders + '</td><td>' + p.waitStock + '</td><td>' + esc(p.vendor) + '</td><td>' + (p.cost === '' ? '' : p.cost) + '</td></tr>'; }).join('') + '</tbody></table>' +
+    '<h3 style="margin-top:22px">新增庫存進貨</h3><form id="skf" style="max-width:760px"><div class="g"><label>商品<select name="pid" id="skp">' + P2.map(function (p) { return '<option value="' + esc(p.id) + '">' + esc(p.name) + '</option>'; }).join('') + '</select></label>' +
+    '<label>規格<select name="spec" id="sks"></select></label>' + fld('數量', 'qty', '', 'number') + '<label>廠商<select name="vendor">' + vopt('', '(用商品預設)') + '</select></label>' + fld('單件成本(空白=用商品預設)', 'cost', '', 'number') + fld('貨源(空白=用商品預設)', 'src', '') + '</div>' +
+    '<label class="ck"><input type="checkbox" name="arrived"> 已到貨(直接增加商品數量)</label><p class="er" id="ske" role="alert"></p><button class="btn a">新增</button></form>' +
+    '<h3 style="margin-top:22px">庫存進貨紀錄</h3><table><thead><tr><th>編號</th><th>日期</th><th>商品</th><th>規格</th><th>數量</th><th>狀態</th><th>廠商</th><th>成本</th><th></th></tr></thead><tbody>' +
+    (SK.ins.map(function (l) { return '<tr><td>' + esc(l.id) + '</td><td>' + esc(l.at) + '</td><td style="white-space:normal">' + esc(l.name) + '</td><td>' + esc(l.spec) + '</td><td>' + l.qty + '</td><td>' + esc(l.arr) + '</td><td>' + esc(l.vendor) + '</td><td>' + l.cost + '</td><td><button class="btn l s" data-sk="del" data-id="' + esc(l.id) + '">刪除</button></td></tr>'; }).join('') || '<tr><td colspan="9" class="m">還沒有庫存進貨</td></tr>') + '</tbody></table><p class="m">到貨狀態、廠商、成本請到「訂單明細」勾選後用「批次修改」;付款也在那邊一起做。</p>';
+  skSpecs();
+}
+function skSpecs() {
+  var p = SK.products.filter(function (x) { return x.id === $('#skp').value; })[0], el = $('#sks'); if (!el) return;
+  el.innerHTML = p && p.specs.length ? p.specs.map(function (x) { return '<option>' + esc(x) + '</option>'; }).join('') : '<option value="">(無規格)</option>';
+}
+document.addEventListener('change', function (e) { if (e.target.id === 'skp') skSpecs(); });
+document.addEventListener('submit', function (e) {
+  var f = e.target; if (f.id !== 'skf') return; e.preventDefault();
+  call('adminAddStockIn', T, { pid: f.pid.value, spec: f.spec.value, qty: f.qty.value, vendor: f.vendor.value, cost: f.cost.value, src: f.src.value, arrived: f.arrived.checked }).then(function (d) { SK = d; PVDIRTY = true; P = null; drawStock(); refreshProducts(); }).catch(fail('#ske'));
+});
+function refreshProducts() { call('adminInit', T).then(function (d) { P = d.products; }).catch(function () {}); }
+document.addEventListener('click', function (e) {
+  var b = e.target.closest('[data-sk="del"]'); if (!b) return;
+  ask('刪除庫存進貨 ' + b.dataset.id + '?(若已到貨,會從商品數量扣回)', function () {
+    call('adminDeleteStockIn', T, b.dataset.id).then(function (d) { SK = d; PVDIRTY = true; if (tab === 'k') drawStock(); else purchView(); refreshProducts(); }).catch(function (er) { tell(er.message); });
+  });
+});
+</script>
+</body>
+</html>
