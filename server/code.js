@@ -1119,6 +1119,16 @@ function adminReport(tk, f) {
   var ords = {}, ships = {};
   rows_('訂單').forEach(function (o) { ords[String(o.訂單ID)] = o; });
   rows_('出貨單').forEach(function (s) { ships[String(s.出貨單ID)] = s; });
+  // 營收 = 訂單金額(商品小計扣掉優惠折抵);優惠依各品項小計比例分攤,尾數補在第一個品項
+  var dsc = {}, byO = {};
+  rows_('訂單明細').forEach(function (l) { (byO[String(l.訂單ID)] = byO[String(l.訂單ID)] || []).push(l); });
+  Object.keys(byO).forEach(function (oid) {
+    var o = ords[oid]; if (!o) return;
+    var d = Math.max(0, Number(o.優惠折抵) || 0), tot = byO[oid].reduce(function (t, l) { return t + Number(l.小計); }, 0), used = 0;
+    if (d > tot) d = tot;
+    byO[oid].forEach(function (l, i) { var x = tot > 0 ? Math.round(d * Number(l.小計) / tot) : 0; dsc[l._r] = x; used += x; });
+    if (byO[oid].length) dsc[byO[oid][0]._r] += d - used;
+  });
   var lm = lineMeta_(true), q = String(f.q || '').toLowerCase(), sum = { revenue: 0, cost: 0, profit: 0, qty: 0, orders: 0, ships: 0, noCost: 0, lines: 0 }, os = {}, ss = {}, prod = {}, status = {};
   rows_('訂單明細').forEach(function (l) {
     var o = ords[String(l.訂單ID)]; if (!o) return;
@@ -1131,7 +1141,7 @@ function adminReport(tk, f) {
     if (f.status && f.status !== st) return;
     if (f.pay && (!s || String(s.付款方式) !== f.pay)) return;
     if (q && (String(l.訂單ID) + o.姓名 + l.品名 + (l.規格 || '')).toLowerCase().indexOf(q) < 0) return;
-    var m = lm(l), qty = Number(l.數量), rev = Number(l.小計), has = m.cost !== '';
+    var m = lm(l), qty = Number(l.數量), rev = Number(l.小計) - (dsc[l._r] || 0), has = m.cost !== '';
     sum.lines++; sum.qty += qty; sum.revenue += rev; os[String(l.訂單ID)] = 1; if (s) ss[String(s.出貨單ID)] = 1;
     if (has) { sum.cost += m.cost * qty; sum.profit += rev - m.cost * qty; } else sum.noCost++;
     var k = String(l.品名) + (l.規格 ? '(' + l.規格 + ')' : ''), pr = prod[k] = prod[k] || { name: k, qty: 0, revenue: 0, cost: 0, profit: 0 };
