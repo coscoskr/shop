@@ -1084,6 +1084,19 @@ document.addEventListener('click', function (e) {
     ask('刪除整個大分類「' + n + '」,包含底下所有小分類?共 ' + b.dataset.n + ' 項商品使用,會從這些商品上移除(商品不會被刪)。', function () { call('adminDeleteBig', T, n).then(function (r) { catSet(r); catRefresh(); }).catch(fail2); });
   }
 });
+function brSet(r) { BR = r; BL = r.map(function (x) { return x.name; }); drawSettings(); catRefresh(); }
+document.addEventListener('click', function (e) {
+  var b = e.target.closest('[data-bt]'); if (!b) return;
+  var n = b.dataset.name, t = b.dataset.bt, fail2 = function (er) { tell(er.message); };
+  if (t === 'ren') {
+    var inp = b.closest('tr').querySelector('.bin'), v = inp.value.trim();
+    if (!v) { tell('請輸入品牌名稱'); return; }
+    if (v === n) { tell('名稱沒有變動'); return; }
+    call('adminRenameBrand', T, n, v).then(brSet).catch(fail2);
+  } else if (t === 'del') {
+    ask('刪除品牌「' + n + '」?目前有 ' + (b.dataset.n || 0) + ' 項商品使用,刪除後這些商品會變成「不指定品牌」(商品不會被刪)。', function () { call('adminDeleteBrand', T, n).then(brSet).catch(fail2); });
+  }
+});
 document.addEventListener('submit', function (e) {
   var f = e.target; if (f.id !== 'ctf') return; e.preventDefault();
   if (f.name.value.indexOf('/') >= 0) { $('#cte').textContent = '大分類名稱不能包含「/」;小分類請在大分類底下新增'; return; }
