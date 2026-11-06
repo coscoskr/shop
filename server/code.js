@@ -200,7 +200,8 @@ function shopData_() {
   var st = settings_();
   return {
     store: st.店名 || '', notice: st.公告 || '', free: Number(st.免運門檻) || 0, fee: Number(st.宅配運費) || 0, feeCvs: Number(st.店到店運費) || 0,
-    line: { on: lineOn_(), friend: String(st.加好友連結 || '') },
+    line: { on: lineOn_(), friend: String(st.加好友連結 || ''), community: String(st.LINE社群連結 || '') },
+    biz: { name: String(st.公司名稱 || ''), addr: String(st.公司地址 || ''), tax: /^\d+$/.test(String(st.統一編號 || '')) ? ('00000000' + st.統一編號).slice(-8) : String(st.統一編號 || ''), ig: String(st.IG連結 || '') },
     cats: cats_(), products: rows_('商品').filter(function (p) { return p.上架 === 'Y'; }).map(pub_)
   };
 }
@@ -495,7 +496,67 @@ function adminDeleteVendor(tk, name) {
   });
   return vendors_();
 }
-function adminInit(tk) { me_(tk); return { products: adminProducts_(), cats: cats_(), admins: admins_(), vendors: vendors_(), brands: brands_() }; }
+
+/* ===== 物流清單(存在設定「物流追蹤連結」,每行「名稱=查詢網址」,網址可含 {單號}) ===== */
+function carriers_() {
+  var s = settings_(), raw = s.物流追蹤連結 === undefined ? defSet_('物流追蹤連結') : String(s.物流追蹤連結 || ''), out = [];
+  raw.split('\n').forEach(function (ln) {
+    var i = ln.indexOf('='); if (i < 1) return;
+    var k = ln.slice(0, i).trim(), v = ln.slice(i + 1).trim(); if (k) out.push({ name: k, url: v });
+  });
+  return out;
+}
+function trackUrl_(co, no) {
+  co = String(co || ''); var list = carriers_(), hit = list.filter(function (c) { return c.name === co; })[0] || list.filter(function (c) { return co.indexOf(c.name) >= 0; })[0];
+  return hit && /^https:\/\//.test(hit.url) ? hit.url.split('{單號}').join(encodeURIComponent(String(no || ''))) : '';
+}
+/** 客人看到的短連結:網站網址/t.html?i=出貨單號(頁面會顯示單號、可複製,再帶去物流官網) */
+function shortTrack_(s) {
+  var co = String(s.物流 || ''), no = String(s.物流單號 || '');
+  if (!co && !no) return '';
+  var u = trackUrl_(co, no); if (!u) return '';
+  var base = appUrl_();
+  return /\/$/.test(base) ? base + 't.html?i=' + encodeURIComponent(String(s.出貨單ID)) : u;
+}
+function saveCarriers_(list, acc, what, target) {
+  var text = list.map(function (c) { return c.name + '=' + c.url; }).join('\n');
+  if (text.length > 1000) throw new Error('物流清單太長');
+  var ex = rows_('設定').filter(function (r) { return r.項目 === '物流追蹤連結'; })[0];
+  if (ex) put_('設定', ex._r, { '項目': '物流追蹤連結', '值': text }); else put_('設定', 0, { '項目': '物流追蹤連結', '值': text });
+  log_(acc, what, target, '');
+}
+function adminCarriers(tk) { me_(tk); return carriers_(); }
+function adminSaveCarrier(tk, name, url, old) {
+  var u = me_(tk); name = t_(name, 30); url = t_(url, 300); old = t_(old, 30);
+  if (!name) throw new Error('請輸入物流名稱');
+  if (/[=\n]/.test(name)) throw new Error('物流名稱不能包含「=」');
+  if (!/^https:\/\//.test(url)) throw new Error('查詢網址需以 https:// 開頭');
+  lk_(function () {
+    var list = carriers_(), i = -1;
+    list.forEach(function (c, k) { if (c.name === (old || name)) i = k; });
+    if (old && i < 0) throw new Error('找不到原本的物流');
+    if (list.some(function (c, k) { return c.name === name && k !== i; })) throw new Error('物流「' + name + '」已經存在');
+    if (i >= 0) list[i] = { name: name, url: url }; else list.push({ name: name, url: url });
+    saveCarriers_(list, u.acc, i >= 0 ? '修改物流' : '新增物流', name);
+  });
+  return carriers_();
+}
+function adminDeleteCarrier(tk, name) {
+  var u = me_(tk); name = String(name || '');
+  lk_(function () {
+    var list = carriers_(), n = list.filter(function (c) { return c.name !== name; });
+    if (n.length === list.length) throw new Error('找不到這個物流');
+    saveCarriers_(n, u.acc, '刪除物流', name);
+  });
+  return carriers_();
+}
+/** 客人點通知裡的短連結:回傳物流名稱、單號與官網查詢網址 */
+function trackLink(id) {
+  var s = rows_('出貨單').filter(function (x) { return String(x.出貨單ID) === String(id || ''); })[0];
+  if (!s || (!s.物流 && !s.物流單號)) throw new Error('查無這筆物流資料');
+  return { id: String(s.出貨單ID), co: String(s.物流 || ''), no: String(s.物流單號 || ''), url: trackUrl_(s.物流, s.物流單號) };
+}
+function adminInit(tk) { me_(tk); return { products: adminProducts_(), cats: cats_(), admins: admins_(), vendors: vendors_(), brands: brands_(), carriers: carriers_() }; }
 
 function adminSaveProduct(tk, d) {
   var u = me_(tk), L = LockService.getScriptLock();
@@ -727,7 +788,7 @@ function shipObj_(r) {
   return { id: String(r.出貨單ID), oids: String(r.訂單ID).split(','), st: String(r.狀態), pay: String(r.付款方式), co: String(r.物流 || ''), no: String(r.物流單號 || ''), it: String(r.品項 || ''),
     cr: String(r.建立時間 || ''), at: String(r.出貨時間 || ''), name: String(r.姓名 || ''), phone: String(r.電話 || ''), ship: String(r.收件資訊 || ''), note: String(r.備註 || ''),
     sub: Number(r.商品金額), disc: Number(r.優惠折抵), cred: Number(r.購物金折抵), fee: Number(r.運費), total: Number(r.總額),
-    link: /^https:\/\//.test(String(r.付款連結)) ? String(r.付款連結) : '', last5: String(r.匯款後五碼 || ''), method: String(r.配送方式 || '') };
+    link: /^https:\/\//.test(String(r.付款連結)) ? String(r.付款連結) : '', last5: String(r.匯款後五碼 || ''), method: String(r.配送方式 || ''), trk: shortTrack_(r) };
 }
 function memberOrders(tk) {
   var ctx = mem_(tk), lm = lineMeta_(false), items = {}, sh = {};
@@ -1227,8 +1288,8 @@ function adminUpdateShip(tk, sid, d) {
 function shipNotice_(oldS, n, f) {
   var oi = f.indexOf(String(oldS.狀態)), ni = f.indexOf(String(n.狀態)), si = si_(n.付款方式), out = [];
   if (ni >= si && oi < si) out.push(notifyShipped_(n));
-  if (ni === f.length - 1 && oi !== ni) out.push(notifyShipped_(n, '送達通知內容', '商品已送達'));
-  return out.join(';') || null;
+  if (ni === f.length - 1 && oi !== ni) out.push(notifyShipped_(n, '送達通知內容', '商品已送達', true));
+  return out.filter(function (x) { return x; }).join(';') || null;
 }
 /** 批次改出貨單狀態(只改狀態;該付款方式沒有此狀態的會略過) */
 function adminBatchShipStatus(tk, ids, st) {
@@ -1482,8 +1543,9 @@ var DEFAULT_SETTINGS = [
   ['到貨通知內容', '{姓名} 您好,您訂購的 {品名} 已到貨!請到會員中心勾選要出貨的商品:{連結}'],
   ['出貨通知內容', '出貨單號 {出貨單號} 已出貨\n物流:{物流}\n物流單號:{物流單號}\n追蹤連結:{追蹤連結}\n\n有任何問題隨時聯繫我們'],
   ['送達通知內容', '出貨單號 {出貨單號} 商品已送達,感謝您的購買!\n有任何問題隨時聯繫我們'],
-  ['物流追蹤連結', ''],
-  ['加好友連結', 'https://line.me/R/ti/p/@coscoskr']
+  ['物流追蹤連結', '新竹物流=https://www.hct.com.tw/Search/SearchGoods_n.aspx\n7-11=https://eservice.7-11.com.tw/e-tracking/search.aspx\n全家=https://fami.tw/package'],
+  ['加好友連結', 'https://line.me/R/ti/p/@coscoskr'],
+  ['公司名稱', '轉機兔實業'], ['公司地址', ''], ['統一編號', ''], ['IG連結', ''], ['LINE社群連結', '']
 ];
 function ensureSettings_() {
   var have = {}; rows_('設定').forEach(function (r) { have[r.項目] = 1; });
@@ -1547,22 +1609,17 @@ function pushLine_(lid, text) {
   } catch (e) { return false; }
 }
 /** 出貨單改成「已出貨」時,用 LINE 通知客人(內容在設定頁);回傳結果文字 */
-function notifyShipped_(s, key, subj) {
+function notifyShipped_(s, key, subj, quiet) {
   key = key || '出貨通知內容'; subj = subj || '出貨通知';
   var st = settings_(), tpl = String(st[key] === undefined ? defSet_(key) : st[key] || '');
   var lid = String(s['LINE ID'] || ''), em = '';
-  if (!tpl) return '未設定' + key + ',沒有發送通知';
+  if (!tpl) return quiet ? '' : '未設定' + key + ',沒有發送通知';
   if (!lid) {
     var o1 = rows_('訂單').filter(function (x) { return String(s.訂單ID).split(',').indexOf(String(x.訂單ID)) >= 0 && x.電子郵件; })[0];
     em = o1 ? String(o1.電子郵件) : '';
-    if (!em) return '此客人沒有 LINE 也沒有 Email,沒有發送通知';
+    if (!em) return quiet ? '' : '此客人沒有 LINE 也沒有 Email,沒有發送通知';
   }
-  var co = String(s.物流 || ''), no = String(s.物流單號 || ''), url = '';
-  String(st.物流追蹤連結 || '').split('\n').forEach(function (ln) {
-    var i = ln.indexOf('='); if (i < 1 || url) return;
-    var k = ln.slice(0, i).trim(), v = ln.slice(i + 1).trim();
-    if (k && co.indexOf(k) >= 0 && /^https:\/\//.test(v)) url = v.split('{單號}').join(encodeURIComponent(no));
-  });
+  var co = String(s.物流 || ''), no = String(s.物流單號 || ''), url = shortTrack_(s);
   var vals = { '出貨單號': String(s.出貨單ID), '物流': co, '物流單號': no, '追蹤連結': url, '姓名': String(s.姓名 || ''), '連結': appUrl_() };
   var lines = tpl.split('\n').filter(function (ln) {
     return !Object.keys(vals).some(function (k) { return ln.indexOf('{' + k + '}') >= 0 && !vals[k]; });
@@ -1834,7 +1891,7 @@ function adminDeleteActivity(tk, id) {
   });
   return adminActivities(tk);
 }
-var SET_KEYS = ['店名', '店到店運費', '宅配運費', '免運門檻', '匯款資訊', '公告', '購物金使用門檻', '購物金折抵上限', '購物金預設有效天數', '到貨通知內容', '出貨通知內容', '送達通知內容', '物流追蹤連結', '加好友連結'];
+var SET_KEYS = ['店名', '店到店運費', '宅配運費', '免運門檻', '匯款資訊', '公告', '購物金使用門檻', '購物金折抵上限', '購物金預設有效天數', '到貨通知內容', '出貨通知內容', '送達通知內容', '物流追蹤連結', '加好友連結', '公司名稱', '公司地址', '統一編號', 'IG連結', 'LINE社群連結'];
 function defSet_(k) { var r = DEFAULT_SETTINGS.filter(function (x) { return x[0] === k; })[0]; return r ? r[1] : ''; }
 function adminSettings(tk) {
   me_(tk); var s = settings_(), o = {};
@@ -1846,9 +1903,10 @@ function adminSaveSettings(tk, v) {
   lk_(function () {
     ['店到店運費', '宅配運費', '免運門檻', '購物金使用門檻', '購物金預設有效天數'].forEach(function (k) { if (!(Number(v[k]) >= 0) || String(v[k]).trim() === '') throw new Error(k + ' 請填數字'); });
     if (String(v.購物金折抵上限).trim() !== '' && !(Number(v.購物金折抵上限) >= 0)) throw new Error('購物金折抵上限請填數字,或留空代表不限制');
-    if (String(v.加好友連結 || '').trim() && !/^https:\/\//.test(String(v.加好友連結).trim())) throw new Error('加好友連結需以 https:// 開頭');
+    ['加好友連結', 'IG連結', 'LINE社群連結'].forEach(function (k) { if (String(v[k] || '').trim() && !/^https:\/\//.test(String(v[k]).trim())) throw new Error(k + '需以 https:// 開頭'); });
     var cur = rows_('設定'), ch = [];
     SET_KEYS.forEach(function (k) {
+      if (v[k] === undefined) return;
       var nv = typeof v[k] === 'string' ? t_(v[k], 1000) : v[k], ex = cur.filter(function (r) { return r.項目 === k; })[0];
       if (['店到店運費', '宅配運費', '免運門檻', '購物金使用門檻', '購物金預設有效天數'].indexOf(k) >= 0 || (k === '購物金折抵上限' && nv !== '')) nv = Number(nv);
       if (ex) { if (String(ex.值) !== String(nv)) { ch.push(k + ':' + ex.值 + '→' + nv); put_('設定', ex._r, { '項目': k, '值': nv }); } }
@@ -1861,7 +1919,7 @@ function adminSaveSettings(tk, v) {
 
 
 /* ===== 以下由 build.py 加入 ===== */
-export const API = {resetAdmin, getShop, placeOrder, adminLogin, adminVendors, adminBrands, adminAddBrand, adminRenameBrand, adminDeleteBrand, adminCats, adminAddCat, adminRenameCat, adminRenameBig, adminDeleteBig, adminDeleteCat, adminAddVendor, adminDeleteVendor, adminInit, adminSaveProduct, adminDeleteProduct, adminBatchProducts, adminCodes, adminSaveCode, adminSetCodeOn, adminDeleteCode, adminSaveAdmin, adminLogs, memberLogin, memberOrders, memberReportPay, adminBatchArrival, adminLineHistory, adminPurchaseList, adminLineInfo, adminRecordPayment, adminUpdatePayment, adminDeletePayment, adminStockView, adminAddStockIn, adminDeleteStockIn, adminBatchDeleteLines, adminReport, adminOrders, adminUpdateOrder, adminEditLine, adminEditLineFull, adminDeleteOrder, adminBatchDeleteOrders, adminCreateShip, adminUpdateShip, adminBatchShipStatus, adminDeleteShip, adminBatchDeleteShips, adminShipHistory, adminBatch, memberCheckout, memberShipQuote, memberCreateShip, lineStart, quote, adminMembers, adminMemberGrants, adminSetLevel, adminGrant, adminVoidGrant, adminLevels, adminSaveLevel, adminDeleteLevel, adminActivities, adminSaveActivity, adminDeleteActivity, adminSettings, adminSaveSettings};
-export const INTERNAL = {catHit_, page_, doGet, setup, resetAdmin, ss_, raw_, sh_, t_, txt_, rows_, put_, log_, major_, diff_, settings_, cats_, cs_, tiers_, unit_, img_, imgList_, bp_, spec_, specs_, imgs_, pub_, getShop, shopData_, placeOrder, hex_, hash_, admins_, saveAdmin_, adminLogin, me_, adminProducts_, vendors_, adminVendors, brandSheet_, brands_, brandKey_, brandPick_, brandResolve_, brandList_, brandName_, adminBrands, adminAddBrand, adminRenameBrand, adminDeleteBrand, catList_, catName_, adminCats, adminAddCat, renameCats_, adminRenameCat, adminRenameBig, adminDeleteBig, adminDeleteCat, adminAddVendor, adminDeleteVendor, adminInit, adminSaveProduct, adminDeleteProduct, adminBatchProducts, codeSheet_, codes_, dstr_, codeState_, findCode_, codeUsed_, codeList_, adminCodes, adminSaveCode, adminSetCodeOn, adminDeleteCode, adminSaveAdmin, adminLogs, nz_, mk_, mem_, lineMeta_, mine_, memberLogin, shipObj_, memberOrders, memberReportPay, authDrive, adminUploadImage, adminBatchArrival, stockMove_, adminLineHistory, allPurch_, purchaseList_, adminPurchaseList, pickPurchase_, adminLineInfo, adminRecordPayment, adminUpdatePayment, adminDeletePayment, stockView_, adminStockView, adminAddStockIn, deleteStockIn_, adminDeleteStockIn, adminBatchDeleteLines, adminReport, lk_, ri_, si_, paidOk_, now_, cp_, ord_, seq_, adminOrders, adminUpdateOrder, adminEditLine, adminEditLineFull, deleteOrder_, adminDeleteOrder, adminBatchDeleteOrders, adminCreateShip, syncOrderStatus_, adminUpdateShip, shipNotice_, adminBatchShipStatus, deleteShip_, adminDeleteShip, adminBatchDeleteShips, adminShipHistory, adminBatch, memberCheckout, shipCalc_, pickLines_, memberShipQuote, memberCreateShip, ensureSettings_, prop_, lineOn_, lineId_, appUrl_, sha_, tot_, lineStart, lineCallback_, newSession_, upsertMember_, memberRow_, levels_, levelOf_, pushLine_, notifyShipped_, mailTo_, authAll, notifyArrival_, today_, grants_, balance_, addGrant_, spend_, refund_, meInfo_, eligSub_, calc_, quote, awardCredits_, adminMembers, adminMemberGrants, adminSetLevel, adminGrant, adminVoidGrant, adminLevels, adminSaveLevel, adminDeleteLevel, actOut_, adminActivities, adminSaveActivity, adminDeleteActivity, defSet_, adminSettings, adminSaveSettings};
+export const API = {resetAdmin, getShop, placeOrder, adminLogin, adminVendors, adminBrands, adminAddBrand, adminRenameBrand, adminDeleteBrand, adminCats, adminAddCat, adminRenameCat, adminRenameBig, adminDeleteBig, adminDeleteCat, adminAddVendor, adminDeleteVendor, adminCarriers, adminSaveCarrier, adminDeleteCarrier, trackLink, adminInit, adminSaveProduct, adminDeleteProduct, adminBatchProducts, adminCodes, adminSaveCode, adminSetCodeOn, adminDeleteCode, adminSaveAdmin, adminLogs, memberLogin, memberOrders, memberReportPay, adminBatchArrival, adminLineHistory, adminPurchaseList, adminLineInfo, adminRecordPayment, adminUpdatePayment, adminDeletePayment, adminStockView, adminAddStockIn, adminDeleteStockIn, adminBatchDeleteLines, adminReport, adminOrders, adminUpdateOrder, adminEditLine, adminEditLineFull, adminDeleteOrder, adminBatchDeleteOrders, adminCreateShip, adminUpdateShip, adminBatchShipStatus, adminDeleteShip, adminBatchDeleteShips, adminShipHistory, adminBatch, memberCheckout, memberShipQuote, memberCreateShip, lineStart, quote, adminMembers, adminMemberGrants, adminSetLevel, adminGrant, adminVoidGrant, adminLevels, adminSaveLevel, adminDeleteLevel, adminActivities, adminSaveActivity, adminDeleteActivity, adminSettings, adminSaveSettings};
+export const INTERNAL = {catHit_, page_, doGet, setup, resetAdmin, ss_, raw_, sh_, t_, txt_, rows_, put_, log_, major_, diff_, settings_, cats_, cs_, tiers_, unit_, img_, imgList_, bp_, spec_, specs_, imgs_, pub_, getShop, shopData_, placeOrder, hex_, hash_, admins_, saveAdmin_, adminLogin, me_, adminProducts_, vendors_, adminVendors, brandSheet_, brands_, brandKey_, brandPick_, brandResolve_, brandList_, brandName_, adminBrands, adminAddBrand, adminRenameBrand, adminDeleteBrand, catList_, catName_, adminCats, adminAddCat, renameCats_, adminRenameCat, adminRenameBig, adminDeleteBig, adminDeleteCat, adminAddVendor, adminDeleteVendor, carriers_, trackUrl_, shortTrack_, saveCarriers_, adminCarriers, adminSaveCarrier, adminDeleteCarrier, trackLink, adminInit, adminSaveProduct, adminDeleteProduct, adminBatchProducts, codeSheet_, codes_, dstr_, codeState_, findCode_, codeUsed_, codeList_, adminCodes, adminSaveCode, adminSetCodeOn, adminDeleteCode, adminSaveAdmin, adminLogs, nz_, mk_, mem_, lineMeta_, mine_, memberLogin, shipObj_, memberOrders, memberReportPay, authDrive, adminUploadImage, adminBatchArrival, stockMove_, adminLineHistory, allPurch_, purchaseList_, adminPurchaseList, pickPurchase_, adminLineInfo, adminRecordPayment, adminUpdatePayment, adminDeletePayment, stockView_, adminStockView, adminAddStockIn, deleteStockIn_, adminDeleteStockIn, adminBatchDeleteLines, adminReport, lk_, ri_, si_, paidOk_, now_, cp_, ord_, seq_, adminOrders, adminUpdateOrder, adminEditLine, adminEditLineFull, deleteOrder_, adminDeleteOrder, adminBatchDeleteOrders, adminCreateShip, syncOrderStatus_, adminUpdateShip, shipNotice_, adminBatchShipStatus, deleteShip_, adminDeleteShip, adminBatchDeleteShips, adminShipHistory, adminBatch, memberCheckout, shipCalc_, pickLines_, memberShipQuote, memberCreateShip, ensureSettings_, prop_, lineOn_, lineId_, appUrl_, sha_, tot_, lineStart, lineCallback_, newSession_, upsertMember_, memberRow_, levels_, levelOf_, pushLine_, notifyShipped_, mailTo_, authAll, notifyArrival_, today_, grants_, balance_, addGrant_, spend_, refund_, meInfo_, eligSub_, calc_, quote, awardCredits_, adminMembers, adminMemberGrants, adminSetLevel, adminGrant, adminVoidGrant, adminLevels, adminSaveLevel, adminDeleteLevel, actOut_, adminActivities, adminSaveActivity, adminDeleteActivity, defSet_, adminSettings, adminSaveSettings};
 export { H };
 export function __reset() { SS_ = null; SHC_ = {}; RC_ = {}; }

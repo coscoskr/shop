@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>物流查詢 | coscos韓國選物店</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600&family=Cormorant+Garamond:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--paper:#FFFBFA;--ink:#4B3B37;--mute:#8C7771;--line:#F0DFD9;--acc:#A95B4D;--soft:#FAEEEA;--pink:#E8AEA0;--pinkbg:#DBB0A5}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:var(--paper);color:var(--ink);font:15px/1.6 "Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;display:flex;flex-direction:column;align-items:center;padding:28px 16px}
+.brand{font:400 26px/1 "Cormorant Garamond","Noto Serif TC",serif;letter-spacing:2px;color:var(--acc);margin-bottom:4px}
+.sub{font-size:12px;letter-spacing:2px;color:var(--mute);margin-bottom:22px}
+.card{width:min(420px,100%);border:1px solid var(--pink);border-radius:16px;background:#fff;padding:20px 18px;text-align:center}
+h1{font:600 18px/1.4 "Noto Serif TC",serif;margin:0 0 14px;letter-spacing:3px}
+.row{padding:10px 0;border-top:1px dashed var(--pink)}.row small{display:block;color:var(--mute);font-size:12px}
+.no{font-size:22px;font-weight:700;letter-spacing:2px;word-break:break-all;margin:2px 0 8px}
+.btn{display:inline-block;border:1px solid var(--acc);background:#fff;color:var(--acc);border-radius:999px;padding:7px 18px;font:inherit;font-size:14px;cursor:pointer;text-decoration:none}
+.btn.a{background:var(--acc);color:#fff}.btn.ok{background:var(--acc);color:#fff}
+.go{margin-top:14px}.go .btn{display:block;padding:11px;font-size:15px;font-weight:700}
+.tip{font-size:12.5px;color:var(--mute);margin:10px 0 0}
+.er{color:var(--acc)}
+</style>
+</head>
+<body>
+<div class="brand">coscos select</div>
+<div class="sub">KOREA SELECT SHOP</div>
+<div class="card" id="c"><p>查詢中…</p></div>
+<script src="api.js"></script>
+<script>
+(function () {
+  var $ = function (s) { return document.querySelector(s); };
+  function esc(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  var id = new URLSearchParams(location.search).get('i') || '';
+  if (!id) { $('#c').innerHTML = '<p class="er">連結不完整,請回到通知訊息重新點選。</p>'; return; }
+  google.script.run.withSuccessHandler(function (r) {
+    var h = '<h1>物流查詢</h1><div class="row"><small>出貨單</small><b>' + esc(r.id) + '</b></div>' +
+      (r.co ? '<div class="row"><small>物流</small><b>' + esc(r.co) + '</b></div>' : '') +
+      (r.no ? '<div class="row"><small>物流單號</small><div class="no" id="no">' + esc(r.no) + '</div><button class="btn" id="cp" type="button">複製單號</button></div>' : '');
+    if (r.url) h += '<div class="go"><a class="btn a" href="' + esc(r.url) + '" target="_blank" rel="noopener">前往 ' + esc(r.co || '物流') + ' 官網查詢</a></div><p class="tip">部分物流官網需手動輸入單號,請先複製上方單號再貼上。</p>';
+    $('#c').innerHTML = h;
+    var b = $('#cp'); if (b) b.onclick = function () {
+      var v = r.no, ok = function () { b.textContent = '已複製'; b.classList.add('ok'); setTimeout(function () { b.textContent = '複製單號'; b.classList.remove('ok'); }, 1500); };
+      var fb = function () { var t = document.createElement('textarea'); t.value = v; t.style.cssText = 'position:fixed;opacity:0'; document.body.appendChild(t); t.select(); try { document.execCommand('copy'); ok(); } catch (x) {} document.body.removeChild(t); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(v).then(ok, fb); else fb();
+    };
+  }).withFailureHandler(function (e) { $('#c').innerHTML = '<p class="er">' + esc(e.message) + '</p>'; }).trackLink(id);
+})();
+</script>
+</body>
+</html>

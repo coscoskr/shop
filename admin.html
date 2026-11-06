@@ -80,7 +80,7 @@ fieldset{border:1px solid var(--line);border-radius:2px;margin:14px 0;padding:10
 
 <script src="api.js"></script>
 <script>
-var BL = [], T = '', P = [], C = [], A = [], O = null, VL = [], FL = {}, tab = 'o', SEL = {};
+var CR = [], BL = [], T = '', P = [], C = [], A = [], O = null, VL = [], FL = {}, tab = 'o', SEL = {};
 var OF = { from: '', to: '', q: '', st: '', pay: '' }, SF = { from: '', to: '', q: '', st: '', pay: '' }, PF = { q: '', type: '', lock: '' };
 var ALLST = ['待刷卡', '已刷卡待出貨', '待匯款', '已匯款待查帳', '已查帳待出貨', '待出貨', '已出貨待送達', '已出貨待收貨', '已送達', '已收貨付款'];
 var $ = function (s) { return document.querySelector(s); };
@@ -115,9 +115,9 @@ function tell(msg) {
 function fail(id) { return function (e) { var el = $(id); if (el) el.textContent = e.message; else tell(e.message); }; }
 function start(tk, name) {
   T = tk; O = null; PV = null; try { sessionStorage.setItem('t', tk); sessionStorage.setItem('n', name); } catch (e) {}
-  call('adminInit', T).then(function (d) { P = d.products; C = d.cats; A = d.admins; VL = d.vendors || []; BL = d.brands || []; $('#who').textContent = name; $('#lg').hidden = true; $('#app').hidden = false; render(); }).catch(function () {});
+  call('adminInit', T).then(function (d) { P = d.products; C = d.cats; A = d.admins; VL = d.vendors || []; BL = d.brands || []; CR = d.carriers || []; $('#who').textContent = name; $('#lg').hidden = true; $('#app').hidden = false; render(); }).catch(function () {});
 }
-try { var st0 = sessionStorage.getItem('t'), sn0 = sessionStorage.getItem('n'); if (st0) { $('#lg').hidden = true; call('adminInit', st0).then(function (d) { T = st0; O = null; PV = null; P = d.products; C = d.cats; A = d.admins; VL = d.vendors || []; BL = d.brands || []; $('#who').textContent = sn0 || ''; $('#app').hidden = false; render(); }).catch(function () { $('#lg').hidden = false; try { sessionStorage.removeItem('t'); sessionStorage.removeItem('n'); } catch (e) {} }); } } catch (e) {}
+try { var st0 = sessionStorage.getItem('t'), sn0 = sessionStorage.getItem('n'); if (st0) { $('#lg').hidden = true; call('adminInit', st0).then(function (d) { T = st0; O = null; PV = null; P = d.products; C = d.cats; A = d.admins; VL = d.vendors || []; BL = d.brands || []; CR = d.carriers || []; $('#who').textContent = sn0 || ''; $('#app').hidden = false; render(); }).catch(function () { $('#lg').hidden = false; try { sessionStorage.removeItem('t'); sessionStorage.removeItem('n'); } catch (e) {} }); } } catch (e) {}
 
 $('#lf').addEventListener('submit', function (e) {
   e.preventDefault(); $('#le').textContent = '';
@@ -212,7 +212,7 @@ function openShip(sid) {
   var s = x.s, d = $('#dlg');
   d.innerHTML = '<h3>出貨單 ' + esc(s.id) + ' <span class="m">訂單 ' + esc(s.oids.join('、')) + ' · ' + esc(s.name) + ' · ' + esc(s.pay) + '</span></h3>' +
     '<p><button type="button" class="btn a" data-a="po" data-id="' + esc(s.id) + '">開啟訂購單(列印給倉庫)</button></p><p>' + esc(s.it) + '</p><p class="m">商品 ' + money(s.sub) + (s.disc ? ' − 優惠 ' + money(s.disc) : '') + (s.cred ? ' − 購物金 ' + money(s.cred) : '') + ' + 運費 ' + money(s.fee) + ' = <b>' + money(s.total) + '</b></p>' +
-    '<form id="shf" data-id="' + esc(s.id) + '"><div class="g"><label>狀態<select name="st">' + opts(FL[s.pay] || [s.st], s.st) + '</select></label>' + fld('物流', 'co', s.co) + fld('物流單號', 'no', s.no) +
+    '<form id="shf" data-id="' + esc(s.id) + '"><div class="g"><label>狀態<select name="st">' + opts(FL[s.pay] || [s.st], s.st) + '</select></label>' + '<label>物流<select name="co"><option value="">(未選擇)</option>' + opts(CR.map(function (c) { return c.name; }).concat(s.co && !CR.some(function (c) { return c.name === s.co; }) ? [s.co] : []), s.co) + '</select></label>' + fld('物流單號', 'no', s.no) +
     fld('運費', 'fee', s.fee, 'number') + fld('電話', 'phone', s.phone) + fld('匯款後五碼', 'last5', s.last5) + '<div class="f">' + fld('付款連結(https,客人刷卡用)', 'link', s.link) + '</div><div class="f">' + fld('收件資訊', 'ship', s.ship) + '</div><div class="f">' + fld('備註', 'note', s.note) + '</div></div>' +
     '<p class="m">狀態依付款方式走流程;改成「已出貨…」會記錄出貨時間;出貨單全部走到最後一個狀態時,訂單自動變「已完成」。</p><p class="er" id="se" role="alert"></p>' +
     '<button class="btn a">儲存</button> <button type="button" class="btn l" data-a="x">關閉</button> <button type="button" class="btn l" data-a="dship" data-id="' + esc(s.id) + '">刪除出貨單</button></form>' +
@@ -414,7 +414,7 @@ function actToggle() {
 
 function setView() {
   $('#v').innerHTML = '<p class="m">載入中…</p>';
-  Promise.all([call('adminSettings', T), call('adminLevels', T), call('adminVendors', T), call('adminCats', T), call('adminBrands', T)]).then(function (r) { SG = r[0]; LV = r[1]; VL = r[2]; CL = r[3]; BR = r[4]; BL = BR.map(function (x) { return x.name; }); C = CL.map(function (x) { return x.name; }); drawSettings(); }).catch(function (e) { $('#v').innerHTML = '<p class="er">' + esc(e.message) + '</p>'; });
+  Promise.all([call('adminSettings', T), call('adminLevels', T), call('adminVendors', T), call('adminCats', T), call('adminBrands', T), call('adminCarriers', T)]).then(function (r) { CR = r[5]; SG = r[0]; LV = r[1]; VL = r[2]; CL = r[3]; BR = r[4]; BL = BR.map(function (x) { return x.name; }); C = CL.map(function (x) { return x.name; }); drawSettings(); }).catch(function (e) { $('#v').innerHTML = '<p class="er">' + esc(e.message) + '</p>'; });
 }
 var CL = [], BR = [];
 function drawSettings() {
@@ -424,9 +424,9 @@ function drawSettings() {
     '<div class="warn">LINE 登入:' + (l.login ? '已設定' : '尚未設定(缺 LINE_LOGIN_SECRET)') + ';LINE 推播:' + (l.msg ? '已設定' : '尚未設定(缺 LINE_MSG_TOKEN)') + '\n網站網址(LINE Callback URL 要填這個):' + esc(l.url) + '</div>' +
     '<form id="stf" style="max-width:760px"><div class="g">' + fld('店名', '店名', v.店名) + fld('店到店運費', '店到店運費', v.店到店運費, 'number') + fld('宅配運費', '宅配運費', v.宅配運費, 'number') + fld('免運門檻(訂單金額扣掉優惠後滿多少免運)', '免運門檻', v.免運門檻, 'number') +
     fld('購物金使用門檻(訂單滿多少才能用)', '購物金使用門檻', v.購物金使用門檻, 'number') + fld('購物金折抵上限(每筆最多折幾元,空白=不限)', '購物金折抵上限', v.購物金折抵上限, 'number') + fld('購物金預設有效天數', '購物金預設有效天數', v.購物金預設有效天數, 'number') +
-    '<div class="f">' + fld('加好友連結', '加好友連結', v.加好友連結) + '</div>' + ta('匯款資訊', 3) + ta('公告', 2) + ta('到貨通知內容', 3) + ta('出貨通知內容', 7) + ta('送達通知內容', 4) + ta('物流追蹤連結', 4) + '</div>' +
-    '<p class="m">到貨通知可用:{姓名} {品名} {訂單} {連結}<br>出貨通知(出貨單改成「已出貨」時自動用 LINE 發送)可用:{出貨單號} {物流} {物流單號} {追蹤連結} {姓名} {連結};某個變數沒有值時,那一整行會自動省略。<br>送達通知(出貨單改成「已送達」或「已收貨付款」時自動發送,LINE 或 Email)可用:{出貨單號} {物流} {物流單號} {姓名} {連結}。<br>物流追蹤連結:每行一個,寫法「物流名稱=網址」,網址裡的 {單號} 會換成物流單號。例:黑貓=https://網址?no={單號}。物流欄位包含該名稱就會套用。</p><p class="er" id="ste" role="alert"></p><button class="btn a">儲存設定</button></form>' +
-    '<h3 style="margin-top:28px">廠商管理</h3><p class="m">商品與訂單明細的「廠商」都從這裡的清單選。刪除廠商不會改動已經存在的商品和訂單。</p><table style="max-width:420px;min-width:0"><tbody>' +
+    '<div class="f">' + fld('加好友連結', '加好友連結', v.加好友連結) + '</div>' + ta('匯款資訊', 3) + ta('公告', 2) + ta('到貨通知內容', 3) + ta('出貨通知內容', 7) + ta('送達通知內容', 4) + '</div><h3 style="margin-top:20px">公司資訊(顯示在前台最下方)</h3><div class="g">' + fld('公司名稱', '公司名稱', v.公司名稱) + fld('統一編號', '統一編號', v.統一編號) + '<div class="f">' + fld('公司地址', '公司地址', v.公司地址) + '</div>' + fld('Instagram 連結(https)', 'IG連結', v.IG連結) + fld('LINE 社群連結(https)', 'LINE社群連結', v.LINE社群連結) + '</div>' +
+    '<p class="m">到貨通知可用:{姓名} {品名} {訂單} {連結}<br>出貨通知(出貨單改成「已出貨」時自動用 LINE 發送)可用:{出貨單號} {物流} {物流單號} {追蹤連結} {姓名} {連結};某個變數沒有值時,那一整行會自動省略。<br>送達通知(出貨單改成「已送達」或「已收貨付款」時自動發送,LINE 或 Email)可用:{出貨單號} {物流} {物流單號} {姓名} {連結}。<br>物流清單請在下方「物流管理」新增與修改。例:黑貓=https://網址?no={單號}。物流欄位包含該名稱就會套用。</p><p class="er" id="ste" role="alert"></p><button class="btn a">儲存設定</button></form>' +
+    carrierSec() + '<h3 style="margin-top:28px">廠商管理</h3><p class="m">商品與訂單明細的「廠商」都從這裡的清單選。刪除廠商不會改動已經存在的商品和訂單。</p><table style="max-width:420px;min-width:0"><tbody>' +
     (VL.map(function (x) { return '<tr><td>' + esc(x) + '</td><td><button class="btn l s" data-vd="del" data-name="' + esc(x) + '">刪除</button></td></tr>'; }).join('') || '<tr><td class="m">還沒有廠商</td></tr>') + '</tbody></table>' +
     '<form id="vdf" style="max-width:420px;margin-top:10px"><div class="g">' + fld('新增廠商', 'name', '') + '</div><p class="er" id="vde" role="alert"></p><button class="btn a">新增</button></form>' +
     '<h3 style="margin-top:28px">商品分類(兩層:大分類 → 小分類)</h3><p class="m">前台客人點大分類後,會再出現第二層的小分類。先新增大分類,再到它底下新增小分類。改名、刪除會同步商品、會員等級與活動;刪除只會把分類從商品上拿掉,商品不會被刪。</p>' + catTree() +
@@ -524,10 +524,10 @@ document.addEventListener('submit', function (e) {
   if (f.id === 'of') {
     $('#oe').textContent = '';
     call('adminUpdateOrder', T, f.dataset.id, { name: f.name.value, phone: f.phone.value, note: f.note.value })
-      .then(function (d) { refreshOpen(d, f.dataset.id); }).catch(fail('#oe'));
+      .then(function (d) { setO(d); PVDIRTY = true; if (tab === 'o') orderRows(); else if (tab === 's') shipRows(); $('#dlg').close(); tell('訂單 ' + f.dataset.id + ' 已更新'); }).catch(fail('#oe'));
   } else if (f.id === 'shf') {
     $('#se').textContent = '';
-    call('adminUpdateShip', T, f.dataset.id, { st: f.st.value, co: f.co.value, no: f.no.value, fee: f.fee.value, phone: f.phone.value, last5: f.last5.value, link: f.link.value, ship: f.ship.value, note: f.note.value }).then(function (d) { setO(d); if (tab === 's') shipRows(); else if (tab === 'o') orderRows(); openShip(f.dataset.id); if (d.shipNotify) tell(d.shipNotify); }).catch(fail('#se'));
+    call('adminUpdateShip', T, f.dataset.id, { st: f.st.value, co: f.co.value, no: f.no.value, fee: f.fee.value, phone: f.phone.value, last5: f.last5.value, link: f.link.value, ship: f.ship.value, note: f.note.value }).then(function (d) { setO(d); if (tab === 's') shipRows(); else if (tab === 'o') orderRows(); $('#dlg').close(); tell('出貨單 ' + f.dataset.id + ' 已更新' + (d.shipNotify ? '\n' + d.shipNotify : '')); }).catch(fail('#se'));
   } else if (f.id === 'bf') {
     $('#be').textContent = '';
     var ids = selIds(), data = { vendor: f.vendor.value, source: f.source.value, cost: f.cost.value, tax: f.tax.value };
@@ -595,7 +595,7 @@ document.addEventListener('submit', function (e) {
       .then(function (r) { AC = r; $('#dlg').close(); drawActs(); }).catch(fail('#ace'));
   } else if (f.id === 'stf') {
     $('#ste').textContent = '';
-    var o = {}; ['店名', '店到店運費', '宅配運費', '免運門檻', '匯款資訊', '公告', '購物金使用門檻', '購物金折抵上限', '購物金預設有效天數', '到貨通知內容', '出貨通知內容', '物流追蹤連結', '加好友連結', '折扣碼'].forEach(function (k) { o[k] = f.elements[k].value; });
+    var o = {}; ['店名', '店到店運費', '宅配運費', '免運門檻', '匯款資訊', '公告', '購物金使用門檻', '購物金折抵上限', '購物金預設有效天數', '到貨通知內容', '出貨通知內容', '送達通知內容', '加好友連結', '公司名稱', '公司地址', '統一編號', 'IG連結', 'LINE社群連結'].forEach(function (k) { if (f.elements[k]) o[k] = f.elements[k].value; });
     call('adminSaveSettings', T, o).then(function (r) { SG = r; drawSettings(); $('#ste').textContent = '已儲存'; $('#ste').className = 'm'; }).catch(fail('#ste'));
   } else if (f.id === 'lvl') {
     $('#lve').textContent = '';
@@ -755,6 +755,26 @@ document.addEventListener('click', function (e) {
 document.addEventListener('submit', function (e) {
   var f = e.target; if (f.id !== 'vdf') return;
   call('adminAddVendor', T, f.name.value).then(function (r) { VL = r; PVDIRTY = true; drawSettings(); }).catch(fail('#vde'));
+});
+
+function carrierSec() {
+  return '<h3 style="margin-top:28px">物流管理</h3><p class="m">出貨單的「物流」從這裡的清單選。每個物流綁一個查詢網址,出貨通知會附上短連結,客人點開會顯示單號(可複製)再前往物流官網。網址裡的 {單號} 會換成物流單號。網址我是依常見的官方查詢頁預填,若失效請在這裡修改。</p>' +
+    '<table style="max-width:760px;min-width:0"><thead><tr><th>物流</th><th>查詢網址</th><th></th></tr></thead><tbody>' +
+    (CR.map(function (c) { return '<tr><td>' + esc(c.name) + '</td><td style="word-break:break-all"><small>' + esc(c.url) + '</small></td><td style="white-space:nowrap"><button type="button" class="btn l s" data-cr="edit" data-name="' + esc(c.name) + '">編輯</button> <button type="button" class="btn l s" data-cr="del" data-name="' + esc(c.name) + '">刪除</button></td></tr>'; }).join('') || '<tr><td colspan="3" class="m">還沒有物流</td></tr>') + '</tbody></table>' +
+    '<form id="crf" style="max-width:760px;margin-top:10px"><input type="hidden" name="old" value=""><div class="g">' + fld('物流名稱', 'name', '') + fld('查詢網址(https)', 'url', '') + '</div><p class="er" id="cre" role="alert"></p><button class="btn a" id="crb">新增物流</button> <button type="button" class="btn l" id="crc" hidden>取消編輯</button></form>';
+}
+document.addEventListener('click', function (e) {
+  var b = e.target.closest('[data-cr]'); if (!b) return;
+  var n = b.dataset.name, c = CR.filter(function (x) { return x.name === n; })[0];
+  if (b.dataset.cr === 'edit' && c) { var f = $('#crf'); f.old.value = c.name; f.name.value = c.name; f.url.value = c.url; $('#crb').textContent = '儲存修改'; $('#crc').hidden = false; f.name.focus(); }
+  else if (b.dataset.cr === 'del') ask('刪除物流「' + n + '」?已有的出貨單仍保留物流名稱,只是不再有查詢連結。', function () {
+    call('adminDeleteCarrier', T, n).then(function (r) { CR = r; drawSettings(); }).catch(function (er) { tell(er.message); });
+  });
+});
+document.addEventListener('click', function (e) { if (e.target.id === 'crc') drawSettings(); });
+document.addEventListener('submit', function (e) {
+  var f = e.target; if (f.id !== 'crf') return; e.preventDefault();
+  call('adminSaveCarrier', T, f.name.value, f.url.value, f.old.value).then(function (r) { CR = r; drawSettings(); tell('物流已儲存'); }).catch(fail('#cre'));
 });
 
 function catTree() {
