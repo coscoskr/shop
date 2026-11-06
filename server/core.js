@@ -63,6 +63,9 @@ const SPECIAL = {
     const ext = mime === 'image/png' ? '.png' : mime === 'image/webp' ? '.webp' : '.jpg';
     const name = 'p' + Date.now() + Math.random().toString(36).slice(2, 6) + ext;
     const bin = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    const sig = (a) => a.every((v, i) => bin[i] === v);
+    const okMagic = mime === 'image/png' ? sig([0x89, 0x50, 0x4e, 0x47]) : mime === 'image/jpeg' ? sig([0xff, 0xd8, 0xff]) : (sig([0x52, 0x49, 0x46, 0x46]) && bin[8] === 0x57 && bin[9] === 0x45 && bin[10] === 0x42 && bin[11] === 0x50);
+    if (!okMagic) throw new Error('檔案內容不是有效的圖片');
     const r = await fetch(`${env.SUPABASE_URL}/storage/v1/object/product-images/${name}`, {
       method: 'POST', headers: { Authorization: 'Bearer ' + env.SUPABASE_SERVICE_ROLE_KEY, 'Content-Type': mime, 'x-upsert': 'false' }, body: bin,
     });

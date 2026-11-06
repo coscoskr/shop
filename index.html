@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
+<meta http-equiv="Content-Security-Policy" content="object-src 'none'; base-uri 'self'">
+<meta name="referrer" content="strict-origin-when-cross-origin">
 <base target="_top">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -486,9 +488,9 @@ function steps(o) {
 }
 function memLogin() {
   var line = D.line && D.line.on;
-  return '<h2>會員專區</h2>' + (line ? '<p class="ds">用 LINE 登入,就能看到你所有的訂單、購物金與出貨狀態。</p><p><a class="btn a" id="lga" href="#" target="_top" aria-disabled="true" style="display:inline-block;text-decoration:none;line-height:28px">準備中…</a></p><hr style="border:0;border-top:1px solid var(--line)"><p class="ds">沒有登入下單的訪客,可以用電話或訂單編號查詢:</p>' : '<p>輸入下單時的電話或訂單編號(填一個即可),就能查看訂單。</p>') +
-    '<form id="mf"><p class="ds">電話或訂單編號,填其中一個就能查詢。</p><label>聯絡電話<input name="phone" inputmode="tel" autocomplete="tel"></label>' +
-    '<label>訂單編號<input name="oid" placeholder="例如 O261103001" autocapitalize="characters"></label>' +
+  return '<h2>會員專區</h2>' + (line ? '<p class="ds">用 LINE 登入,就能看到你所有的訂單、購物金與出貨狀態。</p><p><a class="btn a" id="lga" href="#" target="_top" aria-disabled="true" style="display:inline-block;text-decoration:none;line-height:28px">準備中…</a></p><hr style="border:0;border-top:1px solid var(--line)"><p class="ds">沒有登入下單的訪客,可以用電話加訂單編號查詢:</p>' : '<p>輸入下單時的電話與訂單編號,就能查看訂單。</p>') +
+    '<form id="mf"><p class="ds">為了保護你的個資,請同時填寫下單時的電話與訂單編號。</p><label>聯絡電話<input name="phone" inputmode="tel" autocomplete="tel" required></label>' +
+    '<label>訂單編號<input name="oid" placeholder="例如 O261103001" autocapitalize="characters" required></label>' +
     '<p id="me" class="tg" role="alert"></p><button class="btn' + (line ? ' l' : ' a') + '">查看訂單</button> <button type="button" class="btn l" data-a="x">關閉</button></form>';
 }
 function memHead() {

@@ -853,15 +853,13 @@ function lineMeta_(admin) {
 function mine_(ctx, o) { return ctx.lid ? String(o['LINE ID']) === ctx.lid : nz_(o.電話) === ctx.phone; }
 function memberLogin(phone, oid) {
   var p = nz_(phone), id = String(oid || '').trim().toUpperCase();
-  if (!p && !id) return { ok: false, msg: '請輸入電話或訂單編號(填一個即可)' };
-  var c = CacheService.getScriptCache(), k = 'mf_' + (p || id), n = Number(c.get(k) || 0), gn = Number(c.get('mfg') || 0);
-  if (n >= 5 || gn >= 60) return { ok: false, msg: '嘗試次數過多,請10分鐘後再試' };
-  var orders = rows_('訂單'), hit = null;
-  if (p) hit = orders.filter(function (r) { return nz_(r.電話) === p; })[0];
-  else hit = orders.filter(function (r) { return String(r.訂單ID).toUpperCase() === id; })[0];
+  if (!p || !id) return { ok: false, msg: '請同時輸入下單時的電話與訂單編號' };
+  var c = CacheService.getScriptCache(), k1 = 'mf_' + p, k2 = 'mf_' + id, n1 = Number(c.get(k1) || 0), n2 = Number(c.get(k2) || 0), gn = Number(c.get('mfg') || 0);
+  if (n1 >= 5 || n2 >= 5 || gn >= 60) return { ok: false, msg: '嘗試次數過多,請10分鐘後再試' };
+  var hit = rows_('訂單').filter(function (r) { return String(r.訂單ID).toUpperCase() === id && nz_(r.電話) === p; })[0];
   if (!hit) {
-    c.put(k, String(n + 1), 600); c.put('mfg', String(gn + 1), 600);
-    return { ok: false, msg: p ? '找不到這個電話的訂單' : '找不到這個訂單編號' };
+    c.put(k1, String(n1 + 1), 600); c.put(k2, String(n2 + 1), 600); c.put('mfg', String(gn + 1), 600);
+    return { ok: false, msg: '電話與訂單編號不符,請確認後再試' };
   }
   return { ok: true, token: mk_(nz_(hit.電話)) };
 }
