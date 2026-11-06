@@ -302,7 +302,7 @@ function drawPg(pages) {
   p.innerHTML = h + '<button type="button" data-a="pg" data-p="' + (PAGE + 1) + '"' + (PAGE >= pages ? ' disabled' : '') + ' aria-label="下一頁">›</button>';
 }
 function prodUrl(p) { return location.origin + location.pathname + '?p=' + encodeURIComponent(p.id); }
-function shareMsg(p) { return '欸這個要不要買😍\n\n' + (p.brand ? '「' + p.brand + '」' : '') + p.name + ' ' + money(p.price) + '\n\n商品連結🔗\n' + prodUrl(p); }
+function shareMsg(p) { return (p.brand ? '「' + p.brand + '」' : '') + p.name + '\n\n商品連結🔗\n' + prodUrl(p); }
 function shareProd(p) {
   if (!p) return;
   var msg = shareMsg(p);
