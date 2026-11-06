@@ -121,3 +121,43 @@ export async function runAfter(after, env) {
     } catch (e) { /* 通知失敗不影響主流程 */ }
   }
 }
+
+/**
+ * LINE 官方帳號的 Webhook:客人傳訊息或加好友時,把他記進會員清單(代客下單可直接選)。
+ * 驗證:用 Messaging API 頻道的 Channel secret 檢查 x-line-signature,不符就拒絕。
+ */
+export async function handleWebhook({ rawBody, signature, db, env }) {
+  let events = [];
+  const ok = await db.withTx(async (tx) => {
+    const { tableData, kv, props: dbProps } = await tx.loadAll();
+    const props = Object.assign({}, env.props || {}, dbProps);
+    const secret = props.LINE_MSG_SECRET || '';
+    if (!secret || !signature) return false;
+    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+    const mac = new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(rawBody)));
+    let bin = ''; mac.forEach((b) => { bin += String.fromCharCode(b); });
+    if (btoa(bin) !== signature) return false;
+    try { events = (JSON.parse(rawBody).events || []).slice(0, 20); } catch (e) { events = []; }
+    const seen = new Map();
+    for (const ev of events) {
+      const uid = ev && ev.source && ev.source.userId;
+      if (!uid || !['message', 'follow', 'unfollow'].includes(ev.type)) continue;
+      seen.set(uid, ev.type === 'unfollow' ? false : (seen.get(uid) === undefined ? true : seen.get(uid)));
+    }
+    if (!seen.size) return true;
+    const rt = createRuntime({ H: code.H, tableData, kv, props, fetchMap: {} });
+    for (const [uid, follow] of seen) {
+      let name = '', pic = '';
+      if (follow && props.LINE_MSG_TOKEN) {
+        try {
+          const r = await fetch('https://api.line.me/v2/bot/profile/' + encodeURIComponent(uid), { headers: { Authorization: 'Bearer ' + props.LINE_MSG_TOKEN } });
+          if (r.ok) { const j = await r.json(); name = j.displayName || ''; pic = j.pictureUrl || ''; }
+        } catch (e) { /* 取不到暱稱也先記下 */ }
+      }
+      withRt(rt, () => code.INTERNAL.contactSeen_(uid, name, pic, follow));
+    }
+    await tx.commit(rt.collectOps(), rt.kvOps);
+    return true;
+  });
+  return ok;
+}
