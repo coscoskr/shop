@@ -527,10 +527,14 @@ function liffBoot() {
       if (!liff.isLoggedIn()) { if (liff.isInClient() || /[?&]liff\.state|liff\.line\.me/.test(location.href + document.referrer)) liff.login(); return; }
       var it = liff.getIDToken(); if (!it) { liff.logout(); liff.login(); return; }
       google.script.run.withSuccessHandler(function (r) {
-        LT = r.token; try { localStorage.setItem('lt', LT); } catch (e) {}
+        LT = r.token; try { localStorage.setItem('lt', LT); sessionStorage.removeItem('liffRetry'); } catch (e) {}
         try { history.replaceState(null, '', location.pathname); } catch (e) {}
         memLoad(function () { show(memList()); });
-      }).withFailureHandler(function (e) { $('#notice').hidden = false; $('#notice').textContent = e.message || 'LINE 登入失敗'; }).lineLiff(it, liff.getAccessToken());
+      }).withFailureHandler(function (e) {
+        var tried = ''; try { tried = sessionStorage.getItem('liffRetry') || ''; sessionStorage.setItem('liffRetry', '1'); } catch (x) {}
+        if (!tried) { try { liff.logout(); } catch (x) {} liff.login(); return; }
+        $('#notice').hidden = false; $('#notice').textContent = e.message || 'LINE 登入失敗';
+      }).lineLiff(it, liff.getAccessToken());
     }).catch(function () {});
   };
   document.head.appendChild(sc);

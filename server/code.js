@@ -1694,7 +1694,7 @@ function lineLiff(idToken, accessToken) {
   if (!idToken) throw new Error('LINE 登入失敗,請再試一次');
   var v = {};
   try { v = JSON.parse(UrlFetchApp.fetch('https://api.line.me/oauth2/v2.1/verify', { method: 'post', muteHttpExceptions: true, payload: { id_token: String(idToken), client_id: lineId_() } }).getContentText()); } catch (e) {}
-  if (!v.sub) throw new Error('LINE 登入已過期,請重新登入');
+  if (!v.sub) throw new Error('LINE 登入已過期,請重新登入' + (v.error_description ? '(' + v.error_description + ')' : ''));
   var friend = false;
   try { if (accessToken) friend = !!JSON.parse(UrlFetchApp.fetch('https://api.line.me/friendship/v1/status', { headers: { Authorization: 'Bearer ' + accessToken }, muteHttpExceptions: true }).getContentText()).friendFlag; } catch (e) {}
   upsertMember_(v.sub, v.name || '', v.picture || '', friend);
