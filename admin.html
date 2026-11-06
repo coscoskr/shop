@@ -39,6 +39,7 @@ label{display:block;margin:10px 0;font-size:13px}
 label>select,label>textarea,label>input:not([type=checkbox]):not([type=radio]){margin-top:5px}
 input[type=checkbox],input[type=radio]{margin:0 7px 0 0;vertical-align:middle}
 th,td{line-height:1.6}
+.bt{display:flex;flex-wrap:wrap;align-items:center;gap:8px}.bt label{white-space:nowrap;display:flex!important;flex-direction:row;align-items:center;gap:6px;margin:0}.sht{min-width:1080px}.sht th,.sht td{vertical-align:middle;padding:10px 10px}.sht th{font-size:13px;color:var(--mute);font-weight:500}.sht .c{text-align:center}.sht .n{text-align:right;font-variant-numeric:tabular-nums}.sht td.it{white-space:normal;min-width:200px;max-width:300px;font-size:13px}.sht td b{font-variant-numeric:tabular-nums}.sht small{font-size:12px}.sht tbody tr{cursor:pointer}.sht tbody tr:hover{background:var(--soft)}
 .ln td select{margin:0}
 .bt .btn,p>.btn{margin-right:4px}
 .g{display:grid;grid-template-columns:repeat(3,1fr);gap:4px 22px}.g .f{grid-column:1/-1}
@@ -193,6 +194,7 @@ function shipList() {
 }
 function shipView() { loadOrders(function () { $('#v').innerHTML = '<h2 style="margin-top:0">出貨單列表</h2>' + filterBar('sfb', SF, true, ALLST) + '<div id="tb"></div>'; bindFilter('sfb', SF, shipRows); shipRows(); }); }
 var SSEL = {};
+function dt2(t) { t = String(t || ''); return t.length >= 16 ? esc(t.slice(5, 10)) + '<br><small class="m">' + esc(t.slice(11, 16)) + '</small>' : '<span class="m">—</span>'; }
 function shipRows() {
   var k = SF.q.toLowerCase();
   var rows = shipList().filter(function (x) { var s = x.s; return inRange(s.cr, SF) && (!SF.st || s.st === SF.st) && (!SF.pay || s.pay === SF.pay) && (!k || (s.id + s.oids.join(',') + s.name + s.phone + s.no + s.last5).toLowerCase().indexOf(k) >= 0); });
@@ -201,8 +203,8 @@ function shipRows() {
   $('#sum').textContent = '共 ' + rows.length + ' 張,合計 ' + money(sum) + ';待處理(已到貨、客人尚未出貨)' + pend + ' 項';
   var allOn = rows.length > 0 && rows.every(function (x) { return SSEL[x.s.id]; });
   $('#tb').innerHTML = '<div class="bt"><span class="m">已勾選 <b id="ssn">' + selShips().length + '</b> 張:</span><button class="btn l" data-a="sbq">改為「已查帳待出貨」</button> <label style="display:inline-block;margin:0">改為 <select id="sbst">' + ALLST.map(function (x) { return '<option>' + esc(x) + '</option>'; }).join('') + '</select></label><button class="btn l" data-a="sbgo">套用狀態</button><button class="btn a" data-a="sbp">批次列印訂購單</button><button class="btn l" data-a="sbd">批次刪除</button></div>' +
-    '<table><thead><tr><th><input type="checkbox" id="sall" aria-label="全選目前清單"' + (allOn ? ' checked' : '') + '></th><th>出貨單</th><th>訂單編號</th><th>姓名</th><th>電話</th><th>品項</th><th>付款</th><th>匯款後五碼</th><th>應付</th><th>狀態</th><th>物流/單號</th><th>建立</th><th>出貨</th></tr></thead><tbody>' +
-    rows.map(function (x) { var s = x.s; return '<tr data-a="ship" data-id="' + esc(s.id) + '"><td><input type="checkbox" class="ssel" data-id="' + esc(s.id) + '"' + (SSEL[s.id] ? ' checked' : '') + '></td><td>' + esc(s.id) + '</td><td>' + esc(s.oids.join(',')) + '</td><td>' + esc(s.name) + '</td><td>' + esc(s.phone) + '</td><td style="white-space:normal;min-width:160px">' + esc(s.it) + '</td><td>' + esc(s.pay) + '</td><td>' + (s.last5 ? '<b>' + esc(s.last5) + '</b>' : '<span class="m">—</span>') + '</td><td>' + s.total + '</td><td><span class="chip ' + ((FL[s.pay] || []).indexOf(s.st) <= 0 ? '' : 'd') + '">' + esc(s.st) + '</span></td><td>' + esc(s.co) + ' ' + esc(s.no) + '</td><td>' + esc(s.cr.slice(0, 16)) + '</td><td>' + esc(s.at.slice(0, 16)) + '</td></tr>'; }).join('') + '</tbody></table>' +
+    '<table class="sht"><thead><tr><th class="c"><input type="checkbox" id="sall" aria-label="全選目前清單"' + (allOn ? ' checked' : '') + '></th><th>出貨單</th><th>訂單編號</th><th>姓名 / 電話</th><th>品項</th><th class="c">付款</th><th class="c">後五碼</th><th class="n">應付</th><th class="c">狀態</th><th>物流 / 單號</th><th class="c">建立</th><th class="c">出貨</th></tr></thead><tbody>' +
+    rows.map(function (x) { var s = x.s; return '<tr data-a="ship" data-id="' + esc(s.id) + '"><td class="c"><input type="checkbox" class="ssel" data-id="' + esc(s.id) + '"' + (SSEL[s.id] ? ' checked' : '') + '></td><td><b>' + esc(s.id) + '</b></td><td>' + esc(s.oids.join('、')) + '</td><td>' + esc(s.name) + '<br><small class="m">' + esc(s.phone) + '</small></td><td class="it">' + esc(s.it) + '</td><td class="c">' + esc(s.pay) + '</td><td class="c">' + (s.last5 ? '<b>' + esc(s.last5) + '</b>' : '<span class="m">—</span>') + '</td><td class="n">' + money(s.total) + '</td><td class="c"><span class="chip ' + ((FL[s.pay] || []).indexOf(s.st) <= 0 ? '' : 'd') + '">' + esc(s.st) + '</span></td><td>' + (s.co || s.no ? esc(s.co) + '<br><small class="m">' + esc(s.no) + '</small>' : '<span class="m">—</span>') + '</td><td class="c">' + dt2(s.cr) + '</td><td class="c">' + dt2(s.at) + '</td></tr>'; }).join('') + '</tbody></table>' +
     (rows.length ? '' : '<p class="m">沒有符合的出貨單。客人在前台勾選已到貨商品並按「確定出貨」後會出現在這裡。</p>');
   window.SROWS = rows.map(function (x) { return x.s.id; });
 }
