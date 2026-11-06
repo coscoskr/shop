@@ -114,12 +114,13 @@ dialog{padding:14px 16px}dialog h2{font-size:17px;margin:0 0 8px}#dlg p{margin:6
 var BOOT = {};
 try {
   var q0 = new URLSearchParams(location.search), c0 = q0.get('code'), s0 = q0.get('state');
-  if (c0 && s0) {
+  var lf0 = q0.get('liffClientId') || q0.get('liff.state') || q0.get('liffRedirectUri');
+  if (c0 && s0 && !lf0) {
     var x0 = new XMLHttpRequest(); x0.open('POST', window.COSCOS_API, false); x0.setRequestHeader('Content-Type', 'text/plain');
     x0.send(JSON.stringify({ fn: 'lineCallback', args: [c0, s0] }));
     var j0 = JSON.parse(x0.responseText); BOOT = j0.ok ? (j0.result || {}) : { err: j0.error || 'LINE 登入失敗' };
     history.replaceState(null, '', location.pathname);
-  } else if (q0.get('error')) { BOOT = { err: 'LINE 登入已取消' }; history.replaceState(null, '', location.pathname); }
+  } else if (q0.get('error') && !lf0) { BOOT = { err: 'LINE 登入已取消' }; history.replaceState(null, '', location.pathname); }
 } catch (e0) { BOOT = { err: 'LINE 登入失敗,請稍後再試' }; }
 var D, cart = {}, cat = '', q = '', cur = null, dq = 1, LT = '', QT = null, useCr = false, CODE = '';
 try { LT = localStorage.getItem('lt') || ''; } catch (e) {}
@@ -162,6 +163,7 @@ google.script.run.withSuccessHandler(function (d) {
   }
   nav(); grid();
   if (BOOT.token) memLoad(function () { show(memList()); });
+  liffBoot();
 }).withFailureHandler(function (e) { $('#grid').innerHTML = '<p>載入失敗:' + esc(e.message) + '</p>'; }).getShop();
 
 function catHit(pc, v, p) { if (v === '@現貨' || v === '@預購') return !!p && p.type === v.slice(1); if (v === '@品牌') return !!p && !!p.brand; if (v.indexOf('@品牌/') === 0) return !!p && p.brand === v.slice(4); return !v || pc.some(function (c) { return c === v || c.indexOf(v + '/') === 0; }); }
@@ -220,6 +222,7 @@ function grid() {
 function count() { var n = 0; for (var k in cart) n += cart[k]; $('#cn').hidden = !n; $('#cn').textContent = n; }
 function show(h) { setLg(); var d = $('#dlg'); d.innerHTML = h; if (!d.open) d.showModal(); d.setAttribute('tabindex', '-1'); try { d.focus({ preventScroll: true }); } catch (x) {} d.style.pointerEvents = 'none'; setTimeout(function () { d.style.pointerEvents = ''; }, 350); if (d.querySelector('#lga')) prepLogin(); }
 function prepLogin() {
+  if (D && D.line && D.line.liff) { var a0 = $('#lga'); if (a0) { a0.href = 'https://liff.line.me/' + D.line.liff; a0.removeAttribute('aria-disabled'); a0.textContent = '使用 LINE 登入'; } return; }
   google.script.run.withSuccessHandler(function (u) { var a = $('#lga'); if (a) { a.href = u; a.removeAttribute('aria-disabled'); a.textContent = '使用 LINE 登入'; } })
     .withFailureHandler(function (e) { var a = $('#lga'); if (a) a.textContent = 'LINE 登入暫時無法使用'; }).lineStart();
 }
@@ -515,6 +518,24 @@ document.addEventListener('submit', function (e) {
   google.script.run.withSuccessHandler(function (d) { MD = d; MSEL = {}; MTAB = 's'; show(shipDetail(d.ships.filter(function (z) { return z.id === d.sid; })[0])); })
     .withFailureHandler(function (er) { $('#sfe').textContent = er.message; }).memberCreateShip(mt, items, { pay: f.pay.value, method: f.method.value, rname: f.rname.value, cvs: f.cvs.value, store: f.store.value, addr: f.addr.value, credit: f.credit ? Number(f.credit.value) || 0 : 0, note: f.note.value, phone: f.phone.value });
 });
+
+/* LIFF:從 LINE 內開啟網站時自動登入(只需按一次「允許」) */
+function liffBoot() {
+  var id = D && D.line && D.line.liff; if (!id || LT || window.__liff) return; window.__liff = 1;
+  var sc = document.createElement('script'); sc.src = 'https://static.line-scdn.net/liff/edge/2/sdk.js';
+  sc.onload = function () {
+    liff.init({ liffId: id }).then(function () {
+      if (!liff.isLoggedIn()) { if (liff.isInClient() || /[?&]liff\.state|liff\.line\.me/.test(location.href + document.referrer)) liff.login(); return; }
+      var it = liff.getIDToken(); if (!it) { liff.logout(); liff.login(); return; }
+      google.script.run.withSuccessHandler(function (r) {
+        LT = r.token; try { localStorage.setItem('lt', LT); } catch (e) {}
+        try { history.replaceState(null, '', location.pathname); } catch (e) {}
+        memLoad(function () { show(memList()); });
+      }).withFailureHandler(function (e) { $('#notice').hidden = false; $('#notice').textContent = e.message || 'LINE 登入失敗'; }).lineLiff(it, liff.getAccessToken());
+    }).catch(function () {});
+  };
+  document.head.appendChild(sc);
+}
 </script>
 </body>
 </html>
