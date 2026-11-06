@@ -731,7 +731,7 @@ document.addEventListener('click', function (e) {
   else if (a === 'bo' || a === 'boc') {
     var kb = pvSel(); if (!kb.length) { tell('請先勾選品項(可按「全選未叫貨」)'); return; }
     var on = a === 'bo', cnt = 0, qt = 0;
-    PV.lines.forEach(function (l) { if (PSEL[l.key] && !l.stock && (!!l.ord) !== !on) { cnt++; qt += l.qty; } });
+    PV.lines.forEach(function (l) { if (PSEL[l.key] && !l.stock && (!!l.ord) === !on) { cnt++; qt += l.qty; } });
     if (!cnt) { tell(on ? '勾選的品項都已經叫貨了' : '勾選的品項都還沒叫貨'); return; }
     ask((on ? '確定將 ' : '確定取消 ') + cnt + ' 項(共 ' + qt + ' 件)' + (on ? '標示為「已叫貨」?' : '的叫貨標示?'), function () {
       call('adminBatchOrder', T, kb, on).then(function (r) { pvSet(r); }).catch(function (er) { tell(er.message); });
