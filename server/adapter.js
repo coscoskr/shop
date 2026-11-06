@@ -13,7 +13,7 @@ export const TABLES = {
   '廠商': T('vendors', ['name'], { pk: 'name' }),
   '折扣碼': T('discount_codes', ['code','type','value','enabled','note','used','created_at','usage_limit','start_date','end_date'], { pk: 'code', num: ['value','used','usage_limit'] }),
   '等級': T('levels', ['name','rate','categories'], { pk: 'name', num: ['rate'] }),
-  '會員': T('members', ['line_id','nickname','avatar','level','joined_at','last_login','friend','note'], { pk: 'line_id' }),
+  '會員': T('members', ['line_id','nickname','avatar','level','joined_at','last_login','friend','note','real_name','phone','email','address'], { pk: 'line_id' }),
   '訂單': T('orders', ['order_id','ordered_at','name','phone','pay_method','status','subtotal','shipping','total','receiver','note','line_id','pay_link','remit_last5','level','promo_name','promo_discount','credit_used','credit_detail','email','discount_code'], { pk: 'order_id', num: ['subtotal','shipping','total','promo_discount','credit_used'] }),
   '訂單明細': T('order_lines', ['order_id','product_id','product_name','qty','unit_price','line_total','arrival_status','shippable','ship_requested','ship_id','sale_type','vendor','cost','cost_tax_incl','source','vendor_payment_id','spec','arrived_by','arrived_at','ordered_status','ordered_by','ordered_at'], { pk: 'id', num: ['qty','unit_price','line_total','cost'] }),
   '庫存進貨': T('stock_in', ['order_id','product_id','product_name','spec','qty','arrival_status','vendor','cost','cost_tax_incl','source','vendor_payment_id','arrived_by','arrived_at','date','created_by','ship_id'], { pk: 'id', num: ['qty','cost'] }),

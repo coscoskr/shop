@@ -527,8 +527,18 @@ function memList() {
     }).join('') : '<p class="ds">在「訂單明細」勾選已到貨的商品並按「確定出貨」後,出貨單會顯示在這裡。</p>';
   } else {
     var m = MD.me, f = MD.orders[0] || {};
-    h += '<div class="oc" style="cursor:default"><p>姓名:<b>' + esc((m && m.name) || f.nm || '') + '</b></p><p>電話:<b>' + esc(f.ph || '') + '</b></p>' + (m ? '<p>會員等級:<span class="chip">' + esc(m.level) + '</span></p><p>購物金:<b>' + money(m.balance) + '</b></p>' + (m.grants.length ? '<small>' + m.grants.map(function (g) { return money(g.amt) + ' 到期 ' + esc(g.exp); }).join('<br>') + '</small>' : '') : '<p class="ds">你是以訪客身分查詢。用 LINE 登入可享會員優惠、使用購物金。</p>') + '</div>' +
-      (m && !m.friend ? '<p class="ds">你還沒加我們的官方帳號好友,加入後才收得到到貨通知。' + (D.line && D.line.friend ? ' <a href="' + esc(D.line.friend) + '" target="_blank" rel="noopener">立即加入</a>' : '') + '</p>' : '');
+    if (m) {
+      h += '<div class="oc" style="cursor:default"><p>會員等級:<span class="chip">' + esc(m.level) + '</span> 購物金:<b>' + money(m.balance) + '</b></p>' + (m.grants.length ? '<small>' + m.grants.map(function (g) { return money(g.amt) + ' 到期 ' + esc(g.exp); }).join('<br>') + '</small>' : '') + '</div>' +
+        '<form id="pf"><p class="ds">在這裡修改的資料,下次出貨結帳時會自動帶入。</p>' +
+        '<label>姓名<input name="name" required maxlength="40" autocomplete="name" value="' + esc(m.pname || f.nm || m.name || '') + '"></label>' +
+        '<label>聯絡電話<input name="phone" inputmode="tel" autocomplete="tel" maxlength="20" value="' + esc(m.phone || f.ph || '') + '"></label>' +
+        '<label>電子郵件(選填)<input name="email" type="email" maxlength="80" autocomplete="email" value="' + esc(m.email || '') + '"></label>' +
+        '<label>預設收件地址(選填)<input name="addr" maxlength="150" autocomplete="street-address" value="' + esc(m.addr || '') + '"></label>' +
+        '<p><button class="btn a" type="submit">儲存修改</button> <span id="pfe" class="ds"></span></p></form>' +
+        (!m.friend ? '<p class="ds">你還沒加我們的官方帳號好友,加入後才收得到到貨通知。' + (D.line && D.line.friend ? ' <a href="' + esc(D.line.friend) + '" target="_blank" rel="noopener">立即加入</a>' : '') + '</p>' : '');
+    } else {
+      h += '<div class="oc" style="cursor:default"><p>姓名:<b>' + esc(f.nm || '') + '</b></p><p>電話:<b>' + esc(f.ph || '') + '</b></p><p class="ds">你是以訪客身分查詢。用 LINE 登入後就能修改會員資料、享會員優惠、使用購物金。</p></div>';
+    }
   }
   return h + '<p><button class="btn l" data-a="x">關閉</button>' + ((LT || mt) ? ' <button class="btn l" data-a="lo">登出</button>' : '') + '</p>';
 }
@@ -578,10 +588,10 @@ function shipForm() {
     picked.map(function (i) { var spc = sp(i.pid); return '<tr><td>' + esc(i.name) + (spc ? '<br><small>' + esc(spc) + '</small>' : '') + '</td><td class="n">' + i.qty + '</td><td class="n">' + i.unit + '</td><td class="n">' + i.sub + '</td></tr>'; }).join('') + '</tbody></table>' +
     '<div id="sq" class="ds" style="margin-top:8px">計算金額中…</div></div>' +
     '<form id="sf"><fieldset><legend>配送方式</legend><label><input type="radio" name="method" value="店到店" checked> 店到店 ' + money(MD.feeCvs) + '</label><label><input type="radio" name="method" value="宅配"> 宅配 ' + money(MD.fee) + '</label>' + (MD.free ? '<small class="ds">滿 ' + money(MD.free) + ' 免運</small>' : '') + '</fieldset>' +
-    '<label>收件人姓名<input name="rname" required maxlength="30" value="' + esc(o0.nm || '') + '"></label>' +
-    '<label>聯絡電話<input name="phone" required inputmode="tel" value="' + esc(o0.ph || '') + '"></label>' +
+    '<label>收件人姓名<input name="rname" required maxlength="30" value="' + esc((MD.me && MD.me.pname) || o0.nm || '') + '"></label>' +
+    '<label>聯絡電話<input name="phone" required inputmode="tel" value="' + esc((MD.me && MD.me.phone) || o0.ph || '') + '"></label>' +
     '<div id="mcvs"><label>超商<select name="cvs"><option>7-11</option><option>全家</option></select></label><label>取貨門市(店名或店號)<input name="store" maxlength="60"></label></div>' +
-    '<div id="mhome" hidden><label>收件地址<input name="addr" maxlength="150"></label></div>' +
+    '<div id="mhome" hidden><label>收件地址<input name="addr" maxlength="150" value="' + esc((MD.me && MD.me.addr) || '') + '"></label></div>' +
     (bal > 0 ? '<label>使用購物金(餘額 ' + money(bal) + ')<input name="credit" type="number" min="0" step="1" value="0" inputmode="numeric"></label><small class="ds" id="crh"></small>' : '') +
     '<fieldset><legend>付款方式</legend><label><input type="radio" name="pay" value="匯款" checked> 匯款</label><label><input type="radio" name="pay" value="賣貨便"> 賣貨便(僅店到店)</label><label style="color:var(--mute)"><input type="radio" name="pay" value="刷卡" disabled> 信用卡(籌備中)</label></fieldset>' +
     '<label>備註<textarea name="note" rows="2" maxlength="200"></textarea></label>' +
@@ -625,7 +635,12 @@ document.addEventListener('click', function (e) {
 });
 document.addEventListener('submit', function (e) {
   var f = e.target;
-  if (f.id === 'mf' || f.id === 'rf') e.preventDefault();
+  if (f.id === 'mf' || f.id === 'rf' || f.id === 'pf') e.preventDefault();
+  if (f.id === 'pf') {
+    $('#pfe').textContent = '儲存中…';
+    google.script.run.withSuccessHandler(function (me) { MD.me = me; $('#pfe').textContent = '已儲存 ✓'; }).withFailureHandler(function (er) { $('#pfe').textContent = er.message; }).memberSaveProfile(mt, { name: f.name.value, phone: f.phone.value, email: f.email.value, addr: f.addr.value });
+    return;
+  }
   if (f.id === 'mf') {
     $('#me').textContent = '';
     google.script.run.withSuccessHandler(function (r) {
