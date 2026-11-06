@@ -311,7 +311,8 @@ function shareProd(p) {
       '<a class="btn ln2" href="https://line.me/R/share?text=' + encodeURIComponent(msg) + '" target="_blank" rel="noopener">用 LINE 分享</a>' +
       '<button type="button" class="btn l" data-a="shcp" data-u="' + esc(msg) + '">複製訊息(貼到 IG 或其他 App)</button></div>');
   };
-  if (navigator.share) navigator.share({ text: msg }).catch(function (e) { if (!e || e.name !== 'AbortError') fb(); });
+  var mob = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Mac/i.test(navigator.platform || ''));
+  if (mob && navigator.share) navigator.share({ text: msg }).catch(function (e) { if (!e || e.name !== 'AbortError') fb(); });
   else fb();
 }
 function toTop() { var t = $('#tl'); try { window.scrollTo({ top: Math.max(0, t.getBoundingClientRect().top + window.pageYOffset - 70), behavior: 'smooth' }); } catch (e) { window.scrollTo(0, 0); } }

@@ -250,6 +250,14 @@ function placeCore_(want, ctx, o, name, phone, email, who, notePre) {
     put_('訂單', 0, { '訂單ID': oid, '下單時間': now_(), '姓名': name, '電話': phone, '付款方式': '', '狀態': '已下訂', '商品金額': c.sub, '運費': c.fee, '總額': c.total, '收件資訊': ship, '備註': t_((notePre || '') + (o.note || ''), 200),
       'LINE ID': ctx ? ctx.lid : '', '電子郵件': email, '折扣碼': c.codeOk ? String(o.code).trim() : '', '會員等級': (ctx || c.codeOk) ? c.level : '', '優惠名稱': c.dname, '優惠折抵': c.discount, '購物金折抵': c.credit, '購物金明細': JSON.stringify(detail) });
     log_(who, '下單', oid, '合計 ' + c.total + ',' + pay + (c.discount ? ',優惠 ' + c.dname + ' -' + c.discount : '') + (c.credit ? ',購物金 -' + c.credit : ''));
+    // 下單成功:用官方 LINE 傳訊息給客人(只有 LINE 登入的會員;沒加好友會自動失敗,不影響下單)
+    if (ctx && ctx.lid) {
+      var tpl = String(st.下單成功通知內容 === undefined ? defSet_('下單成功通知內容') : st.下單成功通知內容 || '');
+      if (tpl) {
+        var vals = { '姓名': String(name), '訂單編號': oid, '品項': c.lines.map(function (l) { return l[0].名稱 + (l[3] ? '(' + l[3] + ')' : '') + '×' + l[1]; }).join('、'), '金額': String(c.total), '連結': appUrl_() };
+        pushLine_(ctx.lid, Object.keys(vals).reduce(function (t, k) { return t.split('{' + k + '}').join(vals[k]); }, tpl));
+      }
+    }
     res = { orderId: oid, total: c.total, fee: c.fee, pay: pay, bank: '', discount: c.discount, dname: c.dname, credit: c.credit, mt: ctx ? '' : mk_(nz_(phone)) };
   });
   return res;
@@ -1714,6 +1722,7 @@ var DEFAULT_SETTINGS = [
   ['店名', 'coscos韓國選物店'], ['免運門檻', 1500], ['店到店運費', 60], ['宅配運費', 80], ['匯款資訊', '請填寫銀行代碼、帳號、戶名'], ['公告', ''],
   ['購物金使用門檻', 1000], ['購物金折抵上限', 100], ['購物金預設有效天數', 90],
   ['到貨通知內容', '{姓名} 您好,您訂購的 {品名} 已到貨!請到會員中心勾選要出貨的商品:{連結}'],
+  ['下單成功通知內容', '{姓名} 您好,已收到您的訂單 {訂單編號}!\n商品:{品項}\n訂單金額:NT$ {金額}\n\n商品到貨後,請到會員中心勾選要出貨的商品:{連結}\n有任何問題隨時聯繫我們'],
   ['出貨通知內容', '出貨單號 {出貨單號} 已出貨\n物流:{物流}\n物流單號:{物流單號}\n追蹤連結:{追蹤連結}\n\n有任何問題隨時聯繫我們'],
   ['送達通知內容', '出貨單號 {出貨單號} 商品已送達,感謝您的購買!\n有任何問題隨時聯繫我們'],
   ['物流追蹤連結', '新竹物流=https://www.hct.com.tw/Search/SearchGoods_n.aspx\n7-11=https://eservice.7-11.com.tw/e-tracking/search.aspx\n全家=https://fami.tw/package'],
@@ -2078,7 +2087,7 @@ function adminDeleteActivity(tk, id) {
   });
   return adminActivities(tk);
 }
-var SET_KEYS = ['店名', '店到店運費', '宅配運費', '免運門檻', '匯款資訊', '公告', '購物金使用門檻', '購物金折抵上限', '購物金預設有效天數', '到貨通知內容', '出貨通知內容', '送達通知內容', '物流追蹤連結', '加好友連結', '公司名稱', '公司地址', '統一編號', 'IG連結', 'LINE社群連結'];
+var SET_KEYS = ['店名', '店到店運費', '宅配運費', '免運門檻', '匯款資訊', '公告', '購物金使用門檻', '購物金折抵上限', '購物金預設有效天數', '到貨通知內容', '下單成功通知內容', '出貨通知內容', '送達通知內容', '物流追蹤連結', '加好友連結', '公司名稱', '公司地址', '統一編號', 'IG連結', 'LINE社群連結'];
 function defSet_(k) { var r = DEFAULT_SETTINGS.filter(function (x) { return x[0] === k; })[0]; return r ? r[1] : ''; }
 function adminSettings(tk) {
   me_(tk); var s = settings_(), o = {};
