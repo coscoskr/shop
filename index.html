@@ -302,15 +302,16 @@ function drawPg(pages) {
   p.innerHTML = h + '<button type="button" data-a="pg" data-p="' + (PAGE + 1) + '"' + (PAGE >= pages ? ' disabled' : '') + ' aria-label="下一頁">›</button>';
 }
 function prodUrl(p) { return location.origin + location.pathname + '?p=' + encodeURIComponent(p.id); }
+function shareMsg(p) { return '欸這個要不要買😍\n\n' + (p.brand ? '「' + p.brand + '」' : '') + p.name + ' ' + money(p.price) + '\n\n商品連結🔗\n' + prodUrl(p); }
 function shareProd(p) {
   if (!p) return;
-  var url = prodUrl(p), title = (D.store || 'coscos韓國選物店') + ' | ' + p.name, text = p.name + ' ' + money(p.price);
+  var msg = shareMsg(p);
   var fb = function () {
-    show('<div class="tb"><button type="button" class="btn l" data-a="x">關閉</button></div><h2>分享給朋友</h2><p class="ds">' + esc(p.name) + '</p><div class="shs">' +
-      '<a class="btn ln2" href="https://social-plugins.line.me/lineit/share?url=' + encodeURIComponent(url) + '" target="_blank" rel="noopener">用 LINE 分享</a>' +
-      '<button type="button" class="btn l" data-a="shcp" data-u="' + esc(url) + '">複製連結(貼到 IG 或其他 App)</button></div>');
+    show('<div class="tb"><button type="button" class="btn l" data-a="x">關閉</button></div><h2>分享給朋友</h2><p class="ds" style="white-space:pre-line;max-height:none">' + esc(msg) + '</p><div class="shs">' +
+      '<a class="btn ln2" href="https://line.me/R/share?text=' + encodeURIComponent(msg) + '" target="_blank" rel="noopener">用 LINE 分享</a>' +
+      '<button type="button" class="btn l" data-a="shcp" data-u="' + esc(msg) + '">複製訊息(貼到 IG 或其他 App)</button></div>');
   };
-  if (navigator.share) navigator.share({ title: title, text: text, url: url }).catch(function (e) { if (!e || e.name !== 'AbortError') fb(); });
+  if (navigator.share) navigator.share({ text: msg }).catch(function (e) { if (!e || e.name !== 'AbortError') fb(); });
   else fb();
 }
 function toTop() { var t = $('#tl'); try { window.scrollTo({ top: Math.max(0, t.getBoundingClientRect().top + window.pageYOffset - 70), behavior: 'smooth' }); } catch (e) { window.scrollTo(0, 0); } }
@@ -421,7 +422,7 @@ document.addEventListener('click', function (e) {
   else if (a === 'mnc') { }
   else if (a === 'srch') { var hd = document.querySelector('header'); hd.classList.toggle('ss'); if (hd.classList.contains('ss')) $('#q').focus(); }
   else if (a === 'shr') shareProd(cur);
-  else if (a === 'shcp') { var su = b.dataset.u, okc = function () { b.textContent = '已複製連結,可貼到 IG 或任何地方'; }, fbc = function () { var t = document.createElement('textarea'); t.value = su; t.style.cssText = 'position:fixed;opacity:0'; document.body.appendChild(t); t.select(); try { document.execCommand('copy'); okc(); } catch (x) { b.textContent = su; } document.body.removeChild(t); }; if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(su).then(okc, fbc); else fbc(); }
+  else if (a === 'shcp') { var su = b.dataset.u, okc = function () { b.textContent = '已複製,可貼到 IG 或任何地方'; }, fbc = function () { var t = document.createElement('textarea'); t.value = su; t.style.cssText = 'position:fixed;opacity:0'; document.body.appendChild(t); t.select(); try { document.execCommand('copy'); okc(); } catch (x) { b.textContent = su; } document.body.removeChild(t); }; if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(su).then(okc, fbc); else fbc(); }
   else if (a === 'flt') show(fltHtml());
   else if (a === 'fclr') { FIL = { type: '', brands: {}, min: '', max: '', avail: false }; PAGE = 1; $('#dlg').close(); grid(); }
   else if (a === 'fapply') {
