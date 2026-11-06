@@ -186,8 +186,8 @@ function openOrder(id) {
         '<label>到貨狀態<select class="ln_a"' + dis + '>' + opts(['待到貨', '已到貨'], i.arr) + '</select></label><label>到貨日期<input class="ln_e" type="date" value="' + esc(i.eta || '') + '"></label></div>' +
         '<div class="r3"><label>廠商<select class="ln_v">' + vopt(i.vendor, '—') + '</select></label><label>成本<input class="ln_c" type="number" min="0" value="' + (i.cost === '' || i.cost == null ? '' : i.cost) + '"></label>' +
         '<label>稅<select class="ln_x">' + opts(['未稅', '含稅'], i.tax ? '含稅' : '未稅') + '</select></label><label>貨源<input class="ln_s" value="' + esc(i.src || '') + '"></label>' +
-        '<label>出貨單<output>' + esc(i.sid || '—') + '</output></label><div class="sv"><button class="btn a" data-a="sl" data-oid="' + esc(o.id) + '" data-pid="' + esc(i.pid) + '">儲存這個品項</button></div></div></div>';
-    }).join('') + '<p class="m">每個品項右下角按「儲存這個品項」。廠商、成本、稅、貨源只記在這一筆訂單明細(到貨日期仍是商品共用)。已記錄付款的品項,廠商/成本/貨源要先到「廠商付款紀錄」刪除付款紀錄才能改。已建立出貨單的品項,數量、單價、到貨狀態不能改。</p>';
+        '<label>出貨單<output>' + esc(i.sid || '—') + '</output></label><div class="sv"><button class="btn a" data-a="sl" data-oid="' + esc(o.id) + '" data-pid="' + esc(i.pid) + '">儲存後關閉</button></div></div></div>';
+    }).join('') + '<p class="m">每個品項右下角按「儲存後關閉」。廠商、成本、稅、貨源只記在這一筆訂單明細(到貨日期仍是商品共用)。已記錄付款的品項,廠商/成本/貨源要先到「廠商付款紀錄」刪除付款紀錄才能改。已建立出貨單的品項,數量、單價、到貨狀態不能改。</p>';
   if (o.ships.length) h += '<h4>相關出貨單</h4><table><tbody>' + o.ships.map(function (s) { return '<tr data-a="ship" data-id="' + esc(s.id) + '"><td>' + esc(s.id) + '</td><td>' + esc(s.it) + '</td><td>' + esc(s.pay) + ' ' + money(s.total) + '</td><td><span class="chip d">' + esc(s.st) + '</span></td></tr>'; }).join('') + '</tbody></table>';
   h += '<p style="margin-top:18px"><button class="btn l" data-a="x">關閉</button> <button class="btn l" data-a="dord" data-id="' + esc(o.id) + '">刪除訂單</button></p>';
   d.innerHTML = h; if (!d.open) d.showModal();
@@ -480,7 +480,7 @@ document.addEventListener('click', function (e) {
   } else if (a === 'sl') {
     var tr = b.closest('.ln');
     var q = function (c) { return tr.querySelector(c).value; };
-    call('adminEditLineFull', T, b.dataset.oid, b.dataset.pid, { name: q('.ln_n'), spec: q('.ln_p'), type: q('.ln_t'), qty: q('.lq'), unit: q('.lu'), arr: q('.ln_a'), eta: q('.ln_e'), vendor: q('.ln_v'), cost: q('.ln_c'), tax: q('.ln_x') === '含稅', src: q('.ln_s'), notify: !!($('#ntf') && $('#ntf').checked) }).then(function (d) { refreshOpen(d, b.dataset.oid); if (d.notify) tell('已用 LINE 通知:送出 ' + d.notify.sent + ' 位' + (d.notify.noLine ? ',' + d.notify.noLine + ' 筆訂單沒有 LINE 登入' : '') + (d.notify.failed ? ',' + d.notify.failed + ' 位失敗(可能還沒加好友)' : '')); }).catch(function (er) { tell(er.message); });
+    call('adminEditLineFull', T, b.dataset.oid, b.dataset.pid, { name: q('.ln_n'), spec: q('.ln_p'), type: q('.ln_t'), qty: q('.lq'), unit: q('.lu'), arr: q('.ln_a'), eta: q('.ln_e'), vendor: q('.ln_v'), cost: q('.ln_c'), tax: q('.ln_x') === '含稅', src: q('.ln_s'), notify: !!($('#ntf') && $('#ntf').checked) }).then(function (d) { setO(d); if (tab === 'o') orderRows(); else if (tab === 's') shipRows(); $('#dlg').close(); if (!d.notify) tell('品項已儲存'); if (d.notify) tell('已用 LINE 通知:送出 ' + d.notify.sent + ' 位' + (d.notify.noLine ? ',' + d.notify.noLine + ' 筆訂單沒有 LINE 登入' : '') + (d.notify.failed ? ',' + d.notify.failed + ' 位失敗(可能還沒加好友)' : '')); }).catch(function (er) { tell(er.message); });
   } else if (a === 'dord') {
     var o = ordById(id);
     ask('確定刪除訂單 ' + id + '(' + o.name + ',' + money(o.total) + ')?\n商品庫存會加回去,此動作無法復原。', function () {
@@ -659,17 +659,22 @@ function pvDisc(l, w) {
   var L = pvLines(), i = L.indexOf(l), first = i <= 0 || L[i - 1].oid !== l.oid;
   if (!l.disc && !l.code) return '<span class="m">—</span>';
   if (!first) return '<span class="m">〃</span>';
-  return w === 'n' ? (l.code ? '<b>' + esc(l.code) + '</b>' : '') + (l.dname && l.dname !== '折扣碼 ' + l.code ? (l.code ? '<br>' : '') + '<small class="m">' + esc(l.dname) + '</small>' : '') : '<b>− ' + money(l.disc) + '</b>';
+  return w === 'n' ? (l.code ? '<b>' + esc(l.code) + '</b>' : '<span class="m">—</span>') : '<b>− ' + money(l.disc) + '</b>';
+}
+function pvAmt(l) {
+  if (l.stock) return '—';
+  var L = pvLines(), i = L.indexOf(l), first = i <= 0 || L[i - 1].oid !== l.oid;
+  return l.qty * l.unit - (first ? (l.disc || 0) : 0);
 }
 function pvRows() {
   var L = pvLines(), tot = 0, cost = 0, profit = 0, nc = 0;
   L.forEach(function (l) { if (l.stock) return; tot += l.qty * l.unit; if (l.cost === '') nc++; else { cost += l.cost * l.qty; profit += (l.unit - l.cost) * l.qty; } });
   $('#pvt').innerHTML = '<p class="m">共 ' + L.length + ' 項,複價 ' + money(tot) + ',成本 ' + money(cost) + ',利潤 ' + money(profit) + (nc ? '(' + nc + ' 項未填成本,未計入成本與利潤)' : '') + '</p>' +
-    '<table><thead><tr><th><input type="checkbox" id="pvall"></th><th>訂購日期</th><th>訂購人</th><th>品名</th><th>規格</th><th>數量</th><th>成本</th><th>單價</th><th>複價</th><th>折扣碼 / 優惠</th><th>訂單折扣</th><th>利潤</th><th>到貨狀態</th><th>廠商</th><th>付款狀態</th><th>訂單紀錄 / 編輯</th></tr></thead><tbody>' +
+    '<table><thead><tr><th><input type="checkbox" id="pvall"></th><th>訂購日期</th><th>訂購人</th><th>品名</th><th>規格</th><th>數量</th><th>成本</th><th>單價</th><th>複價</th><th>折扣碼</th><th>折扣</th><th>訂單金額</th><th>利潤</th><th>到貨狀態</th><th>廠商</th><th>付款狀態</th><th>訂單紀錄 / 編輯</th></tr></thead><tbody>' +
     (L.map(function (l) {
       var hc = l.cost !== '';
-      return '<tr><td><input type="checkbox" class="pvk" data-k="' + esc(l.key) + '"' + (PSEL[l.key] ? ' checked' : '') + '></td><td>' + esc(l.at) + '</td><td>' + (l.stock ? '<span class="chip">庫存</span>' : esc(l.buyer)) + '</td><td style="white-space:normal">' + esc(l.name) + '</td><td>' + esc(l.spec) + '</td><td>' + l.qty + '</td><td>' + (hc ? l.cost : '<span class="m">未填</span>') + '</td><td>' + (l.stock ? '—' : l.unit) + '</td><td>' + (l.stock ? '—' : l.qty * l.unit) + '</td><td style="white-space:normal">' + pvDisc(l, 'n') + '</td><td>' + pvDisc(l, 'a') + '</td><td>' + (hc && !l.stock ? (l.unit - l.cost) * l.qty : '<span class="m">—</span>') + '</td><td><span class="chip ' + (l.arr === '已到貨' ? 'd' : '') + '">' + esc(l.arr) + '</span></td><td>' + (l.vendor ? esc(l.vendor) : '<span class="m">—</span>') + '</td><td>' + (l.pay ? '已付 ' + esc(l.pay) : '<span class="m">未付</span>') + '</td><td><button class="btn l s" data-pv="hist" data-k="' + esc(l.key) + '">紀錄</button> ' + (l.stock ? '<button class="btn l s" data-sk="del" data-id="' + esc(l.oid) + '">刪除</button>' : '<button class="btn a s" data-a="ord" data-id="' + esc(l.oid) + '">編輯</button>') + '</td></tr>';
-    }).join('') || '<tr><td colspan="16" class="m">沒有符合的品項</td></tr>') + '</tbody></table><p class="m">按右邊「紀錄」可看這個品項的操作紀錄(誰、什麼時候做了什麼)。</p>';
+      return '<tr><td><input type="checkbox" class="pvk" data-k="' + esc(l.key) + '"' + (PSEL[l.key] ? ' checked' : '') + '></td><td>' + esc(l.at) + '</td><td>' + (l.stock ? '<span class="chip">庫存</span>' : esc(l.buyer)) + '</td><td style="white-space:normal">' + esc(l.name) + '</td><td>' + esc(l.spec) + '</td><td>' + l.qty + '</td><td>' + (hc ? l.cost : '<span class="m">未填</span>') + '</td><td>' + (l.stock ? '—' : l.unit) + '</td><td>' + (l.stock ? '—' : l.qty * l.unit) + '</td><td style="white-space:normal">' + pvDisc(l, 'n') + '</td><td>' + pvDisc(l, 'a') + '</td><td>' + pvAmt(l) + '</td><td>' + (hc && !l.stock ? (l.unit - l.cost) * l.qty : '<span class="m">—</span>') + '</td><td><span class="chip ' + (l.arr === '已到貨' ? 'd' : '') + '">' + esc(l.arr) + '</span></td><td>' + (l.vendor ? esc(l.vendor) : '<span class="m">—</span>') + '</td><td>' + (l.pay ? '已付 ' + esc(l.pay) : '<span class="m">未付</span>') + '</td><td><button class="btn l s" data-pv="hist" data-k="' + esc(l.key) + '">紀錄</button> ' + (l.stock ? '<button class="btn l s" data-sk="del" data-id="' + esc(l.oid) + '">刪除</button>' : '<button class="btn a s" data-a="ord" data-id="' + esc(l.oid) + '">編輯</button>') + '</td></tr>';
+    }).join('') || '<tr><td colspan="17" class="m">沒有符合的品項</td></tr>') + '</tbody></table><p class="m">按右邊「紀錄」可看這個品項的操作紀錄(誰、什麼時候做了什麼)。</p>';
   pvSum(); pvAllState();
 }
 function pvAllState() { var L = pvLines(), a = $('#pvall'); if (a) a.checked = L.length > 0 && L.every(function (l) { return PSEL[l.key]; }); }

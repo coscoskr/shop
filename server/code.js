@@ -1669,7 +1669,7 @@ function lineStart() {
   var s = Utilities.getUuid().replace(/-/g, '');
   CacheService.getScriptCache().put('st_' + s, '1', 600);
   return 'https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=' + lineId_() + '&redirect_uri=' + encodeURIComponent(appUrl_()) +
-    '&state=' + s + '&scope=' + encodeURIComponent('profile openid') + '&bot_prompt=aggressive';
+    '&state=' + s + '&scope=' + encodeURIComponent('profile openid') + '&bot_prompt=normal';
 }
 function lineCallback_(p) {
   var c = CacheService.getScriptCache(), k = 'st_' + p.state;
