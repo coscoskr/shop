@@ -230,7 +230,6 @@ var GUEST = false;
 function loginHtml(why, guestBtn) {
   return '<h2>LINE 登入</h2><p class="ds">' + esc(why || '登入後可享會員優惠、使用購物金,並收到商品到貨通知。') + '</p>' +
     '<p><a class="btn a" id="lga" href="#" target="_top" aria-disabled="true" style="display:inline-block;text-decoration:none;line-height:28px">準備中…</a></p>' +
-    (D.line && D.line.friend ? '<p class="ds">想收到到貨通知,請先<a href="' + esc(D.line.friend) + '" target="_blank" rel="noopener">加我們的官方帳號為好友</a>。</p>' : '') +
     (guestBtn ? '<button class="btn l" data-a="guest">以遊客身分繼續</button> ' : '') + '<button class="btn l" data-a="x">關閉</button>';
 }
 

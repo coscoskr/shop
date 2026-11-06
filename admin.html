@@ -824,21 +824,21 @@ function pxCust() {
     h += '<p><span class="chip">' + (m.lid ? 'LINE 會員' : '新客人') + '</span> <b>' + esc(m.name) + '</b>' + (m.lid ? ' · ' + esc(m.level || '一般會員') + ' · 已有訂單 ' + (m.orders || 0) + ' 筆' : '') + ' <button type="button" class="btn l s" data-px="clr">換客人</button></p>' +
       '<div class="g" style="max-width:520px">' + fld('聯絡電話' + (m.lid ? '(選填)' : ''), 'pxph', m.phone || '') + '</div>';
   } else {
-    var k = PX.mq.trim().toLowerCase(), hits = k ? PX.members.filter(function (x) { return (x.name + ' ' + x.note + ' ' + x.lid).toLowerCase().indexOf(k) >= 0; }).slice(0, 8) : PX.members.slice(0, 5);
+    var k = PX.mq.trim().toLowerCase(), hits = k ? PX.members.filter(function (x) { return (x.name + ' ' + x.note + ' ' + x.lid).toLowerCase().indexOf(k) >= 0; }).slice(0, 8) : [];
     h += '<label style="max-width:420px">搜尋 LINE 會員(暱稱 / 備註)<input id="pxmq" value="' + esc(PX.mq) + '" placeholder="輸入暱稱,例如:小花" autocomplete="off"></label>' +
-      '<div id="pxmh">' + (hits.map(function (x) { return '<button type="button" class="oc" data-px="pick" data-lid="' + esc(x.lid) + '"><b>' + esc(x.name || '(無暱稱)') + '</b> <span class="m">' + esc(x.level) + ' · 訂單 ' + x.orders + (x.note ? ' · ' + esc(x.note) : '') + '</span></button>'; }).join('') || '<p class="m">找不到。客人私訊過官方帳號後會自動出現在這裡;也可以用下方「新客人」。</p>') + '</div>' +
+      '<div id="pxmh">' + (hits.map(function (x) { return '<button type="button" class="oc" data-px="pick" data-lid="' + esc(x.lid) + '"><b>' + esc(x.name || '(無暱稱)') + '</b> <span class="m">' + esc(x.level) + ' · 訂單 ' + x.orders + (x.note ? ' · ' + esc(x.note) : '') + '</span></button>'; }).join('') || (k ? '<p class="m">找不到。客人私訊過官方帳號後會自動出現在這裡;也可以用下方「新客人」。</p>' : '<p class="m">輸入暱稱或備註後,符合的客人會出現在這裡讓你選。</p>')) + '</div>' +
       '<details style="margin-top:8px"><summary class="m" style="cursor:pointer">找不到客人?改用姓名與電話建立「新客人」</summary><div class="g" style="max-width:520px;margin-top:8px">' + fld('姓名', 'pxgn', '') + fld('電話', 'pxgp', '') + '</div><button type="button" class="btn l" data-px="guest">使用這位新客人</button></details>';
   }
   $('#pxc').innerHTML = h;
 }
 function pxProd() {
-  var k = PX.pq.trim().toLowerCase(), list = P.filter(function (p) { return p.on && (!k || (p.name + ' ' + (p.brand || '')).toLowerCase().indexOf(k) >= 0); }).slice(0, 8);
+  var k = PX.pq.trim().toLowerCase(), list = !k ? [] : P.filter(function (p) { return p.on && (p.name + ' ' + (p.brand || '')).toLowerCase().indexOf(k) >= 0; }).slice(0, 8);
   $('#pxp').innerHTML = '<h3>2. 商品</h3><label style="max-width:420px">搜尋商品<input id="pxpq" value="' + esc(PX.pq) + '" placeholder="輸入商品名稱或品牌" autocomplete="off"></label>' +
     '<div>' + (list.map(function (p) {
       var sp = p.specs && p.specs.length ? '<select class="pxsp" style="width:auto;min-width:120px"><option value="">選規格</option>' + p.specs.map(function (x) { return '<option>' + esc(x) + '</option>'; }).join('') + '</select> ' : '';
       return '<div class="oc" data-pid="' + esc(p.id) + '" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;cursor:default"><div style="flex:1;min-width:200px"><b>' + esc(p.name) + '</b><br><span class="m">' + money(p.price) + ' · ' + esc(p.type) + (p.stock === '' ? '' : ' · 剩 ' + p.stock) + '</span></div>' + sp +
         '<input class="pxq" type="number" min="1" max="99" value="1" style="width:70px"> <button type="button" class="btn a s" data-px="add">加入</button></div>';
-    }).join('') || '<p class="m">沒有符合的上架商品。</p>') + '</div>';
+    }).join('') || (k ? '<p class="m">沒有符合的上架商品。</p>' : '<p class="m">輸入商品名稱或品牌後,符合的商品會出現在這裡讓你選。</p>')) + '</div>';
 }
 function pxLines() {
   var m = PX.mem, q = PX.q, h = '<h3>3. 訂單明細</h3>';
