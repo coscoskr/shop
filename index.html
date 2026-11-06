@@ -115,7 +115,7 @@ dialog{padding:14px 16px}dialog h2{font-size:17px;margin:0 0 8px}#dlg p{margin:6
 #ft .fi{border-top:1px solid rgba(255,255,255,.45);display:inline-block;padding-top:14px;min-width:220px}#ft .fi b{font-weight:500;letter-spacing:2px;font-size:14px}#ft .fi span{display:block;opacity:.95}
 #ft .fk{margin:14px 0 0;display:flex;gap:10px;justify-content:center;flex-wrap:wrap}#ft .fk a{color:#fff;border:1px solid rgba(255,255,255,.85);border-radius:999px;padding:5px 18px;font-size:13px;text-decoration:none;min-height:0}#ft .fk a:hover{background:#fff;color:var(--acc)}
 #ft .fc{margin-top:18px;font-size:11px;letter-spacing:1px;opacity:.8}
-#fab{position:fixed;right:10px;bottom:20px;z-index:4;display:flex;flex-direction:column;gap:8px}#fab a{display:grid;place-items:center;width:46px;height:46px;border-radius:50%;background:#06C755;color:#fff;font-size:11px;font-weight:700;text-decoration:none;line-height:1.1;text-align:center;box-shadow:0 2px 10px rgba(75,59,55,.28)}#fab a.cm{background:var(--acc)}
+#fab{position:fixed;right:10px;bottom:20px;z-index:4;display:flex;flex-direction:column;gap:8px}#fab a{display:grid;place-items:center;width:58px;height:58px;border-radius:50%;background:#06C755;color:#fff;font-size:13px;font-weight:700;text-decoration:none;line-height:1.1;text-align:center;box-shadow:0 2px 10px rgba(75,59,55,.28)}#fab a.cm{background:var(--acc);position:relative}#fab .bub{position:absolute;right:calc(100% + 8px);top:50%;transform:translateY(-50%);white-space:nowrap;background:#fff;color:var(--acc);border:1px solid var(--pink);border-radius:14px;padding:4px 10px;font-size:12px;font-weight:700;box-shadow:0 2px 8px rgba(75,59,55,.18)}#fab .bub::after{content:'';position:absolute;left:100%;top:50%;margin-top:-5px;border:5px solid transparent;border-left-color:var(--pink)}
 @media(min-width:700px){dialog{width:min(480px,94vw)}.big{max-height:40vh}}
 </style>
 </head>
@@ -213,7 +213,7 @@ function drawFt() {
   ft.hidden = false;
   var f = [];
   if (/^https:\/\//.test(l.friend || '')) f.push('<a href="' + esc(l.friend) + '" target="_blank" rel="noopener" aria-label="LINE 官方帳號">LINE<br>客服</a>');
-  if (/^https:\/\//.test(l.community || '')) f.push('<a class="cm" href="' + esc(l.community) + '" target="_blank" rel="noopener" aria-label="LINE 社群">LINE<br>社群</a>');
+  if (/^https:\/\//.test(l.community || '')) f.push('<a class="cm" href="' + esc(l.community) + '" target="_blank" rel="noopener" aria-label="LINE 社群,群友獨家優惠"><span class="bub">群友獨家優惠</span>LINE<br>社群</a>');
   fab.innerHTML = f.join(''); fab.hidden = !f.length;
 }
 function setLg() {
