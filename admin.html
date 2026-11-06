@@ -654,17 +654,24 @@ function pvDraw() {
     '<div id="pvt"></div>';
   $('#v').innerHTML = h; pvRows();
 }
+function pvShare(l) {
+  var L = PV.lines.filter(function (x) { return x.oid === l.oid && !x.stock; });
+  var total = L.reduce(function (a, x) { return a + x.qty * x.unit; }, 0), d = l.disc || 0, left = d, out = 0;
+  if (!d || !total) return 0;
+  for (var i = 0; i < L.length; i++) {
+    var v = i === L.length - 1 ? left : Math.round(d * (L[i].qty * L[i].unit) / total);
+    left -= v; if (L[i] === l) { out = v; break; }
+  }
+  return out;
+}
 function pvDisc(l, w) {
   if (l.stock) return '<span class="m">—</span>';
-  var L = pvLines(), i = L.indexOf(l), first = i <= 0 || L[i - 1].oid !== l.oid;
   if (!l.disc && !l.code) return '<span class="m">—</span>';
-  if (!first) return '<span class="m">〃</span>';
-  return w === 'n' ? (l.code ? '<b>' + esc(l.code) + '</b>' : '<span class="m">—</span>') : '<b>− ' + money(l.disc) + '</b>';
+  return w === 'n' ? (l.code ? '<b>' + esc(l.code) + '</b>' : '<span class="m">—</span>') : '<b>− ' + money(pvShare(l)) + '</b>';
 }
 function pvAmt(l) {
   if (l.stock) return '—';
-  var L = pvLines(), i = L.indexOf(l), first = i <= 0 || L[i - 1].oid !== l.oid;
-  return l.qty * l.unit - (first ? (l.disc || 0) : 0);
+  return l.qty * l.unit - pvShare(l);
 }
 function pvRows() {
   var L = pvLines(), tot = 0, cost = 0, profit = 0, nc = 0;
