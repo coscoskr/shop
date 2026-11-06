@@ -936,6 +936,7 @@ function purchaseList_() {
   var lines = allPurch_().map(function (r) {
     var m = lm(r), st = r._sh === '庫存進貨', o = ords[String(r.訂單ID)] || {};
     return { key: String(r.訂單ID) + '|' + String(r.商品ID), oid: String(r.訂單ID), pid: String(r.商品ID), stock: st, at: st ? String(r.日期 || '') : String(o.下單時間 || '').slice(0, 10), name: String(r.品名), qty: Number(r.數量), unit: st ? 0 : Number(r.單價),
+      code: st ? '' : String(o.折扣碼 || ''), dname: st ? '' : String(o.優惠名稱 || ''), disc: st ? 0 : Number(o.優惠折抵 || 0),
       buyer: st ? '【庫存】' : String(o.姓名 || ''), spec: String(r.規格 || ''), sid: String(r.出貨單ID || ''), arrBy: String(r.到貨操作人 || ''), arrAt: String(r.到貨時間 || ''), typ: st ? '庫存' : m.typ, arr: String(r.到貨狀態), vendor: m.vendor, cost: m.cost, tax: m.tax, src: m.src, pay: m.pay };
   }).sort(function (a, b) { return a.at < b.at ? 1 : a.at > b.at ? -1 : (a.oid < b.oid ? 1 : -1); });
   var vs = {}; lines.forEach(function (l) { if (l.vendor) vs[l.vendor] = 1; });
