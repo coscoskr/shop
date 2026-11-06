@@ -39,7 +39,11 @@ label{display:block;margin:10px 0;font-size:13px}
 label>select,label>textarea,label>input:not([type=checkbox]):not([type=radio]){margin-top:5px}
 input[type=checkbox],input[type=radio]{margin:0 7px 0 0;vertical-align:middle}
 th,td{line-height:1.6}
-.bt{display:flex;flex-wrap:wrap;align-items:center;gap:8px}.bt label{white-space:nowrap;display:flex!important;flex-direction:row;align-items:center;gap:6px;margin:0}.px{max-width:900px;margin-bottom:20px}.px h3{margin:0 0 8px}.px .oc{display:block;width:100%;text-align:left;border:1px solid var(--line);border-radius:6px;padding:8px 12px;margin:6px 0;background:#fff;cursor:pointer;font:inherit;color:inherit}.px button.oc:hover{background:var(--soft)}.px .n{text-align:right}.sht{min-width:1080px}.sht th,.sht td{vertical-align:middle;padding:10px 10px}.sht th{font-size:13px;color:var(--mute);font-weight:500}.sht .c{text-align:center}.sht .n{text-align:right;font-variant-numeric:tabular-nums}.sht td.it{white-space:normal;min-width:200px;max-width:300px;font-size:13px}.sht td b{font-variant-numeric:tabular-nums}.sht small{font-size:12px}.sht tbody tr{cursor:pointer}.sht tbody tr:hover{background:var(--soft)}
+.bt{display:flex;flex-wrap:wrap;align-items:center;gap:8px}.bt label{white-space:nowrap;display:flex!important;flex-direction:row;align-items:center;gap:6px;margin:0}.px{max-width:900px;margin-bottom:20px}.px h3{margin:0 0 8px}.px .oc{display:block;width:100%;text-align:left;border:1px solid var(--line);border-radius:6px;padding:8px 12px;margin:6px 0;background:#fff;cursor:pointer;font:inherit;color:inherit}.px button.oc:hover{background:var(--soft)}.px .n{text-align:right}.sm{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:6px 0 12px}.sm>div{background:var(--soft);border-radius:6px;padding:8px 12px;display:flex;flex-direction:column;gap:2px}.sm .m{font-size:12px}.sm b{font-size:16px}.sm .tt{color:var(--acc);font-size:18px}
+.ic{border:1px solid var(--line);border-radius:8px;padding:14px;margin:12px 0;background:#fff}.ic label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--mute);margin:0}.ic input,.ic select{width:100%!important;height:36px;padding:0 10px;font-size:14px;box-sizing:border-box;color:var(--ink)}.ic output{display:flex;align-items:center;height:36px;font-size:14px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
+.ic .r1{display:grid;grid-template-columns:3fr 1fr;gap:12px;margin-bottom:12px}.ic .r2,.ic .r3{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:12px}.ic .r3{margin-bottom:0}.ic .sv{display:flex;align-items:flex-end}.ic .sv .btn{width:100%;height:36px;padding:0 12px}
+@media(max-width:700px){.ic .r1{grid-template-columns:1fr}}
+.sht{min-width:1080px}.sht th,.sht td{vertical-align:middle;padding:10px 10px}.sht th{font-size:13px;color:var(--mute);font-weight:500}.sht .c{text-align:center}.sht .n{text-align:right;font-variant-numeric:tabular-nums}.sht td.it{white-space:normal;min-width:200px;max-width:300px;font-size:13px}.sht td b{font-variant-numeric:tabular-nums}.sht small{font-size:12px}.sht tbody tr{cursor:pointer}.sht tbody tr:hover{background:var(--soft)}
 .ln td select{margin:0}
 .bt .btn,p>.btn{margin-right:4px}
 .g{display:grid;grid-template-columns:repeat(3,1fr);gap:4px 22px}.g .f{grid-column:1/-1}
@@ -167,20 +171,23 @@ function openOrder(id) {
   var h = '<h3>訂單 ' + esc(o.id) + ' <span class="m">' + esc(o.at) + ' · <span class="chip">' + esc(o.st) + '</span></span></h3>' +
     '<form id="of" data-id="' + esc(o.id) + '"><div class="g">' + fld('姓名', 'name', o.name) + fld('電話', 'phone', o.phone) + '<div class="f">' + fld('備註', 'note', o.note) + '</div></div>' +
     '<p class="er" id="oe" role="alert"></p><button class="btn a">儲存訂單資料</button></form>';
-  h += '<h4>訂單品項 <span class="m">商品 ' + money(o.sub) + (o.disc ? ' − 優惠 ' + money(o.disc) : '') + (o.cred ? ' − 購物金 ' + money(o.cred) : '') + ' = ' + money(o.total) + '(運費在出貨單計算)</span></h4>' +
-    '<label class="ck"><input type="checkbox" id="ntf" checked> 把「到貨狀態」改成已到貨時,用 LINE 通知客人</label>' +
-    '<table class="itm"><thead><tr><th>品名</th><th>規格</th><th>現貨/預購</th><th>單價</th><th>數量</th><th>複價</th><th>到貨狀態</th><th>到貨日期</th><th>廠商</th><th>成本</th><th>稅</th><th>貨源</th><th>出貨單</th><th></th></tr></thead><tbody>' +
+  var locked = o.items.some(function (i) { return !!i.sid; });
+  h += '<h4>金額與優惠</h4><div class="sm"><div><span class="m">商品金額</span><b>' + money(o.sub) + '</b></div><div><span class="m">優惠折抵' + (o.dname ? '(' + esc(o.dname) + ')' : '') + '</span><b>' + (o.disc ? '− ' + money(o.disc) : '—') + '</b></div><div><span class="m">購物金折抵</span><b>' + (o.cred ? '− ' + money(o.cred) : '—') + '</b></div><div><span class="m">合計(運費在出貨單計算)</span><b class="tt">' + money(o.total) + '</b></div></div>' +
+    '<form id="oaf" data-id="' + esc(o.id) + '"><div class="g">' + fld('折扣碼(可替客人輸入或更換,清空=移除)', 'code', o.code) + fld('折扣金額(手動調整,元)', 'discount', o.disc, 'number') + fld('優惠名稱(手動調整時顯示)', 'dname', o.dname) + '</div>' +
+    '<p class="m">輸入折扣碼會依目前商品金額重算折抵並取代原本的優惠;只改「折扣金額」是手動議價,會清掉折扣碼。' + (locked ? '<br><b class="er">此訂單已有品項建立出貨單,不能再調整優惠。</b>' : '') + '</p><p class="er" id="oae" role="alert"></p><button class="btn a"' + (locked ? ' disabled' : '') + '>套用調整</button></form>';
+  h += '<h4>訂單品項</h4><label class="ck"><input type="checkbox" id="ntf" checked> 把「到貨狀態」改成已到貨時,用 LINE 通知客人</label>' +
     o.items.map(function (i) {
       var lock = !!i.sid, dis = lock ? ' disabled' : '';
-      return '<tr class="ln" data-pid="' + esc(i.pid) + '"><td><input class="ln_n" value="' + esc(i.name) + '"></td><td><input class="ln_p" value="' + esc(i.spec || '') + '" placeholder="顏色/尺寸"></td>' +
-        '<td><select class="ln_t"' + dis + '>' + opts(['現貨', '預購'], i.typ) + '</select></td>' +
-        '<td><input class="lu" type="number" min="0" value="' + i.unit + '"' + dis + '></td><td><input class="lq" type="number" min="1" value="' + i.qty + '"' + dis + '></td><td>' + i.sub + '</td>' +
-        '<td><select class="ln_a"' + dis + '>' + opts(['待到貨', '已到貨'], i.arr) + '</select></td>' +
-        '<td><input class="ln_e" type="date" value="' + esc(i.eta || '') + '"></td><td><select class="ln_v">' + vopt(i.vendor, '—') + '</select></td>' +
-        '<td><input class="ln_c" type="number" min="0" value="' + (i.cost === '' || i.cost == null ? '' : i.cost) + '"></td><td><select class="ln_x">' + opts(['未稅', '含稅'], i.tax ? '含稅' : '未稅') + '</select></td>' +
-        '<td><input class="ln_s" value="' + esc(i.src || '') + '"></td><td>' + esc(i.sid || '—') + '</td>' +
-        '<td><button class="btn a s" data-a="sl" data-oid="' + esc(o.id) + '" data-pid="' + esc(i.pid) + '">儲存</button></td></tr>';
-    }).join('') + '</tbody></table><p class="m">每列右邊按「儲存」。廠商、成本、稅、貨源只記在這一筆訂單明細(到貨日期仍是商品共用)。已記錄付款的品項,廠商/成本/貨源要先到「廠商付款紀錄」刪除付款紀錄才能改。已建立出貨單的品項,數量、單價、到貨狀態不能改。</p>';
+      return '<div class="ln ic" data-pid="' + esc(i.pid) + '">' +
+        '<div class="r1"><label>品名<input class="ln_n" value="' + esc(i.name) + '"></label><label>規格<input class="ln_p" value="' + esc(i.spec || '') + '" placeholder="顏色/尺寸"></label></div>' +
+        '<div class="r2"><label>現貨/預購<select class="ln_t"' + dis + '>' + opts(['現貨', '預購'], i.typ) + '</select></label>' +
+        '<label>單價<input class="lu" type="number" min="0" value="' + i.unit + '"' + dis + '></label><label>數量<input class="lq" type="number" min="1" value="' + i.qty + '"' + dis + '></label>' +
+        '<label>複價<output class="lt">' + money(i.sub) + '</output></label>' +
+        '<label>到貨狀態<select class="ln_a"' + dis + '>' + opts(['待到貨', '已到貨'], i.arr) + '</select></label><label>到貨日期<input class="ln_e" type="date" value="' + esc(i.eta || '') + '"></label></div>' +
+        '<div class="r3"><label>廠商<select class="ln_v">' + vopt(i.vendor, '—') + '</select></label><label>成本<input class="ln_c" type="number" min="0" value="' + (i.cost === '' || i.cost == null ? '' : i.cost) + '"></label>' +
+        '<label>稅<select class="ln_x">' + opts(['未稅', '含稅'], i.tax ? '含稅' : '未稅') + '</select></label><label>貨源<input class="ln_s" value="' + esc(i.src || '') + '"></label>' +
+        '<label>出貨單<output>' + esc(i.sid || '—') + '</output></label><div class="sv"><button class="btn a" data-a="sl" data-oid="' + esc(o.id) + '" data-pid="' + esc(i.pid) + '">儲存這個品項</button></div></div></div>';
+    }).join('') + '<p class="m">每個品項右下角按「儲存這個品項」。廠商、成本、稅、貨源只記在這一筆訂單明細(到貨日期仍是商品共用)。已記錄付款的品項,廠商/成本/貨源要先到「廠商付款紀錄」刪除付款紀錄才能改。已建立出貨單的品項,數量、單價、到貨狀態不能改。</p>';
   if (o.ships.length) h += '<h4>相關出貨單</h4><table><tbody>' + o.ships.map(function (s) { return '<tr data-a="ship" data-id="' + esc(s.id) + '"><td>' + esc(s.id) + '</td><td>' + esc(s.it) + '</td><td>' + esc(s.pay) + ' ' + money(s.total) + '</td><td><span class="chip d">' + esc(s.st) + '</span></td></tr>'; }).join('') + '</tbody></table>';
   h += '<p style="margin-top:18px"><button class="btn l" data-a="x">關閉</button> <button class="btn l" data-a="dord" data-id="' + esc(o.id) + '">刪除訂單</button></p>';
   d.innerHTML = h; if (!d.open) d.showModal();
@@ -442,6 +449,10 @@ function drawSettings() {
 
 /* ---------- 事件 ---------- */
 function refreshOpen(d, id) { setO(d); PVDIRTY = true; if (tab === 'o') orderRows(); else if (tab === 's') shipRows(); openOrder(id); }
+document.addEventListener('input', function (e) {
+  var t = e.target; if (!t.classList || !(t.classList.contains('lu') || t.classList.contains('lq'))) return;
+  var r = t.closest('.ln'); if (!r) return; r.querySelector('.lt').textContent = money((+r.querySelector('.lu').value || 0) * (+r.querySelector('.lq').value || 0));
+});
 document.addEventListener('click', function (e) {
   var ssl = e.target.closest('.ssel');
   if (ssl) { SSEL[ssl.dataset.id] = ssl.checked; $('#ssn').textContent = selShips().length; var sa = $('#sall'); if (sa) sa.checked = window.SROWS.length > 0 && window.SROWS.every(function (x) { return SSEL[x]; }); e.stopPropagation(); return; }
@@ -467,7 +478,7 @@ document.addEventListener('click', function (e) {
       call('adminDeleteProduct', T, id).then(function (r) { P = r; $('#dlg').close(); prodView(); }).catch(fail('#pe'));
     });
   } else if (a === 'sl') {
-    var tr = b.closest('tr');
+    var tr = b.closest('.ln');
     var q = function (c) { return tr.querySelector(c).value; };
     call('adminEditLineFull', T, b.dataset.oid, b.dataset.pid, { name: q('.ln_n'), spec: q('.ln_p'), type: q('.ln_t'), qty: q('.lq'), unit: q('.lu'), arr: q('.ln_a'), eta: q('.ln_e'), vendor: q('.ln_v'), cost: q('.ln_c'), tax: q('.ln_x') === '含稅', src: q('.ln_s'), notify: !!($('#ntf') && $('#ntf').checked) }).then(function (d) { refreshOpen(d, b.dataset.oid); if (d.notify) tell('已用 LINE 通知:送出 ' + d.notify.sent + ' 位' + (d.notify.noLine ? ',' + d.notify.noLine + ' 筆訂單沒有 LINE 登入' : '') + (d.notify.failed ? ',' + d.notify.failed + ' 位失敗(可能還沒加好友)' : '')); }).catch(function (er) { tell(er.message); });
   } else if (a === 'dord') {
@@ -527,6 +538,9 @@ document.addEventListener('submit', function (e) {
     $('#oe').textContent = '';
     call('adminUpdateOrder', T, f.dataset.id, { name: f.name.value, phone: f.phone.value, note: f.note.value })
       .then(function (d) { setO(d); PVDIRTY = true; if (tab === 'o') orderRows(); else if (tab === 's') shipRows(); $('#dlg').close(); tell('訂單 ' + f.dataset.id + ' 已更新'); }).catch(fail('#oe'));
+  } else if (f.id === 'oaf') {
+    $('#oae').textContent = '';
+    call('adminOrderAdjust', T, f.dataset.id, { code: f.code.value, discount: f.discount.value, dname: f.dname.value }).then(function (d) { refreshOpen(d, f.dataset.id); tell('優惠已調整'); }).catch(fail('#oae'));
   } else if (f.id === 'shf') {
     $('#se').textContent = '';
     call('adminUpdateShip', T, f.dataset.id, { st: f.st.value, co: f.co.value, no: f.no.value, fee: f.fee.value, phone: f.phone.value, last5: f.last5.value, link: f.link.value, ship: f.ship.value, note: f.note.value }).then(function (d) { setO(d); if (tab === 's') shipRows(); else if (tab === 'o') orderRows(); $('#dlg').close(); tell('出貨單 ' + f.dataset.id + ' 已更新' + (d.shipNotify ? '\n' + d.shipNotify : '')); }).catch(fail('#se'));
