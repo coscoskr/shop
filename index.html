@@ -84,7 +84,11 @@ dialog{padding:14px 16px}dialog h2{font-size:17px;margin:0 0 8px}#dlg p{margin:6
 .cp{flex:none;border:1px solid var(--acc);background:#fff;color:var(--acc);border-radius:999px;padding:2px 12px;font-size:12px;cursor:pointer;min-height:26px}.cp.ok{background:var(--acc);color:#fff}
 .l5f{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0 0}.l5f label{font-size:13px;color:var(--mute);display:flex;align-items:center;gap:6px;white-space:nowrap;margin:0}.l5f input{flex:none;width:5.8em!important;height:32px;padding:0 8px;border:1px solid var(--line);border-radius:8px;text-align:center;font-size:16px;letter-spacing:3px;background:#fff}.l5f .btn{min-height:32px;padding:0 14px;font-size:13px}
 .po{border:1px solid var(--pink);border-radius:14px;background:linear-gradient(#fff,var(--paper));position:relative}.po .pot{text-align:center;font:500 13px/1 "Cormorant Garamond","Noto Serif TC",serif;letter-spacing:3px;color:var(--acc);margin-bottom:6px}.po h3{font-family:"Noto Serif TC",serif;color:var(--ink)}.po .pon{text-align:center;margin:0 0 8px;font-size:12px;color:var(--mute);letter-spacing:1px}.po .pof{border-top:1px dashed var(--pink);margin-top:8px;padding-top:8px;font-size:14px}.po .pof b{color:var(--acc)}.po .prc{border-top:1px dashed var(--pink);margin-top:8px;padding-top:6px;font-size:13px;color:var(--mute)}
-#ft{padding:22px 16px 92px;text-align:center;font-size:12.5px;color:var(--mute);border-top:1px solid var(--line);margin-top:8px;line-height:1.9}#ft b{color:var(--ink);font-weight:500;letter-spacing:1px}#ft a{color:var(--acc);text-decoration:none}
+#ft{background:var(--pinkbg);color:#fff;text-align:center;padding:30px 20px 96px;margin-top:28px;font-size:13px;line-height:1.9}
+#ft .fl{height:46px;width:auto;filter:brightness(0) invert(1);display:block;margin:0 auto 8px}#ft .fw{font:400 26px/1 "Cormorant Garamond","Noto Serif TC",serif;letter-spacing:2px}#ft .fs{font-size:11px;letter-spacing:3px;opacity:.9;margin:6px 0 16px}
+#ft .fi{border-top:1px solid rgba(255,255,255,.45);display:inline-block;padding-top:14px;min-width:220px}#ft .fi b{font-weight:500;letter-spacing:2px;font-size:14px}#ft .fi span{display:block;opacity:.95}
+#ft .fk{margin:14px 0 0;display:flex;gap:10px;justify-content:center;flex-wrap:wrap}#ft .fk a{color:#fff;border:1px solid rgba(255,255,255,.85);border-radius:999px;padding:5px 18px;font-size:13px;text-decoration:none;min-height:0}#ft .fk a:hover{background:#fff;color:var(--acc)}
+#ft .fc{margin-top:18px;font-size:11px;letter-spacing:1px;opacity:.8}
 #fab{position:fixed;right:10px;bottom:72px;z-index:4;display:flex;flex-direction:column;gap:8px}#fab a{display:grid;place-items:center;width:46px;height:46px;border-radius:50%;background:#06C755;color:#fff;font-size:11px;font-weight:700;text-decoration:none;line-height:1.1;text-align:center;box-shadow:0 2px 10px rgba(75,59,55,.28)}#fab a.cm{background:var(--acc)}
 @media(min-width:700px){dialog{width:min(480px,94vw)}.big{max-height:40vh}}
 </style>
@@ -162,12 +166,15 @@ google.script.run.withSuccessHandler(function (d) {
 
 function catHit(pc, v, p) { if (v === '@現貨' || v === '@預購') return !!p && p.type === v.slice(1); if (v === '@品牌') return !!p && !!p.brand; if (v.indexOf('@品牌/') === 0) return !!p && p.brand === v.slice(4); return !v || pc.some(function (c) { return c === v || c.indexOf(v + '/') === 0; }); }
 function drawFt() {
-  var b = (D && D.biz) || {}, l = (D && D.line) || {}, ft = $('#ft'), fab = $('#fab'), h = [];
-  if (b.name) h.push('<b>' + esc(b.name) + '</b>');
-  if (b.tax) h.push('統一編號 ' + esc(b.tax));
-  if (b.addr) h.push(esc(b.addr));
-  if (/^https:\/\//.test(b.ig || '')) h.push('<a href="' + esc(b.ig) + '" target="_blank" rel="noopener">Instagram</a>');
-  ft.innerHTML = h.join('<br>'); ft.hidden = !h.length;
+  var b = (D && D.biz) || {}, l = (D && D.line) || {}, ft = $('#ft'), fab = $('#fab'), mk = document.querySelector('.hero .mkw'), i = [], k = [];
+  if (b.name) i.push('<b>' + esc(b.name) + '</b>');
+  if (b.tax) i.push('<span>統一編號 ' + esc(b.tax) + '</span>');
+  if (b.addr) i.push('<span>' + esc(b.addr) + '</span>');
+  if (/^https:\/\//.test(b.ig || '')) k.push('<a href="' + esc(b.ig) + '" target="_blank" rel="noopener">Instagram</a>');
+  ft.innerHTML = (mk ? '<img class="fl" src="' + mk.src + '" alt="">' : '') + '<div class="fw">coscos select</div><div class="fs">KOREA SELECT SHOP</div>' +
+    (i.length ? '<div class="fi">' + i.join('') + '</div>' : '') + (k.length ? '<div class="fk">' + k.join('') + '</div>' : '') +
+    '<div class="fc">© ' + new Date().getFullYear() + ' ' + esc(b.name || D.store || 'coscos') + '</div>';
+  ft.hidden = false;
   var f = [];
   if (/^https:\/\//.test(l.friend || '')) f.push('<a href="' + esc(l.friend) + '" target="_blank" rel="noopener" aria-label="LINE 官方帳號">LINE<br>客服</a>');
   if (/^https:\/\//.test(l.community || '')) f.push('<a class="cm" href="' + esc(l.community) + '" target="_blank" rel="noopener" aria-label="LINE 社群">LINE<br>社群</a>');
