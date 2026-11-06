@@ -92,6 +92,7 @@ dialog{width:100%;max-width:none;margin:auto 0 0;border-radius:14px 14px 0 0;max
 .fbr{max-height:34vh;overflow-y:auto}.fbr label{display:block!important;margin:4px 0!important}.fpr{display:flex;align-items:center;gap:8px}#ff fieldset{min-width:0}.fpr input{flex:1 1 0;width:0;min-width:0;padding:10px;border:1px solid var(--line);border-radius:8px;background:#fff;font-size:16px}
 @media(max-width:699px){#nav,nav.sub{display:none}.sw{display:none}header.ss .sw{display:block}header{flex-wrap:wrap}}
 @media(min-width:700px){.hi{order:2;margin-left:0}.sw{order:1}#hs{display:none}#hun{display:inline}#hm{padding:8px 12px}.ib#hb{display:none}#mn,#mnb{display:none!important}#tl{padding:12px 24px 4px;max-width:720px}#pg{padding-left:24px;padding-right:24px}}
+.shb{display:inline-flex;align-items:center;justify-content:center;gap:6px}.r .shb{padding-left:12px;padding-right:12px}.shs a,.shs button{display:block;width:100%;margin:8px 0;text-align:center;text-decoration:none;box-sizing:border-box}.shs .ln2{background:#06C755;border-color:#06C755;color:#fff}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
 .tw{overflow-x:auto}.ot{width:100%;border-collapse:collapse;font-size:13px}.ot th,.ot td{padding:6px 4px;border-bottom:1px solid #eee;text-align:left;white-space:nowrap}.ot td:first-child{white-space:normal;min-width:90px}
 .tb{display:flex;gap:6px;margin-bottom:10px}.tb .btn{flex:1;padding:8px 4px}
@@ -195,6 +196,7 @@ google.script.run.withSuccessHandler(function (d) {
   }
   nav(); grid();
   if (BOOT.token) memLoad(function () { show(memList()); });
+  try { var pid0 = new URLSearchParams(location.search).get('p'); if (pid0 && !BOOT.token) { var pp0 = byId(pid0); if (pp0) { cur = pp0; dq = 1; show(detail(cur)); } } } catch (e0) {}
   liffBoot();
 }).withFailureHandler(function (e) { $('#grid').innerHTML = '<p>載入失敗:' + esc(e.message) + '</p>'; }).getShop();
 
@@ -299,6 +301,18 @@ function drawPg(pages) {
   }
   p.innerHTML = h + '<button type="button" data-a="pg" data-p="' + (PAGE + 1) + '"' + (PAGE >= pages ? ' disabled' : '') + ' aria-label="下一頁">›</button>';
 }
+function prodUrl(p) { return location.origin + location.pathname + '?p=' + encodeURIComponent(p.id); }
+function shareProd(p) {
+  if (!p) return;
+  var url = prodUrl(p), title = (D.store || 'coscos韓國選物店') + ' | ' + p.name, text = p.name + ' ' + money(p.price);
+  var fb = function () {
+    show('<div class="tb"><button type="button" class="btn l" data-a="x">關閉</button></div><h2>分享給朋友</h2><p class="ds">' + esc(p.name) + '</p><div class="shs">' +
+      '<a class="btn ln2" href="https://social-plugins.line.me/lineit/share?url=' + encodeURIComponent(url) + '" target="_blank" rel="noopener">用 LINE 分享</a>' +
+      '<button type="button" class="btn l" data-a="shcp" data-u="' + esc(url) + '">複製連結(貼到 IG 或其他 App)</button></div>');
+  };
+  if (navigator.share) navigator.share({ title: title, text: text, url: url }).catch(function (e) { if (!e || e.name !== 'AbortError') fb(); });
+  else fb();
+}
 function toTop() { var t = $('#tl'); try { window.scrollTo({ top: Math.max(0, t.getBoundingClientRect().top + window.pageYOffset - 70), behavior: 'smooth' }); } catch (e) { window.scrollTo(0, 0); } }
 function fltHtml() {
   var types = ['現貨', '預購'].filter(function (t) { return D.products.some(function (p) { return p.type === t; }); }), bl = [];
@@ -350,7 +364,7 @@ function detail(p) {
   return '<div class="tb">' + (!LT && D.line && D.line.on ? '<button type="button" class="lgb" data-a="lgd">LINE 登入</button>' : '') + '<button type="button" class="xb" data-a="x" aria-label="關閉">✕</button></div><h2>' + bn(p) + '</h2>' + (p.imgs && p.imgs.length ? '<img class="big" id="bigimg" src="' + esc(p.imgs[0]) + '" alt="" referrerpolicy="no-referrer">' + (p.imgs.length > 1 ? '<div class="th">' + p.imgs.map(function (u, k) { return '<img src="' + esc(u) + '" referrerpolicy="no-referrer" alt="商品圖片 ' + (k + 1) + '" data-a="bigimg" data-u="' + esc(u) + '" class="' + (k ? '' : 'on') + '">'; }).join('') + '</div>' : '') : '') +
     '<p><span class="pr">' + money(p.price) + '</span> <span class="tg">' + tag(p) + '</span></p>' + (t ? '<p class="tg">' + t + '</p>' : '') +
     '<p class="ds">' + esc(p.desc) + '</p>' +
-    (p.stock === 0 ? '<p>這項商品已售完。</p>' : (p.specs && p.specs.length ? '<label>規格<select id="spsel"><option value="">請選擇規格</option>' + p.specs.map(function (x) { return '<option>' + esc(x) + '</option>'; }).join('') + '</select></label>' : '') + '<p id="dte" class="tg" role="alert"></p><div class="r"><button class="btn l" data-a="dn">−</button><b id="qn">1</b><button class="btn l" data-a="up">+</button><button class="btn a" data-a="add">加入購物車</button></div>') +
+    (p.stock === 0 ? '<p>這項商品已售完。</p><p><button class="btn l shb" data-a="shr">'+'<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5.5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="18.5" r="2.6"/><path d="M8.3 10.8l7.4-3.8M8.3 13.2l7.4 3.8"/></svg>'+' 分享給朋友</button></p>' : (p.specs && p.specs.length ? '<label>規格<select id="spsel"><option value="">請選擇規格</option>' + p.specs.map(function (x) { return '<option>' + esc(x) + '</option>'; }).join('') + '</select></label>' : '') + '<p id="dte" class="tg" role="alert"></p><div class="r"><button class="btn l" data-a="dn">−</button><b id="qn">1</b><button class="btn l" data-a="up">+</button><button class="btn a" data-a="add">加入購物車</button><button type="button" class="btn l shb" data-a="shr" aria-label="分享給朋友" title="分享給朋友">'+'<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5.5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="18.5" r="2.6"/><path d="M8.3 10.8l7.4-3.8M8.3 13.2l7.4 3.8"/></svg>'+'</button></div>') +
     '';
 }
 function cartHtml(noRefresh) {
@@ -406,6 +420,8 @@ document.addEventListener('click', function (e) {
   else if (a === 'mnx') { var g = b.dataset.g, was = b.getAttribute('aria-expanded') === 'true'; MNX[g] = !was; b.setAttribute('aria-expanded', String(!was)); b.nextElementSibling.hidden = was; }
   else if (a === 'mnc') { }
   else if (a === 'srch') { var hd = document.querySelector('header'); hd.classList.toggle('ss'); if (hd.classList.contains('ss')) $('#q').focus(); }
+  else if (a === 'shr') shareProd(cur);
+  else if (a === 'shcp') { var su = b.dataset.u, okc = function () { b.textContent = '已複製連結,可貼到 IG 或任何地方'; }, fbc = function () { var t = document.createElement('textarea'); t.value = su; t.style.cssText = 'position:fixed;opacity:0'; document.body.appendChild(t); t.select(); try { document.execCommand('copy'); okc(); } catch (x) { b.textContent = su; } document.body.removeChild(t); }; if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(su).then(okc, fbc); else fbc(); }
   else if (a === 'flt') show(fltHtml());
   else if (a === 'fclr') { FIL = { type: '', brands: {}, min: '', max: '', avail: false }; PAGE = 1; $('#dlg').close(); grid(); }
   else if (a === 'fapply') {
