@@ -23,6 +23,7 @@ h1{font-size:18px;margin:0;white-space:nowrap;letter-spacing:.5px}
 .hero small{display:block;font-size:12px;letter-spacing:2px;opacity:.9;margin-top:6px;font-family:"Noto Sans TC",sans-serif}
 .sw{position:relative;flex:1;max-width:460px;margin-left:auto}
 .lgb,.btn.lgb,#lga{background:#06C755;border:1px solid #06C755;color:#fff;border-radius:6px;font-weight:600}.lgb:hover,#lga:hover{background:#05b34c;color:#fff}
+.ot{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);font-size:14px}.ot>div{display:flex;justify-content:space-between;padding:2px 0}.ot .dc{color:var(--acc)}.ot .tt{font-weight:700;font-size:15px;padding-top:4px}
 #cdw{position:fixed;inset:0;z-index:99999;background:rgba(75,59,55,.45);display:flex;align-items:center;justify-content:center;padding:24px}#cdw .cdb{background:#fff;border-radius:18px;padding:22px 20px;max-width:320px;width:100%;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.25)}#cdw .cdb p{margin:0 0 10px}#cdw .cdb b{font-size:17px;color:var(--acc)}
 .cd{margin:12px 0;padding:12px 14px;background:var(--soft);border:2px dashed var(--pink);border-radius:16px}.cd .cdt{font-size:15px;font-weight:700;color:var(--acc);margin-bottom:8px}.cd .cdr{display:flex;gap:8px}.cd input{flex:1;min-width:0;height:44px;padding:0 14px;border:1.5px solid var(--pink);border-radius:999px;background:#fff;font-size:16px;letter-spacing:.5px}.cd input:focus{outline:none;border-color:var(--acc)}.cd .btn{flex:none;height:44px;min-height:0;padding:0 20px;font-size:15px;line-height:1;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center}.cd .cdh{margin-top:6px;font-size:12px;color:var(--mute)}
 .sw{min-width:0}.sw input{width:100%;padding:9px 14px;border:1px solid var(--line);border-radius:999px;background:#fff}
@@ -525,7 +526,10 @@ function memList() {
               '<div><div class="t">' + esc(i.name) + (spc ? ' <span class="s">(' + esc(spc) + ')</span>' : '') + '</div><div class="s">' + i.qty + ' 件 × ' + money(i.unit) + ' · ' +
               (i.sid ? '<a href="#" data-a="sd" data-id="' + esc(i.sid) + '">已出貨 ' + esc(i.sid) + '</a>' : i.arr === '已到貨' ? '<b>已到貨</b>' : '<span class="tg">待到貨' + (i.eta ? '(預計' + esc(md(i.eta)) + '左右)' : '') + '</span>') + '</div></div>' +
               '<div class="p">' + money(i.sub) + '</div></div>';
-          }).join('') + '</div>';
+          }).join('') + ((o.disc > 0 || o.cred > 0) ? '<div class="ot"><div><span>商品金額</span><span>' + money(o.sub) + '</span></div>' +
+            (o.disc > 0 ? '<div class="dc"><span>折扣' + (o.code ? '(' + esc(o.code) + ')' : o.dname ? '(' + esc(o.dname) + ')' : '') + '</span><span>− ' + money(o.disc) + '</span></div>' : '') +
+            (o.cred > 0 ? '<div class="dc"><span>購物金折抵</span><span>− ' + money(o.cred) + '</span></div>' : '') +
+            '<div class="tt"><span>訂單金額</span><span>' + money(o.total) + '</span></div></div>' : '') + '</div>';
       });
       h += '<div class="stk"><button class="btn a" data-a="sgo" id="sgo"' + (selCount() ? '' : ' disabled') + '>確定出貨(' + selCount() + ')</button></div>';
     }
