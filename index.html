@@ -23,6 +23,7 @@ h1{font-size:18px;margin:0;white-space:nowrap;letter-spacing:.5px}
 .hero small{display:block;font-size:12px;letter-spacing:2px;opacity:.9;margin-top:6px;font-family:"Noto Sans TC",sans-serif}
 .sw{position:relative;flex:1;max-width:460px;margin-left:auto}
 .lgb,.btn.lgb,#lga{background:#06C755;border:1px solid #06C755;color:#fff;border-radius:6px;font-weight:600}.lgb:hover,#lga:hover{background:#05b34c;color:#fff}
+#cdw{position:fixed;inset:0;z-index:99999;background:rgba(75,59,55,.45);display:flex;align-items:center;justify-content:center;padding:24px}#cdw .cdb{background:#fff;border-radius:18px;padding:22px 20px;max-width:320px;width:100%;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.25)}#cdw .cdb p{margin:0 0 10px}#cdw .cdb b{font-size:17px;color:var(--acc)}
 .cd{margin:12px 0;padding:12px 14px;background:var(--soft);border:2px dashed var(--pink);border-radius:16px}.cd .cdt{font-size:15px;font-weight:700;color:var(--acc);margin-bottom:8px}.cd .cdr{display:flex;gap:8px}.cd input{flex:1;min-width:0;height:44px;padding:0 14px;border:1.5px solid var(--pink);border-radius:999px;background:#fff;font-size:16px;letter-spacing:.5px}.cd input:focus{outline:none;border-color:var(--acc)}.cd .btn{flex:none;height:44px;min-height:0;padding:0 20px;font-size:15px;line-height:1;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center}.cd .cdh{margin-top:6px;font-size:12px;color:var(--mute)}
 .sw{min-width:0}.sw input{width:100%;padding:9px 14px;border:1px solid var(--line);border-radius:999px;background:#fff}
 #sg{position:absolute;left:0;right:0;top:100%;background:#fff;border:1px solid var(--line);display:none;z-index:6}
@@ -371,6 +372,12 @@ function detail(p) {
     (p.stock === 0 ? '<p>這項商品已售完。</p><p><button class="btn l shb" data-a="shr">分享給朋友</button></p>' : (p.specs && p.specs.length ? '<label>規格<select id="spsel"><option value="">請選擇規格</option>' + p.specs.map(function (x) { return '<option>' + esc(x) + '</option>'; }).join('') + '</select></label>' : '') + '<p id="dte" class="tg" role="alert"></p><div class="r"><button class="btn l" data-a="dn">−</button><b id="qn">1</b><button class="btn l" data-a="up">+</button><button class="btn a" data-a="add">加入購物車</button><button type="button" class="btn l shb" data-a="shr">分享給朋友</button></div>') +
     '';
 }
+function cdWarn() {
+  if ($('#cdw')) return;
+  var d = document.createElement('div'); d.id = 'cdw'; d.setAttribute('role', 'alertdialog'); d.setAttribute('aria-modal', 'true');
+  d.innerHTML = '<div class="cdb"><p><b>您的折扣碼尚未按套用</b></p><p class="ds">請先按折扣碼旁邊的「套用」,折扣才會算進金額。</p><button class="btn a" data-a="cdok">我知道了</button></div>';
+  ($('#dlg') || document.body).appendChild(d); var b = d.querySelector('button'); if (b) b.focus();
+}
 function cartHtml(noRefresh) {
   var ids = Object.keys(cart), sub = 0, h = '<h2>購物車</h2>';
   if (!ids.length) return h + '<p>購物車是空的。</p><button class="btn l" data-a="x">繼續逛逛</button>';
@@ -451,7 +458,8 @@ document.addEventListener('click', function (e) {
   else if (a === 'inc') { var p = byId(bp(id)); if (room(p) > 0) cart[id]++; count(); show(cartHtml()); }
   else if (a === 'dec') { if (--cart[id] < 1) delete cart[id]; count(); show(cartHtml()); }
   else if (a === 'del') { delete cart[id]; count(); show(cartHtml()); }
-  else if (a === 'co' && $('#cdi') && $('#cdi').value.trim() && $('#cdi').value.trim() !== CODE) { CODE = $('#cdi').value.trim(); QT = null; refreshQuote(); }
+  else if (a === 'co' && $('#cdi') && $('#cdi').value.trim() && $('#cdi').value.trim() !== CODE) { cdWarn(); }
+  else if (a === 'cdok') { var w = $('#cdw'); if (w) w.remove(); var i = $('#cdi'); if (i) { i.focus(); } }
   else if (a === 'co') { if (LT) placeNow({}); else if (!GUEST && D.line && D.line.on) show(loginHtml('請先用 LINE 登入,或以遊客身分繼續下單。', true)); else show(formHtml()); }
   else if (a === 'guest') { GUEST = true; show(formHtml()); }
   else if (a === 'x') $('#dlg').close();
