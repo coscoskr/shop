@@ -23,7 +23,7 @@ h1{font-size:18px;margin:0;white-space:nowrap;letter-spacing:.5px}
 .hero small{display:block;font-size:12px;letter-spacing:2px;opacity:.9;margin-top:6px;font-family:"Noto Sans TC",sans-serif}
 .sw{position:relative;flex:1;max-width:460px;margin-left:auto}
 .lgb,.btn.lgb,#lga{background:#06C755;border:1px solid #06C755;color:#fff;border-radius:6px;font-weight:600}.lgb:hover,#lga:hover{background:#05b34c;color:#fff}
-.cd{display:flex;align-items:center;gap:6px;margin:8px 0 2px;max-width:280px}.cd label{flex:none;font-size:13px;color:var(--mute)}.cd input{flex:1;min-width:0;height:32px;padding:0 12px;border:1px solid var(--line);border-radius:999px;background:#fff;font-size:16px;letter-spacing:.5px}.cd .btn.l{flex:none;height:32px;min-height:0;padding:0 14px;font-size:13px;line-height:1;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center}
+.cd{margin:12px 0;padding:12px 14px;background:var(--soft);border:2px dashed var(--pink);border-radius:16px}.cd .cdt{font-size:15px;font-weight:700;color:var(--acc);margin-bottom:8px}.cd .cdr{display:flex;gap:8px}.cd input{flex:1;min-width:0;height:44px;padding:0 14px;border:1.5px solid var(--pink);border-radius:999px;background:#fff;font-size:16px;letter-spacing:.5px}.cd input:focus{outline:none;border-color:var(--acc)}.cd .btn{flex:none;height:44px;min-height:0;padding:0 20px;font-size:15px;line-height:1;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center}.cd .cdh{margin-top:6px;font-size:12px;color:var(--mute)}
 .sw{min-width:0}.sw input{width:100%;padding:9px 14px;border:1px solid var(--line);border-radius:999px;background:#fff}
 #sg{position:absolute;left:0;right:0;top:100%;background:#fff;border:1px solid var(--line);display:none;z-index:6}
 #sg div{padding:8px 12px;cursor:pointer}#sg div:hover{background:var(--soft)}
@@ -379,7 +379,7 @@ function cartHtml(noRefresh) {
     var p = byId(bp(id)), n = cart[id]; if (!p) return; var u = unit(p, n); sub += u * n;
     h += '<div class="ln"><div><div class="nm">' + bn(p) + (sp(id) ? ' <small>(' + esc(sp(id)) + ')</small>' : '') + '</div><small>' + money(u) + ' × ' + n + '</small></div><div class="r"><button class="btn l" data-a="dec" data-id="' + esc(id) + '">−</button><button class="btn l" data-a="inc" data-id="' + esc(id) + '">+</button><b>' + money(u * n) + '</b><button class="btn l" data-a="del" data-id="' + esc(id) + '">移除</button></div></div>';
   });
-  h += '<form id="cdf" class="cd"><label for="cdi">折扣碼:</label><input id="cdi" value="' + esc(CODE) + '" maxlength="30" autocomplete="off"><button class="btn l">套用</button></form>';
+  h += '<form id="cdf" class="cd"><label for="cdi" class="cdt">有折扣碼嗎?在這裡輸入</label><div class="cdr"><input id="cdi" value="' + esc(CODE) + '" maxlength="30" autocomplete="off" autocapitalize="characters" placeholder="輸入折扣碼"><button class="btn a">套用</button></div><div class="cdh">輸入後請按「套用」,折扣才會算進金額</div></form>';
   var q = QT && QT.ok ? QT : null;
   if (CODE && q) h += q.codeOk ? '<p class="tg">折扣碼已套用</p>' : '<p class="tg">折扣碼不正確或已失效</p>';
   if (q) {
@@ -451,6 +451,7 @@ document.addEventListener('click', function (e) {
   else if (a === 'inc') { var p = byId(bp(id)); if (room(p) > 0) cart[id]++; count(); show(cartHtml()); }
   else if (a === 'dec') { if (--cart[id] < 1) delete cart[id]; count(); show(cartHtml()); }
   else if (a === 'del') { delete cart[id]; count(); show(cartHtml()); }
+  else if (a === 'co' && $('#cdi') && $('#cdi').value.trim() && $('#cdi').value.trim() !== CODE) { CODE = $('#cdi').value.trim(); QT = null; refreshQuote(); }
   else if (a === 'co') { if (LT) placeNow({}); else if (!GUEST && D.line && D.line.on) show(loginHtml('請先用 LINE 登入,或以遊客身分繼續下單。', true)); else show(formHtml()); }
   else if (a === 'guest') { GUEST = true; show(formHtml()); }
   else if (a === 'x') $('#dlg').close();
