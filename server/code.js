@@ -180,13 +180,41 @@ function imgList_(v) {
 }
 function bp_(x) { return String(x).split('~')[0]; }
 function spec_(x) { var s = String(x), i = s.indexOf('~'); return i < 0 ? '' : s.slice(i + 1); }
-function specs_(p) { return String(p.規格 || '').split('|').map(function (x) { return x.trim(); }).filter(Boolean); }
+/** 規格欄位格式:「黑色=5|白色=3|紅色」,=後面是該規格的數量,沒有=代表不限量(舊資料也相容) */
+function specParse_(p) {
+  var names = [], q = {};
+  String(p.規格 || '').split('|').forEach(function (x) {
+    x = x.trim(); if (!x) return;
+    var i = x.lastIndexOf('='), n = x, v = null;
+    if (i > 0 && /^\d+$/.test(x.slice(i + 1))) { n = x.slice(0, i); v = Number(x.slice(i + 1)); }
+    if (names.indexOf(n) < 0) { names.push(n); q[n] = v; }
+  });
+  return { names: names, q: q };
+}
+function specs_(p) { return specParse_(p).names; }
+function specQty_(p) { return specParse_(p).q; }
+/** 這個商品(含規格)目前還能賣幾件;null=不限量 */
+function availOf_(p, sp) {
+  var q = specQty_(p);
+  if (sp && q[sp] !== undefined && q[sp] !== null) return q[sp];
+  return p.數量 === '' ? null : Number(p.數量);
+}
+/** 增減庫存(delta 負=扣庫存):有設定數量的規格扣該規格,商品總數量也同步 */
+function adjStock_(p, sp, delta) {
+  var ps = specParse_(p);
+  if (sp && ps.q[sp] !== undefined && ps.q[sp] !== null) {
+    ps.q[sp] = Math.max(0, ps.q[sp] + delta);
+    p.規格 = ps.names.map(function (n) { return ps.q[n] === null ? n : n + '=' + ps.q[n]; }).join('|');
+    sh_('商品').getRange(p._r, H['商品'].indexOf('規格') + 1).setValue(p.規格);
+  }
+  if (p.數量 !== '') { p.數量 = Math.max(0, Number(p.數量) + delta); sh_('商品').getRange(p._r, H['商品'].indexOf('數量') + 1).setValue(p.數量); }
+}
 function imgs_(v) { return String(v || '').split('|').map(img_).filter(Boolean); }
 function pub_(p) {
   return {
     id: p.商品ID, name: p.名稱, cats: cs_(p.類別), type: p.銷售型態, price: Number(p.單價),
     stock: p.數量 === '' ? null : Number(p.數量), arrival: p.到貨日期, desc: p.說明,
-    tiers: tiers_(p.階梯價), img: imgs_(p.圖片)[0] || '', imgs: imgs_(p.圖片), specs: specs_(p), brand: String(p.品牌 || '')
+    tiers: tiers_(p.階梯價), img: imgs_(p.圖片)[0] || '', imgs: imgs_(p.圖片), specs: specs_(p), specQty: specQty_(p), brand: String(p.品牌 || '')
   };
 }
 function getShop() {
@@ -242,7 +270,7 @@ function placeCore_(want, ctx, o, name, phone, email, who, notePre) {
     var innM = {}; rows_('商品_內部').forEach(function (r) { innM[String(r.商品ID)] = r; });
     c.lines.forEach(function (l) {
       var p = l[0], inStock = p.銷售型態 === '現貨', lpid = l[3] ? String(p.商品ID) + '~' + l[3] : String(p.商品ID);
-      if (p.數量 !== '') { p.數量 = Number(p.數量) - l[1]; sh_('商品').getRange(p._r, H['商品'].indexOf('數量') + 1).setValue(p.數量); }
+      adjStock_(p, l[3] || '', -l[1]);
       put_('訂單明細', 0, { '訂單ID': oid, '商品ID': lpid, '規格': l[3] || '', '品名': p.名稱, '數量': l[1], '單價': l[2], '小計': l[1] * l[2], '到貨狀態': inStock ? '已到貨' : '待到貨', '可出貨': inStock ? 'Y' : 'N', '型態': p.銷售型態,
         '廠商': (innM[String(p.商品ID)] || {}).廠商 || '', '成本': (innM[String(p.商品ID)] || {}).成本 === undefined ? '' : (innM[String(p.商品ID)] || {}).成本, '成本含稅': (innM[String(p.商品ID)] || {}).成本含稅 || 'N', '貨源': (innM[String(p.商品ID)] || {}).貨源 || '' });
     });
@@ -380,7 +408,7 @@ function adminProducts_() {
       stock: p.數量 === '' ? '' : Number(p.數量), arrival: p.到貨日期, desc: p.說明, tiers: String(p.階梯價 || ''),
       img: String(p.圖片 || ''), on: p.上架 === 'Y', brand: String(p.品牌 || ''), vendor: String(i.廠商 || ''),
       cost: (i.成本 === undefined || i.成本 === '') ? '' : Number(i.成本), taxIncl: i.成本含稅 === 'Y',
-      source: String(i.貨源 || ''), locked: i.鎖定 === 'Y', specs: specs_(p)
+      source: String(i.貨源 || ''), locked: i.鎖定 === 'Y', specs: specs_(p), specQty: specQty_(p)
     };
   });
 }
@@ -648,14 +676,23 @@ function adminSaveProduct(tk, d) {
     var price = Number(d.price);
     if (d.price === '' || !(price >= 0)) throw new Error('單價不正確');
     var stock = '';
-    if (!d.unlimited) {
+    var specs = [], specAll = true, specSum = 0, seenSp = {};
+    [].concat(d.specs || []).forEach(function (s) {
+      var sq = '';
+      if (s && typeof s === 'object') { sq = s.q; s = s.n; }
+      s = t_(s, 30).split('|').join('/').split('~').join('-').split('=').join('-');
+      if (!s || seenSp[s]) return; seenSp[s] = 1;
+      if (sq === '' || sq == null) { specAll = false; specs.push(s); return; }
+      sq = Math.floor(Number(sq)); if (!(sq >= 0)) throw new Error('規格「' + s + '」的數量不正確');
+      specSum += sq; specs.push(s + '=' + sq);
+    });
+    if (specs.join('|').length > 40000) throw new Error('規格太多');
+    if (specs.length && (specAll || specSum > 0 || specs.some(function (x) { return x.indexOf('=') > 0; }))) { stock = specAll ? specSum : ''; }
+    else if (!d.unlimited) {
       if (d.stock === '' || d.stock == null) throw new Error('請填寫數量,或勾選「無限」');
       stock = Math.floor(Number(d.stock));
       if (!(stock >= 0)) throw new Error('數量不正確');
     }
-    var specs = [];
-    [].concat(d.specs || []).forEach(function (s) { s = t_(s, 30).split('|').join('/').split('~').join('-'); if (s && specs.indexOf(s) < 0) specs.push(s); });
-    if (specs.join('|').length > 40000) throw new Error('規格太多');
     if (['現貨', '預購'].indexOf(d.type) < 0) throw new Error('請選擇現貨或預購');
     if (d.arrival && !/^\d{4}-\d{2}-\d{2}$/.test(d.arrival)) throw new Error('到貨日期格式不正確');
     tiers_(d.tiers, true);
@@ -931,8 +968,8 @@ function adminBatchArrival(tk, keys, arr, notify) { return adminLineInfo(tk, key
 /** 庫存進貨品項改到貨時,同步增減商品庫存數量(無限庫存的商品不動) */
 function stockMove_(l, delta) {
   var p = rows_('商品').filter(function (x) { return String(x.商品ID) === bp_(l.商品ID); })[0];
-  if (!p || p.數量 === '') return;
-  sh_('商品').getRange(p._r, H['商品'].indexOf('數量') + 1).setValue(Math.max(0, Number(p.數量) + delta));
+  if (!p) return;
+  adjStock_(p, String(l.規格 || ''), delta);
 }
 /** 單一品項的詳細資料與操作紀錄(誰、何時、做了什麼) */
 function adminLineHistory(tk, oid, pid) {
@@ -1299,9 +1336,12 @@ function adminEditLineFull(tk, oid, pid, d) {
     if (shipped && (q !== Number(l.數量) || up !== Number(l.單價) || arr !== String(l.到貨狀態))) throw new Error('此品項已建立出貨單,數量、單價、到貨狀態需先刪除出貨單才能修改');
     var delta = q - Number(l.數量);
     var p = rows_('商品').filter(function (x) { return String(x.商品ID) === bp_(pid); })[0];
-    if (p && p.數量 !== '' && delta !== 0) {
-      if (Number(p.數量) - delta < 0) throw new Error('商品庫存不足,最多還能加 ' + Number(p.數量) + ' 件');
-      sh_('商品').getRange(p._r, H['商品'].indexOf('數量') + 1).setValue(Number(p.數量) - delta);
+    var oldSp = String(l.規格 || ''), newSp = (!d.keep && d.spec !== undefined) ? t_(d.spec, 60) : oldSp;
+    if (p && (delta !== 0 || newSp !== oldSp)) {
+      var av = availOf_(p, newSp);
+      if (av !== null && newSp === oldSp && delta > 0 && av - delta < 0) throw new Error('商品庫存不足,最多還能加 ' + av + ' 件');
+      if (av !== null && newSp !== oldSp && av < q) throw new Error('「' + newSp + '」庫存不足,只剩 ' + av + ' 件');
+      adjStock_(p, oldSp, Number(l.數量)); adjStock_(p, newSp, -q);
     }
     var extra = '', newInfo = null;
     if (!d.keep) {
@@ -1342,7 +1382,7 @@ function deleteOrder_(u, oid) {
   var ps = {}; rows_('商品').forEach(function (p) { ps[String(p.商品ID)] = p; });
   lines.forEach(function (l) {
     var p = ps[bp_(l.商品ID)];
-    if (p && p.數量 !== '') { p.數量 = Number(p.數量) + Number(l.數量); sh_('商品').getRange(p._r, H['商品'].indexOf('數量') + 1).setValue(p.數量); }
+    if (p) adjStock_(p, String(l.規格 || ''), Number(l.數量));
   });
   refund_(o.購物金明細);
   rows_('購物金').forEach(function (g) { if (String(g.訂單ID) === oid && Number(g.剩餘) > 0) { var gn = cp_(g); gn.剩餘 = 0; put_('購物金', g._r, gn); } });
@@ -1930,6 +1970,7 @@ function calc_(want, ctx, wantCredit, code) {
     if (sl.length && !sp) throw new Error('「' + p.名稱 + '」請先選擇規格');
     if (sp && sl.indexOf(sp) < 0) throw new Error('「' + p.名稱 + '」沒有「' + sp + '」這個規格,請重新整理頁面');
     if (p.數量 !== '' && Number(p.數量) < tot[bp_(id)]) throw new Error('「' + p.名稱 + '」數量不足,剩 ' + Number(p.數量) + ' 件');
+    if (sp) { var sq = specQty_(p)[sp]; if (sq !== null && sq !== undefined && sq < n) throw new Error('「' + p.名稱 + '」' + sp + (sq ? ' 數量不足,剩 ' + sq + ' 件' : ' 已售完')); }
     var u = unit_(Number(p.單價), tiers_(p.階梯價), tot[bp_(id)]);
     if (OVR_ && OVR_[id] !== undefined) u = OVR_[id];
     lines.push([p, n, u, sp]); sub += u * n;
@@ -2145,6 +2186,6 @@ function adminSaveSettings(tk, v) {
 
 /* ===== 以下由 build.py 加入 ===== */
 export const API = {resetAdmin, getShop, placeOrder, adminProxyQuote, adminPlaceOrder, adminLogin, adminVendors, adminBrands, adminAddBrand, adminRenameBrand, adminDeleteBrand, adminCats, adminAddCat, adminRenameCat, adminRenameBig, adminDeleteBig, adminDeleteCat, adminAddVendor, adminDeleteVendor, adminCarriers, adminSaveCarrier, adminDeleteCarrier, trackLink, adminInit, adminSaveProduct, adminDeleteProduct, adminBatchProducts, adminCodes, adminSaveCode, adminSetCodeOn, adminDeleteCode, adminSaveAdmin, adminLogs, memberLogin, memberOrders, memberSaveProfile, memberReportPay, adminBatchArrival, adminLineHistory, adminBatchOrder, adminPurchaseList, adminLineInfo, adminRecordPayment, adminUpdatePayment, adminDeletePayment, adminStockView, adminAddStockIn, adminDeleteStockIn, adminBatchDeleteLines, adminReport, adminOrders, adminOrderAdjust, adminUpdateOrder, adminEditLine, adminEditLineFull, adminDeleteOrder, adminBatchDeleteOrders, adminCreateShip, adminUpdateShip, adminBatchShipStatus, adminDeleteShip, adminBatchDeleteShips, adminShipHistory, adminBatch, memberCheckout, memberShipQuote, memberCreateShip, adminShipQuote, adminCreateShipFor, lineStart, lineLiff, quote, adminMembers, adminMemberGrants, adminSetLevel, adminGrant, adminVoidGrant, adminLevels, adminSaveLevel, adminDeleteLevel, adminActivities, adminSaveActivity, adminDeleteActivity, adminSettings, adminSaveSettings};
-export const INTERNAL = {catHit_, page_, doGet, setup, resetAdmin, ss_, raw_, sh_, t_, txt_, rows_, put_, log_, major_, diff_, settings_, cats_, cs_, tiers_, unit_, img_, imgList_, bp_, spec_, specs_, imgs_, pub_, getShop, shopData_, placeOrder, placeCore_, proxyCtx_, proxyWant_, adminProxyQuote, adminPlaceOrder, contactSeen_, hex_, hash_, admins_, saveAdmin_, adminLogin, me_, adminProducts_, vendors_, adminVendors, brandSheet_, brands_, brandKey_, brandPick_, brandResolve_, brandList_, brandName_, adminBrands, adminAddBrand, adminRenameBrand, adminDeleteBrand, catList_, catName_, adminCats, adminAddCat, renameCats_, adminRenameCat, adminRenameBig, adminDeleteBig, adminDeleteCat, adminAddVendor, adminDeleteVendor, carriers_, trackUrl_, shortTrack_, saveCarriers_, adminCarriers, adminSaveCarrier, adminDeleteCarrier, trackLink, adminInit, adminSaveProduct, adminDeleteProduct, adminBatchProducts, codeSheet_, codes_, dstr_, codeState_, findCode_, codeUsed_, codeList_, adminCodes, adminSaveCode, adminSetCodeOn, adminDeleteCode, adminSaveAdmin, adminLogs, nz_, mk_, mem_, lineMeta_, mine_, memberLogin, shipObj_, memberOrders, memberSaveProfile, memberReportPay, authDrive, adminUploadImage, adminBatchArrival, stockMove_, adminLineHistory, adminBatchOrder, allPurch_, purchaseList_, adminPurchaseList, pickPurchase_, adminLineInfo, adminRecordPayment, adminUpdatePayment, adminDeletePayment, stockView_, adminStockView, adminAddStockIn, deleteStockIn_, adminDeleteStockIn, adminBatchDeleteLines, adminReport, lk_, ri_, si_, paidOk_, now_, cp_, ord_, seq_, adminOrders, adminOrderAdjust, adminUpdateOrder, adminEditLine, adminEditLineFull, deleteOrder_, adminDeleteOrder, adminBatchDeleteOrders, adminCreateShip, syncOrderStatus_, adminUpdateShip, shipNotice_, adminBatchShipStatus, deleteShip_, adminDeleteShip, adminBatchDeleteShips, adminShipHistory, adminBatch, memberCheckout, shipCalc_, pickLines_, memberShipQuote, memberCreateShip, shipCtx_, shipRecv_, adminShipQuote, adminCreateShipFor, ensureSettings_, prop_, lineOn_, lineId_, appUrl_, sha_, tot_, lineStart, lineCallback_, lineLiff, newSession_, upsertMember_, memberRow_, levels_, levelOf_, pushLine_, notifyShipped_, mailTo_, authAll, notifyArrival_, today_, grants_, balance_, addGrant_, spend_, refund_, meInfo_, eligSub_, calc_, quote, awardCredits_, adminMembers, adminMemberGrants, adminSetLevel, adminGrant, adminVoidGrant, adminLevels, adminSaveLevel, adminDeleteLevel, actOut_, adminActivities, adminSaveActivity, adminDeleteActivity, defSet_, adminSettings, adminSaveSettings};
+export const INTERNAL = {catHit_, page_, doGet, setup, resetAdmin, ss_, raw_, sh_, t_, txt_, rows_, put_, log_, major_, diff_, settings_, cats_, cs_, tiers_, unit_, img_, imgList_, bp_, spec_, specParse_, specs_, specQty_, availOf_, adjStock_, imgs_, pub_, getShop, shopData_, placeOrder, placeCore_, proxyCtx_, proxyWant_, adminProxyQuote, adminPlaceOrder, contactSeen_, hex_, hash_, admins_, saveAdmin_, adminLogin, me_, adminProducts_, vendors_, adminVendors, brandSheet_, brands_, brandKey_, brandPick_, brandResolve_, brandList_, brandName_, adminBrands, adminAddBrand, adminRenameBrand, adminDeleteBrand, catList_, catName_, adminCats, adminAddCat, renameCats_, adminRenameCat, adminRenameBig, adminDeleteBig, adminDeleteCat, adminAddVendor, adminDeleteVendor, carriers_, trackUrl_, shortTrack_, saveCarriers_, adminCarriers, adminSaveCarrier, adminDeleteCarrier, trackLink, adminInit, adminSaveProduct, adminDeleteProduct, adminBatchProducts, codeSheet_, codes_, dstr_, codeState_, findCode_, codeUsed_, codeList_, adminCodes, adminSaveCode, adminSetCodeOn, adminDeleteCode, adminSaveAdmin, adminLogs, nz_, mk_, mem_, lineMeta_, mine_, memberLogin, shipObj_, memberOrders, memberSaveProfile, memberReportPay, authDrive, adminUploadImage, adminBatchArrival, stockMove_, adminLineHistory, adminBatchOrder, allPurch_, purchaseList_, adminPurchaseList, pickPurchase_, adminLineInfo, adminRecordPayment, adminUpdatePayment, adminDeletePayment, stockView_, adminStockView, adminAddStockIn, deleteStockIn_, adminDeleteStockIn, adminBatchDeleteLines, adminReport, lk_, ri_, si_, paidOk_, now_, cp_, ord_, seq_, adminOrders, adminOrderAdjust, adminUpdateOrder, adminEditLine, adminEditLineFull, deleteOrder_, adminDeleteOrder, adminBatchDeleteOrders, adminCreateShip, syncOrderStatus_, adminUpdateShip, shipNotice_, adminBatchShipStatus, deleteShip_, adminDeleteShip, adminBatchDeleteShips, adminShipHistory, adminBatch, memberCheckout, shipCalc_, pickLines_, memberShipQuote, memberCreateShip, shipCtx_, shipRecv_, adminShipQuote, adminCreateShipFor, ensureSettings_, prop_, lineOn_, lineId_, appUrl_, sha_, tot_, lineStart, lineCallback_, lineLiff, newSession_, upsertMember_, memberRow_, levels_, levelOf_, pushLine_, notifyShipped_, mailTo_, authAll, notifyArrival_, today_, grants_, balance_, addGrant_, spend_, refund_, meInfo_, eligSub_, calc_, quote, awardCredits_, adminMembers, adminMemberGrants, adminSetLevel, adminGrant, adminVoidGrant, adminLevels, adminSaveLevel, adminDeleteLevel, actOut_, adminActivities, adminSaveActivity, adminDeleteActivity, defSet_, adminSettings, adminSaveSettings};
 export { H };
 export function __reset() { SS_ = null; SHC_ = {}; RC_ = {}; }

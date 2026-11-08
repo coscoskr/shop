@@ -335,26 +335,32 @@ function drawCats(keepBig) {
   var bigs = catBigs(), q = ($('#cq') && $('#cq').value || '').trim().toLowerCase();
   var cur = keepBig !== undefined ? keepBig : ($('#cbig') ? $('#cbig').value : '');
   var shown = bigs.filter(function (k) { return !q || k.toLowerCase().indexOf(q) >= 0 || C.some(function (c) { return c.split('/')[0] === k && c.toLowerCase().indexOf(q) >= 0; }); });
-  if (cur && shown.indexOf(cur) < 0 && !keepBig) cur = '';
+  if (cur && shown.indexOf(cur) < 0 && keepBig === undefined) cur = '';
   var chips = CSEL.map(function (c, i) { return '<span class="chip" style="display:inline-block;background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:2px 4px 2px 10px;margin:0 6px 6px 0">' + esc(c.replace('/', ' › ')) + ' <button type="button" class="btn l s" style="border:0;padding:0 6px" data-a="crm" data-i="' + i + '" aria-label="移除">×</button></span>'; }).join('') || '<span class="m">尚未選擇類別</span>';
-  var subs = cur ? C.filter(function (c) { return c.split('/')[0] === cur; }) : [];
-  var subHtml = cur ? subs.map(function (c) {
-    var lab = c === cur ? (subs.length > 1 ? '不分小分類' : cur) : c.slice(cur.length + 1);
-    return '<label style="margin-right:14px;display:inline-block"><input type="checkbox" data-cs="' + esc(c) + '"' + (CSEL.indexOf(c) >= 0 ? ' checked' : '') + '> ' + esc(lab) + '</label>';
-  }).join('') || '<span class="m">(尚無小分類)</span>' : '<span class="m">先選大項目,再勾小項目</span>';
-  b.innerHTML = '<div>' + chips + '</div><div style="display:flex;gap:8px;flex-wrap:wrap"><input id="cq" placeholder="搜尋類別" value="' + esc($('#cq') ? $('#cq').value : '') + '" style="flex:1;min-width:120px" autocomplete="off"><select id="cbig" style="flex:1;min-width:140px"><option value="">① 選大項目…</option>' + shown.map(function (k) { return '<option value="' + esc(k) + '"' + (k === cur ? ' selected' : '') + '>' + esc(k) + '</option>'; }).join('') + '</select></div><div style="margin-top:8px"><span class="m">② 小項目</span><br>' + subHtml + '</div>';
-  var qi = $('#cq'); if (document.activeElement && document.activeElement.id === 'cq') { /* keep focus */ }
+  var subs = cur ? C.filter(function (c) { return c.split('/')[0] === cur && CSEL.indexOf(c) < 0; }) : [];
+  var subSel = '<select id="csub" style="flex:1;min-width:140px"' + (cur ? '' : ' disabled') + '><option value="">' + (cur ? '② 選小項目…(選了就加入)' : '② 先選大項目') + '</option>' + subs.map(function (c) { var lab = c === cur ? '不分小分類' : c.slice(cur.length + 1); return '<option value="' + esc(c) + '">' + esc(lab) + '</option>'; }).join('') + '</select>';
+  b.innerHTML = '<div>' + chips + '</div><div style="display:flex;gap:8px;flex-wrap:wrap"><input id="cq" placeholder="搜尋" value="' + esc($('#cq') ? $('#cq').value : '') + '" style="width:90px;flex:none" autocomplete="off"><select id="cbig" style="flex:1;min-width:140px"><option value="">① 選大項目…</option>' + shown.map(function (k) { return '<option value="' + esc(k) + '"' + (k === cur ? ' selected' : '') + '>' + esc(k) + '</option>'; }).join('') + '</select>' + subSel + '</div>';
 }
 document.addEventListener('input', function (e) { if (e.target.id === 'cq') { var v = e.target.value, p = e.target.selectionStart; drawCats(); var n = $('#cq'); n.focus(); try { n.setSelectionRange(p, p); } catch (x) { } } });
 document.addEventListener('change', function (e) {
   if (e.target.id === 'cbig') drawCats(e.target.value);
-  else if (e.target.dataset && e.target.dataset.cs !== undefined) { var c = e.target.dataset.cs, k = CSEL.indexOf(c); if (e.target.checked && k < 0) CSEL.push(c); else if (!e.target.checked && k >= 0) CSEL.splice(k, 1); var big = $('#cbig').value; drawCats(big); }
+  else if (e.target.id === 'csub') { var c = e.target.value; if (c && CSEL.indexOf(c) < 0) CSEL.push(c); drawCats($('#cbig').value); }
 });
 document.addEventListener('click', function (e) { var b = e.target.closest && e.target.closest('[data-a=crm]'); if (b) { CSEL.splice(+b.dataset.i, 1); drawCats($('#cbig').value); } });
 var SPL = [];
 function drawSpecs() {
   var b = $('#spl'); if (!b) return;
-  b.innerHTML = SPL.map(function (x, i) { return '<div style="display:flex;gap:6px;margin:4px 0"><input class="spi" data-i="' + i + '" value="' + esc(x) + '" maxlength="30" placeholder="例:黑色 / M"><button type="button" class="btn l s" data-a="sprm" data-i="' + i + '">移除</button></div>'; }).join('') || '<span class="m">沒有規格</span>';
+  b.innerHTML = SPL.map(function (x, i) { return '<div style="display:flex;gap:6px;margin:4px 0;align-items:center"><input class="spi" data-i="' + i + '" value="' + esc(x.n) + '" maxlength="30" placeholder="規格:黑色 / M" style="flex:1;min-width:0"><input class="spq" data-i="' + i + '" type="number" min="0" step="1" value="' + esc(x.q) + '" placeholder="數量" style="width:84px" aria-label="此規格數量"><button type="button" class="btn l s" data-a="sprm" data-i="' + i + '">移除</button></div>'; }).join('') || '<span class="m">沒有規格</span>';
+  syncStock();
+}
+function syncStock() {
+  var f = $('#pf'); if (!f) return;
+  var has = SPL.some(function (x) { return String(x.n).trim(); }), st = f.elements.stock, un = f.elements.unlimited, h = $('#sph');
+  if (has) {
+    var all = true, sum = 0; SPL.forEach(function (x) { if (!String(x.n).trim()) return; if (x.q === '' || x.q == null) all = false; else sum += Number(x.q) || 0; });
+    st.disabled = true; un.disabled = true; st.value = all ? sum : ''; un.checked = !all;
+    if (h) h.textContent = all ? '有規格時,總數量由各規格數量加總。' : '有規格留空 = 該規格不限量,總數量視為無限。';
+  } else { un.disabled = false; st.disabled = un.checked; if (h) h.textContent = ''; }
 }
 function editProd(id) {
   CUR = id;
@@ -365,7 +371,7 @@ function editProd(id) {
         '<div>' + fld('品名', 'name', p.name) + '<div style="margin-top:10px"><span class="m">規格(可新增,沒有上限;沒有規格就留空)</span><div id="spl"></div><button type="button" class="btn l s" data-a="spadd">+ 新增規格</button></div></div>' +
     '<div>' + fld('單價', 'price', p.price, 'number') + '<div style="margin-top:10px">' + fld('多數量優惠', 'tiers', p.tiers, 'text', '3=450,5=400 (買3件起每件450、買5件起每件400)') + '</div></div>' +
     '<label>銷售型態<select name="type">' + opts(['現貨', '預購'], p.type) + '</select></label>' +
-    '<div><label>數量(必填)<span style="display:flex;gap:12px;align-items:center"><input name="stock" type="number" min="0" step="1" style="flex:1;min-width:0" value="' + (p.stock === '' ? '' : p.stock) + '"' + (p.stock === '' && id ? ' disabled' : '') + '><span class="ck" style="white-space:nowrap"><input type="checkbox" name="unlimited"' + (id && p.stock === '' ? ' checked' : '') + '> 無限數量</span></span></label></div>' +
+    '<div><label>數量(必填)<span style="display:flex;gap:12px;align-items:center"><input name="stock" type="number" min="0" step="1" style="flex:1;min-width:0" value="' + (p.stock === '' ? '' : p.stock) + '"' + (p.stock === '' && id ? ' disabled' : '') + '><span class="ck" style="white-space:nowrap"><input type="checkbox" name="unlimited"' + (id && p.stock === '' ? ' checked' : '') + '> 無限數量</span></span></label><span class="m" id="sph"></span></div>' +
     fld('預計到貨日(預購商品前台顯示「預計xx/xx左右」)', 'arrival', p.arrival, 'date') + '<div></div>' +
     '<div class="f"><span class="m">商品圖片(第一張是封面,最多 8 張)</span><div id="imgs" class="ig"></div><input type="file" id="imf" multiple accept="image/jpeg,image/png,image/webp"> <span id="ims" class="m"></span>' + fld('或貼上圖片網址(按 Enter 加入)', 'imgurl', '') + '<input type="hidden" name="img" value="' + esc(p.img) + '"></div>' +
     '<label class="f">說明<textarea name="desc" rows="3">' + esc(p.desc) + '</textarea></label>' +
@@ -376,9 +382,10 @@ function editProd(id) {
     '</div></fieldset>' +
     '<p class="er" id="pe" role="alert"></p><button class="btn a">儲存</button> <button type="button" class="btn l" data-a="x">取消</button>' +
     (id ? ' <button type="button" class="btn l" data-a="dp" data-id="' + esc(id) + '">刪除</button>' : '') + '</form>';
-  SPL = (p.specs || []).slice(); if (innerWidth > 860) d.style.width = 'min(760px,96vw)'; d.addEventListener('close', function () { d.style.width = ''; }, { once: true }); d.showModal(); drawImgs(); drawSpecs(); drawCats();
+  SPL = (p.specs || []).map(function (n) { var q = (p.specQty || {})[n]; return { n: n, q: q == null ? '' : q }; }); if (innerWidth > 860) d.style.width = 'min(760px,96vw)'; d.addEventListener('close', function () { d.style.width = ''; }, { once: true }); d.showModal(); drawImgs(); drawCats();
   var f = $('#pf');
   f.elements.unlimited.onchange = function () { f.elements.stock.disabled = this.checked; if (this.checked) f.elements.stock.value = ''; };
+  drawSpecs();
 }
 
 /* ---------- 管理員 / 紀錄 ---------- */
@@ -603,10 +610,15 @@ document.addEventListener('submit', function (e) {
     call('adminBatch', T, ids, 'info', data).then(function (r) { batchDone(r, '批次修改'); }).catch(fail('#be'));
   } else if (f.id === 'pf') {
     var g = function (n) { return f.elements[n]; };
-    var o2 = { id: CUR, name: g('name').value, price: g('price').value, stock: g('stock').value, arrival: g('arrival').value, tiers: g('tiers').value, unlimited: g('unlimited').checked, brand: g('brand').value, newBrand: g('newBrand').value, specs: SPL.map(function (x) { return x.trim(); }).filter(Boolean), img: g('img').value, desc: g('desc').value, type: g('type').value, on: g('on').checked,
+    var o2 = { id: CUR, name: g('name').value, price: g('price').value, stock: g('stock').value, arrival: g('arrival').value, tiers: g('tiers').value, unlimited: g('unlimited').checked, brand: g('brand').value, newBrand: g('newBrand').value, specs: SPL.filter(function (x) { return String(x.n).trim(); }).map(function (x) { return { n: x.n.trim(), q: x.q }; }), img: g('img').value, desc: g('desc').value, type: g('type').value, on: g('on').checked,
       cats: CSEL.slice(),
       vendor: g('vendor').value, source: g('source').value, cost: g('cost').value, taxIncl: g('tax').value === 'Y'};
-    call('adminSaveProduct', T, o2).then(function (r) { P = r; if (o2.newBrand.trim()) call('adminBrands', T).then(function (b) { BR = b; BL = b.map(function (x) { return x.name; }); }); $('#dlg').close(); prodView(); }).catch(fail('#pe'));
+    $('#pe').textContent = ''; wait('商品儲存中…請稍候');
+    call('adminSaveProduct', T, o2).then(function (r) {
+      P = r; if (o2.newBrand.trim()) call('adminBrands', T).then(function (b) { BR = b; BL = b.map(function (x) { return x.name; }); });
+      var d = $('#dq'); d.innerHTML = '<p style="margin:6px 0;text-align:center;font-weight:700">✓ 商品已儲存</p>';
+      setTimeout(function () { d.oncancel = null; if (d.open) d.close(); if ($('#dlg').open) $('#dlg').close(); prodView(); }, 900);
+    }).catch(function (e) { var d = $('#dq'); d.oncancel = null; if (d.open) d.close(); var el = $('#pe'); if (el) el.textContent = e.message; else tell(e.message); });
   } else if (f.id === 'af') {
     call('adminSaveAdmin', T, { acc: f.acc.value, name: f.name.value, pw: f.pw.value, on: f.on.checked }).then(function (r) { A = r; adminView(); }).catch(fail('#ae'));
   }
@@ -639,7 +651,7 @@ document.addEventListener('click', function (e) {
   }
   if (a === 'po') { openPO([id]); return; }
   if (a === 'poprint') { window.print(); return; }
-  if (a === 'spadd') { SPL.push(''); drawSpecs(); var ins = document.querySelectorAll('.spi'); if (ins.length) ins[ins.length - 1].focus(); return; }
+  if (a === 'spadd') { SPL.push({ n: '', q: '' }); drawSpecs(); var ins = document.querySelectorAll('.spi'); if (ins.length) ins[ins.length - 1].focus(); return; }
   if (a === 'sprm') { SPL.splice(Number(b.dataset.i), 1); drawSpecs(); return; }
   if (a === 'mb') openMember(id);
   else if (a === 'gvoid') { var lidv = b.dataset.lid; ask('確定作廢這筆購物金的剩餘金額?', function () { call('adminVoidGrant', T, id).then(function (r) { MB = r; memberRows(); openMember(lidv); }).catch(function (er) { tell(er.message); }); }); }
@@ -754,7 +766,7 @@ function pvSum() {
   var vis = pvLines().filter(function (l) { return !l.stock && !l.ord; }), vq = vis.reduce(function (a, l) { return a + l.qty; }, 0);
   var el = $('#pvsum'); if (el) el.innerHTML = '已勾選 <b>' + n + '</b> 項 / <b>' + q + '</b> 件(其中未叫貨 <b>' + nn + '</b> 項 / <b>' + nq + '</b> 件),成本合計 ' + money(c) + (miss ? '(' + miss + ' 項未填成本)' : '') + '<br><span class="m">目前列表未叫貨:' + vis.length + ' 項 / ' + vq + ' 件</span>';
 }
-document.addEventListener('input', function (e) { if (e.target.classList && e.target.classList.contains('spi')) SPL[Number(e.target.dataset.i)] = e.target.value; });
+document.addEventListener('input', function (e) { var c = e.target.classList; if (!c) return; if (c.contains('spi')) { SPL[Number(e.target.dataset.i)].n = e.target.value; syncStock(); } else if (c.contains('spq')) { SPL[Number(e.target.dataset.i)].q = e.target.value; syncStock(); } });
 document.addEventListener('input', function (e) {
   var k = e.target.dataset && e.target.dataset.k, f = e.target.closest && e.target.closest('#pvf'); if (!f || !k) return;
   VF[k] = e.target.value; if (e.target.type === 'date' || e.target.tagName === 'SELECT' || k === 'q') pvRows();
