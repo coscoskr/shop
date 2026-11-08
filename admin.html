@@ -324,15 +324,33 @@ function batchInfo() {
   d.showModal();
 }
 var CUR = '';
+var CSEL = [];
+function catBigs() { var o = []; C.forEach(function (c) { var k = c.split('/')[0]; if (o.indexOf(k) < 0) o.push(k); }); return o; }
 function catGroups(sel) {
-  var g = {}, order = [], self = {};
-  C.forEach(function (c) { var k = c.split('/')[0]; if (!g[k]) { g[k] = []; order.push(k); } if (c === k) self[k] = 1; else g[k].push(c); });
-  return order.map(function (k) {
-    var subs = g[k].map(function (c) { return '<label style="margin-right:14px"><input type="checkbox" name="cat" value="' + esc(c) + '"' + (sel.indexOf(c) >= 0 ? ' checked' : '') + '> ' + esc(c.slice(k.length + 1)) + '</label>'; }).join('');
-    var whole = self[k] ? '<label style="margin-right:14px"><input type="checkbox" name="cat" value="' + esc(k) + '"' + (sel.indexOf(k) >= 0 ? ' checked' : '') + '> ' + (subs ? '不分小分類' : esc(k)) + '</label>' : '';
-    return '<div style="display:flex;gap:10px;margin:6px 0;padding:6px 0;border-top:1px solid var(--line)"><div style="width:110px;flex:none"><span class="m">大分類</span><br><b>' + esc(k) + '</b></div><div style="flex:1"><span class="m">小分類</span><br>' + (subs + whole || '<span class="m">(尚無小分類)</span>') + '</div></div>';
-  }).join('');
+  CSEL = (sel || []).slice();
+  return '<div id="cpk"></div>';
 }
+function drawCats(keepBig) {
+  var b = $('#cpk'); if (!b) return;
+  var bigs = catBigs(), q = ($('#cq') && $('#cq').value || '').trim().toLowerCase();
+  var cur = keepBig !== undefined ? keepBig : ($('#cbig') ? $('#cbig').value : '');
+  var shown = bigs.filter(function (k) { return !q || k.toLowerCase().indexOf(q) >= 0 || C.some(function (c) { return c.split('/')[0] === k && c.toLowerCase().indexOf(q) >= 0; }); });
+  if (cur && shown.indexOf(cur) < 0 && !keepBig) cur = '';
+  var chips = CSEL.map(function (c, i) { return '<span class="chip" style="display:inline-block;background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:2px 4px 2px 10px;margin:0 6px 6px 0">' + esc(c.replace('/', ' › ')) + ' <button type="button" class="btn l s" style="border:0;padding:0 6px" data-a="crm" data-i="' + i + '" aria-label="移除">×</button></span>'; }).join('') || '<span class="m">尚未選擇類別</span>';
+  var subs = cur ? C.filter(function (c) { return c.split('/')[0] === cur; }) : [];
+  var subHtml = cur ? subs.map(function (c) {
+    var lab = c === cur ? (subs.length > 1 ? '不分小分類' : cur) : c.slice(cur.length + 1);
+    return '<label style="margin-right:14px;display:inline-block"><input type="checkbox" data-cs="' + esc(c) + '"' + (CSEL.indexOf(c) >= 0 ? ' checked' : '') + '> ' + esc(lab) + '</label>';
+  }).join('') || '<span class="m">(尚無小分類)</span>' : '<span class="m">先選大項目,再勾小項目</span>';
+  b.innerHTML = '<div>' + chips + '</div><div style="display:flex;gap:8px;flex-wrap:wrap"><input id="cq" placeholder="搜尋類別" value="' + esc($('#cq') ? $('#cq').value : '') + '" style="flex:1;min-width:120px" autocomplete="off"><select id="cbig" style="flex:1;min-width:140px"><option value="">① 選大項目…</option>' + shown.map(function (k) { return '<option value="' + esc(k) + '"' + (k === cur ? ' selected' : '') + '>' + esc(k) + '</option>'; }).join('') + '</select></div><div style="margin-top:8px"><span class="m">② 小項目</span><br>' + subHtml + '</div>';
+  var qi = $('#cq'); if (document.activeElement && document.activeElement.id === 'cq') { /* keep focus */ }
+}
+document.addEventListener('input', function (e) { if (e.target.id === 'cq') { var v = e.target.value, p = e.target.selectionStart; drawCats(); var n = $('#cq'); n.focus(); try { n.setSelectionRange(p, p); } catch (x) { } } });
+document.addEventListener('change', function (e) {
+  if (e.target.id === 'cbig') drawCats(e.target.value);
+  else if (e.target.dataset && e.target.dataset.cs !== undefined) { var c = e.target.dataset.cs, k = CSEL.indexOf(c); if (e.target.checked && k < 0) CSEL.push(c); else if (!e.target.checked && k >= 0) CSEL.splice(k, 1); var big = $('#cbig').value; drawCats(big); }
+});
+document.addEventListener('click', function (e) { var b = e.target.closest && e.target.closest('[data-a=crm]'); if (b) { CSEL.splice(+b.dataset.i, 1); drawCats($('#cbig').value); } });
 var SPL = [];
 function drawSpecs() {
   var b = $('#spl'); if (!b) return;
@@ -342,23 +360,23 @@ function editProd(id) {
   CUR = id;
   var p = id ? P.filter(function (x) { return x.id === id; })[0] : { name: '', cats: [], type: '現貨', price: '', stock: '', arrival: '', desc: '', tiers: '', img: '', on: true, vendor: '', cost: '', taxIncl: false, source: '', specs: [] };
   var d = $('#dlg');
-  d.innerHTML = '<h3>' + (id ? '編輯 ' + esc(p.id) : '新增商品') + '</h3><form id="pf"><div class="g">' +
+  d.innerHTML = '<h3>' + (id ? '編輯 ' + esc(p.id) : '新增商品') + '</h3><form id="pf"><div class="g" style="grid-template-columns:1fr 1fr">' +
     '<div class="f"><span class="m">品牌(從清單選;清單沒有就在右邊空白格輸入新品牌,按「新增」)</span><div style="display:flex;gap:8px;margin-top:4px"><select name="brand" id="brsel" style="flex:1">' + brOpts(p.brand) + '</select><input name="newBrand" id="brnew" placeholder="新品牌:直接輸入" maxlength="40" autocomplete="off" style="flex:1"><button type="button" class="btn a" data-a="bradd">新增</button></div><span class="m" id="brmsg">輸入的品牌若和清單裡的只差大小寫(例:lloyd / LLOYD),會自動用清單裡的寫法。</span></div>' +
-    '<div class="f">' + fld('品名', 'name', p.name) + '</div>' +
-    fld('單價', 'price', p.price, 'number') + '<label>銷售型態<select name="type">' + opts(['現貨', '預購'], p.type) + '</select></label>' +
-    '<label>數量(必填)<input name="stock" type="number" min="0" step="1" value="' + (p.stock === '' ? '' : p.stock) + '"' + (p.stock === '' && id ? ' disabled' : '') + '></label><label class="ck" style="align-self:end"><input type="checkbox" name="unlimited"' + (id && p.stock === '' ? ' checked' : '') + '> 無限數量</label>' + fld('預計到貨日(預購商品前台顯示「預計xx/xx左右」)', 'arrival', p.arrival, 'date') +
-    '<div class="f"><span class="m">規格(可新增,沒有上限;沒有規格就留空)</span><div id="spl"></div><button type="button" class="btn l s" data-a="spadd">+ 新增規格</button></div>' +
-    '<div class="f">' + fld('多數量優惠', 'tiers', p.tiers, 'text', '3=450,5=400 (買3件起每件450、買5件起每件400)') + '</div>' +
+        '<div>' + fld('品名', 'name', p.name) + '<div style="margin-top:10px"><span class="m">規格(可新增,沒有上限;沒有規格就留空)</span><div id="spl"></div><button type="button" class="btn l s" data-a="spadd">+ 新增規格</button></div></div>' +
+    '<div>' + fld('單價', 'price', p.price, 'number') + '<div style="margin-top:10px">' + fld('多數量優惠', 'tiers', p.tiers, 'text', '3=450,5=400 (買3件起每件450、買5件起每件400)') + '</div></div>' +
+    '<label>銷售型態<select name="type">' + opts(['現貨', '預購'], p.type) + '</select></label>' +
+    '<div><label>數量(必填)<span style="display:flex;gap:12px;align-items:center"><input name="stock" type="number" min="0" step="1" style="flex:1;min-width:0" value="' + (p.stock === '' ? '' : p.stock) + '"' + (p.stock === '' && id ? ' disabled' : '') + '><span class="ck" style="white-space:nowrap"><input type="checkbox" name="unlimited"' + (id && p.stock === '' ? ' checked' : '') + '> 無限數量</span></span></label></div>' +
+    fld('預計到貨日(預購商品前台顯示「預計xx/xx左右」)', 'arrival', p.arrival, 'date') + '<div></div>' +
     '<div class="f"><span class="m">商品圖片(第一張是封面,最多 8 張)</span><div id="imgs" class="ig"></div><input type="file" id="imf" multiple accept="image/jpeg,image/png,image/webp"> <span id="ims" class="m"></span>' + fld('或貼上圖片網址(按 Enter 加入)', 'imgurl', '') + '<input type="hidden" name="img" value="' + esc(p.img) + '"></div>' +
     '<label class="f">說明<textarea name="desc" rows="3">' + esc(p.desc) + '</textarea></label>' +
-    '<div class="f ck"><span class="m">類別(可複選)</span><br>' + catGroups(p.cats) + '</div>' +
+    '<div class="f"><span class="m">類別(可複選)</span>' + catGroups(p.cats) + '</div>' +
     '<label class="f"><input type="checkbox" name="on"' + (p.on ? ' checked' : '') + '> 上架(前台可見)</label></div>' +
     '<fieldset><legend>內部資料(前台看不到)</legend><div class="g">' + '<label>廠商<select name="vendor">' + vopt(p.vendor, '(未指定)') + '</select></label>' + fld('貨源', 'source', p.source) + fld('成本', 'cost', p.cost, 'number') +
     '<label>成本是否含稅<select name="tax"><option value="N"' + (p.taxIncl ? '' : ' selected') + '>未稅</option><option value="Y"' + (p.taxIncl ? ' selected' : '') + '>含稅</option></select></label>' +
     '</div></fieldset>' +
     '<p class="er" id="pe" role="alert"></p><button class="btn a">儲存</button> <button type="button" class="btn l" data-a="x">取消</button>' +
     (id ? ' <button type="button" class="btn l" data-a="dp" data-id="' + esc(id) + '">刪除</button>' : '') + '</form>';
-  SPL = (p.specs || []).slice(); d.showModal(); drawImgs(); drawSpecs();
+  SPL = (p.specs || []).slice(); if (innerWidth > 860) d.style.width = 'min(760px,96vw)'; d.addEventListener('close', function () { d.style.width = ''; }, { once: true }); d.showModal(); drawImgs(); drawSpecs(); drawCats();
   var f = $('#pf');
   f.elements.unlimited.onchange = function () { f.elements.stock.disabled = this.checked; if (this.checked) f.elements.stock.value = ''; };
 }
@@ -586,7 +604,7 @@ document.addEventListener('submit', function (e) {
   } else if (f.id === 'pf') {
     var g = function (n) { return f.elements[n]; };
     var o2 = { id: CUR, name: g('name').value, price: g('price').value, stock: g('stock').value, arrival: g('arrival').value, tiers: g('tiers').value, unlimited: g('unlimited').checked, brand: g('brand').value, newBrand: g('newBrand').value, specs: SPL.map(function (x) { return x.trim(); }).filter(Boolean), img: g('img').value, desc: g('desc').value, type: g('type').value, on: g('on').checked,
-      cats: [].slice.call(f.querySelectorAll('input[name=cat]:checked')).map(function (x) { return x.value; }),
+      cats: CSEL.slice(),
       vendor: g('vendor').value, source: g('source').value, cost: g('cost').value, taxIncl: g('tax').value === 'Y'};
     call('adminSaveProduct', T, o2).then(function (r) { P = r; if (o2.newBrand.trim()) call('adminBrands', T).then(function (b) { BR = b; BL = b.map(function (x) { return x.name; }); }); $('#dlg').close(); prodView(); }).catch(fail('#pe'));
   } else if (f.id === 'af') {
