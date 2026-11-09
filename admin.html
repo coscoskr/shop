@@ -43,6 +43,7 @@ label{display:block;margin:10px 0;font-size:13px}
 label>select,label>textarea,label>input:not([type=checkbox]):not([type=radio]){margin-top:5px}
 input[type=checkbox],input[type=radio]{margin:0 7px 0 0;vertical-align:middle}
 th,td{line-height:1.6}
+#pvt th,#pvt td{padding:6px 7px;font-size:13px}
 .bt{display:flex;flex-wrap:wrap;align-items:center;gap:8px}.bt label{white-space:nowrap;display:flex!important;flex-direction:row;align-items:center;gap:6px;margin:0}.px{max-width:900px;margin-bottom:20px}.px h3{margin:0 0 8px}.px .oc{display:block;width:100%;text-align:left;border:1px solid var(--line);border-radius:6px;padding:8px 12px;margin:6px 0;background:#fff;cursor:pointer;font:inherit;color:inherit}.px button.oc:hover{background:var(--soft)}.px .n{text-align:right}.sm{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:6px 0 12px}.sm>div{background:var(--soft);border-radius:6px;padding:8px 12px;display:flex;flex-direction:column;gap:2px}.sm .m{font-size:12px}.sm b{font-size:16px}.sm .tt{color:var(--acc);font-size:18px}
 .ic{border:1px solid var(--line);border-radius:8px;padding:14px;margin:12px 0;background:#fff}.ic label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--mute);margin:0}.ic input,.ic select{width:100%!important;height:36px;padding:0 10px;font-size:14px;box-sizing:border-box;color:var(--ink)}.ic output{display:flex;align-items:center;height:36px;font-size:14px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
 .ic .r1{display:grid;grid-template-columns:3fr 1fr;gap:12px;margin-bottom:12px}.ic .r2,.ic .r3{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:12px}.ic .r3{margin-bottom:0}.ic .sv{display:flex;align-items:flex-end}.ic .sv .btn{width:100%;height:36px;padding:0 12px}
@@ -786,7 +787,7 @@ function pvDraw() {
     '<label>叫貨<select data-k="ord"><option value="">全部</option><option value="no"' + (VF.ord === 'no' ? ' selected' : '') + '>未叫貨</option><option value="yes"' + (VF.ord === 'yes' ? ' selected' : '') + '>已叫貨</option></select></label>' +
     '<label>下單從<input type="date" data-k="from" value="' + esc(VF.from) + '"></label><label>到<input type="date" data-k="to" value="' + esc(VF.to) + '"></label>' +
     '<label>關鍵字<input data-k="q" placeholder="訂單、訂購人、品名、廠商、貨源、折扣碼" value="' + esc(VF.q) + '"></label><button class="btn l" data-pv="rs">清除篩選</button></div>' +
-    '<p style="margin:8px 0"><span class="zm" role="group" aria-label="表格縮放"><button class="btn l s" data-pv="zo" aria-label="縮小">－</button><b id="pvzv" style="min-width:48px;display:inline-block;text-align:center">' + PZ + '%</b><button class="btn l s" data-pv="zi" aria-label="放大">＋</button><button class="btn l s" data-pv="zr">還原</button></span> <button class="btn a" data-pv="bo">批次訂貨</button> <button class="btn l" data-pv="bos">全選未叫貨</button> <button class="btn l" data-pv="boc">取消叫貨</button> <button class="btn a" data-pv="info">批次修改(到貨/成本/廠商/貨源)</button> <button class="btn a" data-pv="pay">廠商付款紀錄</button> <button class="btn l" data-pv="bdel">批次刪除</button> <span class="sum" id="pvsum"></span></p>' +
+    '<p style="margin:8px 0"><span class="zm" role="group" aria-label="表格縮放"><button class="btn l s" data-pv="zo" aria-label="縮小">－</button><b id="pvzv" style="min-width:48px;display:inline-block;text-align:center">' + PZ + '%</b><button class="btn l s" data-pv="zi" aria-label="放大">＋</button><button class="btn l s" data-pv="zr">還原</button><button class="btn l s" data-pv="zf">符合寬度</button></span> <button class="btn a" data-pv="bo">批次訂貨</button> <button class="btn l" data-pv="bos">全選未叫貨</button> <button class="btn l" data-pv="boc">取消叫貨</button> <button class="btn a" data-pv="info">批次修改(到貨/成本/廠商/貨源)</button> <button class="btn a" data-pv="pay">廠商付款紀錄</button> <button class="btn l" data-pv="bdel">批次刪除</button> <span class="sum" id="pvsum"></span></p>' +
     '<div id="pvt"></div>';
   $('#v').innerHTML = h; pvRows();
 }
@@ -818,14 +819,22 @@ function pvRows() {
       var hc = l.cost !== '';
       return '<tr><td><input type="checkbox" class="pvk" data-k="' + esc(l.key) + '"' + (PSEL[l.key] ? ' checked' : '') + '></td><td>' + (l.stock ? '<span class="m">—</span>' : l.ord ? '<span class="chip d" title="' + esc((l.ordBy || '') + ' ' + (l.ordAt || '')) + '">已叫貨</span>' : '<span class="chip">未叫貨</span>') + '</td><td>' + esc(l.oid) + '</td><td>' + esc(l.at) + '</td><td>' + (l.stock ? '<span class="chip">庫存</span>' : esc(l.buyer)) + '</td><td style="white-space:normal">' + esc(l.name) + '</td><td>' + esc(l.spec) + '</td><td>' + nf(l.qty) + '</td><td>' + (hc ? nf(l.cost) : '<span class="m">未填</span>') + '</td><td>' + (l.stock ? '—' : nf(l.unit)) + '</td><td>' + (l.stock ? '—' : nf(l.qty * l.unit)) + '</td><td style="white-space:normal">' + pvDisc(l, 'n') + '</td><td>' + pvDisc(l, 'a') + '</td><td>' + pvAmt(l) + '</td><td>' + (hc && !l.stock ? nf((l.unit - l.cost) * l.qty) : '<span class="m">—</span>') + '</td><td><span class="chip ' + (l.arr === '已到貨' ? 'd' : '') + '">' + esc(l.arr) + '</span></td><td>' + (l.vendor ? esc(l.vendor) : '<span class="m">—</span>') + '</td><td>' + (l.pay ? '已付 ' + esc(l.pay) : '<span class="m">未付</span>') + '</td><td><button class="btn l s" data-pv="hist" data-k="' + esc(l.key) + '">紀錄</button> ' + (l.stock ? '<button class="btn l s" data-sk="del" data-id="' + esc(l.oid) + '">刪除</button>' : '<button class="btn a s" data-a="ord" data-id="' + esc(l.oid) + '">編輯</button>') + '</td></tr>';
     }).join('') || '<tr><td colspan="19" class="m">沒有符合的品項</td></tr>') + '</tbody></table><p class="m">按右邊「紀錄」可看這個品項的操作紀錄(誰、什麼時候做了什麼)。</p>';
-  pvSum(); pvAllState(); pvZoom(0);
+  pvSum(); pvAllState(); if (!PZ) pvFit(); else pvZoom(0);
 }
-var PZ = (function () { try { return Number(localStorage.getItem('pvz')) || 100; } catch (e) { return 100; } })();
+var PZ = (function () { try { return Number(localStorage.getItem('pvz')) || 0; } catch (e) { return 0; } })();
 function pvZoom(d) {
   PZ = d === 'r' ? 100 : Math.max(50, Math.min(160, PZ + (d || 0)));
   var t = $('#pvt'); if (t) t.style.zoom = PZ / 100;
   var v = $('#pvzv'); if (v) v.textContent = PZ + '%';
   try { localStorage.setItem('pvz', String(PZ)); } catch (e) {}
+}
+function pvFit() {
+  var t = $('#pvt'), tb = t && t.querySelector('table'), w = t && t.closest('.w'); if (!tb || !w) return;
+  t.style.zoom = 1; tb.style.minWidth = '0';
+  var need = tb.scrollWidth, avail = w.clientWidth - 64;
+  tb.style.minWidth = '';
+  PZ = Math.max(50, Math.min(100, Math.floor(avail / need * 100)));
+  pvZoom(0);
 }
 function pvAllState() { var L = pvLines(), a = $('#pvall'); if (a) a.checked = L.length > 0 && L.every(function (l) { return PSEL[l.key]; }); }
 function pvSel() { return Object.keys(PSEL).filter(function (k) { return PSEL[k]; }); }
@@ -865,6 +874,7 @@ document.addEventListener('click', function (e) {
   else if (a === 'zo') pvZoom(-10);
   else if (a === 'zi') pvZoom(10);
   else if (a === 'zr') pvZoom('r');
+  else if (a === 'zf') pvFit();
   else if (a === 'bos') {
     pvLines().forEach(function (l) { PSEL[l.key] = !l.stock && !l.ord; }); pvRows();
     var nsel = pvSel().length; tell(nsel ? '已選取目前列表中未叫貨的 ' + nsel + ' 項' : '目前列表沒有未叫貨的品項');
