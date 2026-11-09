@@ -124,6 +124,7 @@ function vopt(cur, blank) {
   return '<option value="">' + blank + '</option>' + l.map(function (x) { return '<option' + (x === cur ? ' selected' : '') + '>' + esc(x) + '</option>'; }).join('');
 }
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+function nf(n) { return n === '' || n == null || isNaN(Number(n)) ? (n == null ? '' : n) : Number(n).toLocaleString('en-US'); }
 function money(n) { return 'NT$ ' + Number(n || 0).toLocaleString('en-US'); }
 var BUSY = 0, BT = 0;
 function busy(d) {
@@ -286,7 +287,7 @@ function prodView() {
 
     '<table><thead><tr><th><input type="checkbox" id="pall" aria-label="全選目前清單"></th><th>編號</th><th>品牌</th><th>品名</th><th>大分類</th><th>小分類</th><th>型態</th><th>單價</th><th>數量</th><th>到貨日</th><th>上架</th><th>廠商</th><th>成本</th><th>貨源</th></tr></thead><tbody>' +
     rows.map(function (p) {
-      return '<tr data-a="pe" data-id="' + esc(p.id) + '"><td><input type="checkbox" class="sel" data-id="' + esc(p.id) + '"' + (SEL[p.id] ? ' checked' : '') + '></td><td>' + esc(p.id) + '</td><td>' + esc(p.brand) + '</td><td>' + esc(p.name) + '</td><td>' + esc(catBig(p.cats)) + '</td><td>' + esc(catSub(p.cats)) + '</td><td>' + esc(p.type) + '</td><td>' + p.price + '</td><td>' + (p.stock === '' ? '不限' : p.stock) + '</td><td>' + esc(p.arrival) + '</td><td>' + (p.on ? '是' : '否') + '</td><td>' + esc(p.vendor) + '</td><td>' + (p.cost === '' ? '' : p.cost + (p.taxIncl ? '(含稅)' : '(未稅)')) + '</td><td>' + esc(p.source) + '</td></tr>';
+      return '<tr data-a="pe" data-id="' + esc(p.id) + '"><td><input type="checkbox" class="sel" data-id="' + esc(p.id) + '"' + (SEL[p.id] ? ' checked' : '') + '></td><td>' + esc(p.id) + '</td><td>' + esc(p.brand) + '</td><td>' + esc(p.name) + '</td><td>' + esc(catBig(p.cats)) + '</td><td>' + esc(catSub(p.cats)) + '</td><td>' + esc(p.type) + '</td><td>' + nf(p.price) + '</td><td>' + (p.stock === '' ? '不限' : nf(p.stock)) + '</td><td>' + esc(p.arrival) + '</td><td>' + (p.on ? '是' : '否') + '</td><td>' + esc(p.vendor) + '</td><td>' + (p.cost === '' ? '' : nf(p.cost) + (p.taxIncl ? '(含稅)' : '(未稅)')) + '</td><td>' + esc(p.source) + '</td></tr>';
     }).join('') + '</tbody></table>' + (rows.length ? '' : '<p class="m">沒有符合的商品。</p>');
   var pa = $('#pall'); pa.checked = rows.length > 0 && rows.every(function (p) { return SEL[p.id]; });
   pa.onchange = function () { var on = this.checked; rows.forEach(function (p) { SEL[p.id] = on; }); document.querySelectorAll('.sel').forEach(function (c) { c.checked = on; }); $('#sn').textContent = selIds().length; };
@@ -429,7 +430,7 @@ function memberRows() {
   var rows = MB.members.filter(function (m) { return (!MF.lv || m.level === MF.lv) && (!k || m.name.toLowerCase().indexOf(k) >= 0); });
   $('#sum').textContent = '共 ' + rows.length + ' 位會員';
   $('#tb').innerHTML = '<table><thead><tr><th>暱稱</th><th>等級</th><th>購物金</th><th>訂單數</th><th>累計消費</th><th>加好友</th><th>最近登入</th></tr></thead><tbody>' +
-    rows.map(function (m) { return '<tr data-a="mb" data-id="' + esc(m.lid) + '"><td>' + esc(m.name) + '</td><td><span class="chip">' + esc(m.level) + '</span></td><td>' + m.balance + '</td><td>' + m.orders + '</td><td>' + m.spent + '</td><td>' + (m.friend ? '是' : '<span class="er">否</span>') + '</td><td>' + esc(m.last.slice(0, 16)) + '</td></tr>'; }).join('') + '</tbody></table>' +
+    rows.map(function (m) { return '<tr data-a="mb" data-id="' + esc(m.lid) + '"><td>' + esc(m.name) + '</td><td><span class="chip">' + esc(m.level) + '</span></td><td>' + nf(m.balance) + '</td><td>' + nf(m.orders) + '</td><td>' + nf(m.spent) + '</td><td>' + (m.friend ? '是' : '<span class="er">否</span>') + '</td><td>' + esc(m.last.slice(0, 16)) + '</td></tr>'; }).join('') + '</tbody></table>' +
     (rows.length ? '' : '<p class="m">還沒有會員。客人用 LINE 登入後就會出現在這裡。</p>');
 }
 function openMember(lid) {
@@ -446,7 +447,7 @@ function loadGrants(lid) {
   call('adminMemberGrants', T, lid).then(function (r) {
     var t = new Date().toISOString().slice(0, 10);
     $('#gl').innerHTML = r.length ? '<table><thead><tr><th>時間</th><th>來源</th><th>金額</th><th>剩餘</th><th>到期日</th><th>備註</th><th></th></tr></thead><tbody>' + r.map(function (g) {
-      return '<tr><td>' + esc(g.at.slice(0, 16)) + '</td><td>' + esc(g.src) + '</td><td>' + g.amt + '</td><td>' + g.rem + (g.rem > 0 && g.exp < t ? ' <span class="m">(已過期)</span>' : '') + '</td><td>' + esc(g.exp) + '</td><td style="white-space:normal">' + esc(g.note) + (g.oid ? ' ' + esc(g.oid) : '') + '</td><td>' + (g.rem > 0 ? '<button class="btn l s" data-a="gvoid" data-id="' + esc(g.seq) + '" data-lid="' + esc(lid) + '">作廢</button>' : '') + '</td></tr>';
+      return '<tr><td>' + esc(g.at.slice(0, 16)) + '</td><td>' + esc(g.src) + '</td><td>' + nf(g.amt) + '</td><td>' + nf(g.rem) + (g.rem > 0 && g.exp < t ? ' <span class="m">(已過期)</span>' : '') + '</td><td>' + esc(g.exp) + '</td><td style="white-space:normal">' + esc(g.note) + (g.oid ? ' ' + esc(g.oid) : '') + '</td><td>' + (g.rem > 0 ? '<button class="btn l s" data-a="gvoid" data-id="' + esc(g.seq) + '" data-lid="' + esc(lid) + '">作廢</button>' : '') + '</td></tr>';
     }).join('') + '</tbody></table>' : '<p class="m">還沒有購物金紀錄。</p>';
   }).catch(function (e) { $('#gl').innerHTML = '<p class="er">' + esc(e.message) + '</p>'; });
 }
@@ -774,7 +775,7 @@ function pvDraw() {
   var h = '<h2 style="margin-top:0">訂單明細</h2><p><button class="btn ' + (PVIEW === 'lines' ? 'a' : 'l') + '" data-pv="vl">訂單明細</button> <button class="btn ' + (PVIEW === 'pays' ? 'a' : 'l') + '" data-pv="vp">廠商付款紀錄(' + PV.payments.length + ')</button> <button class="btn l" data-pv="rf">重新整理</button></p>';
   if (PVIEW === 'pays') {
     h += '<table><thead><tr><th>付款ID</th><th>日期</th><th>廠商</th><th>金額</th><th>品項成本合計</th><th>差額</th><th>匯款備註</th><th>品項</th><th></th></tr></thead><tbody>' +
-      (PV.payments.map(function (p) { return '<tr><td>' + esc(p.id) + '</td><td>' + esc(p.date) + '</td><td>' + esc(p.vendor) + '</td><td>' + money(p.amount) + '</td><td>' + money(p.expect) + '</td><td>' + (p.amount - p.expect) + '</td><td style="white-space:normal">' + esc(p.note) + '</td><td style="white-space:normal;min-width:260px">' + esc(p.items) + '</td><td><button class="btn l s" data-pv="pe" data-id="' + esc(p.id) + '">編輯</button> <button class="btn l s" data-pv="pdt" data-id="' + esc(p.id) + '">明細</button> <button class="btn l s" data-pv="pd" data-id="' + esc(p.id) + '">刪除</button></td></tr>'; }).join('') || '<tr><td colspan="9" class="m">還沒有付款紀錄</td></tr>') + '</tbody></table>';
+      (PV.payments.map(function (p) { return '<tr><td>' + esc(p.id) + '</td><td>' + esc(p.date) + '</td><td>' + esc(p.vendor) + '</td><td>' + money(p.amount) + '</td><td>' + money(p.expect) + '</td><td>' + nf(p.amount - p.expect) + '</td><td style="white-space:normal">' + esc(p.note) + '</td><td style="white-space:normal;min-width:260px">' + esc(p.items) + '</td><td><button class="btn l s" data-pv="pe" data-id="' + esc(p.id) + '">編輯</button> <button class="btn l s" data-pv="pdt" data-id="' + esc(p.id) + '">明細</button> <button class="btn l s" data-pv="pd" data-id="' + esc(p.id) + '">刪除</button></td></tr>'; }).join('') || '<tr><td colspan="9" class="m">還沒有付款紀錄</td></tr>') + '</tbody></table>';
     $('#v').innerHTML = h; return;
   }
   var arrs = {}; PV.lines.forEach(function (l) { if (l.arr) arrs[l.arr] = 1; });
@@ -805,7 +806,7 @@ function pvDisc(l, w) {
 }
 function pvAmt(l) {
   if (l.stock) return '—';
-  return l.qty * l.unit - pvShare(l);
+  return nf(l.qty * l.unit - pvShare(l));
 }
 function pvRows() {
   var L = pvLines(), tot = 0, cost = 0, profit = 0, nc = 0;
@@ -814,7 +815,7 @@ function pvRows() {
     '<table><thead><tr><th><input type="checkbox" id="pvall"></th><th>叫貨</th><th>訂單編號</th><th>訂購日期</th><th>訂購人</th><th>品名</th><th>規格</th><th>數量</th><th>成本</th><th>單價</th><th>複價</th><th>折扣碼</th><th>折扣</th><th>訂單金額</th><th>利潤</th><th>到貨狀態</th><th>廠商</th><th>付款狀態</th><th>訂單紀錄 / 編輯</th></tr></thead><tbody>' +
     (L.map(function (l) {
       var hc = l.cost !== '';
-      return '<tr><td><input type="checkbox" class="pvk" data-k="' + esc(l.key) + '"' + (PSEL[l.key] ? ' checked' : '') + '></td><td>' + (l.stock ? '<span class="m">—</span>' : l.ord ? '<span class="chip d" title="' + esc((l.ordBy || '') + ' ' + (l.ordAt || '')) + '">已叫貨</span>' : '<span class="chip">未叫貨</span>') + '</td><td>' + esc(l.oid) + '</td><td>' + esc(l.at) + '</td><td>' + (l.stock ? '<span class="chip">庫存</span>' : esc(l.buyer)) + '</td><td style="white-space:normal">' + esc(l.name) + '</td><td>' + esc(l.spec) + '</td><td>' + l.qty + '</td><td>' + (hc ? l.cost : '<span class="m">未填</span>') + '</td><td>' + (l.stock ? '—' : l.unit) + '</td><td>' + (l.stock ? '—' : l.qty * l.unit) + '</td><td style="white-space:normal">' + pvDisc(l, 'n') + '</td><td>' + pvDisc(l, 'a') + '</td><td>' + pvAmt(l) + '</td><td>' + (hc && !l.stock ? (l.unit - l.cost) * l.qty : '<span class="m">—</span>') + '</td><td><span class="chip ' + (l.arr === '已到貨' ? 'd' : '') + '">' + esc(l.arr) + '</span></td><td>' + (l.vendor ? esc(l.vendor) : '<span class="m">—</span>') + '</td><td>' + (l.pay ? '已付 ' + esc(l.pay) : '<span class="m">未付</span>') + '</td><td><button class="btn l s" data-pv="hist" data-k="' + esc(l.key) + '">紀錄</button> ' + (l.stock ? '<button class="btn l s" data-sk="del" data-id="' + esc(l.oid) + '">刪除</button>' : '<button class="btn a s" data-a="ord" data-id="' + esc(l.oid) + '">編輯</button>') + '</td></tr>';
+      return '<tr><td><input type="checkbox" class="pvk" data-k="' + esc(l.key) + '"' + (PSEL[l.key] ? ' checked' : '') + '></td><td>' + (l.stock ? '<span class="m">—</span>' : l.ord ? '<span class="chip d" title="' + esc((l.ordBy || '') + ' ' + (l.ordAt || '')) + '">已叫貨</span>' : '<span class="chip">未叫貨</span>') + '</td><td>' + esc(l.oid) + '</td><td>' + esc(l.at) + '</td><td>' + (l.stock ? '<span class="chip">庫存</span>' : esc(l.buyer)) + '</td><td style="white-space:normal">' + esc(l.name) + '</td><td>' + esc(l.spec) + '</td><td>' + nf(l.qty) + '</td><td>' + (hc ? nf(l.cost) : '<span class="m">未填</span>') + '</td><td>' + (l.stock ? '—' : nf(l.unit)) + '</td><td>' + (l.stock ? '—' : nf(l.qty * l.unit)) + '</td><td style="white-space:normal">' + pvDisc(l, 'n') + '</td><td>' + pvDisc(l, 'a') + '</td><td>' + pvAmt(l) + '</td><td>' + (hc && !l.stock ? nf((l.unit - l.cost) * l.qty) : '<span class="m">—</span>') + '</td><td><span class="chip ' + (l.arr === '已到貨' ? 'd' : '') + '">' + esc(l.arr) + '</span></td><td>' + (l.vendor ? esc(l.vendor) : '<span class="m">—</span>') + '</td><td>' + (l.pay ? '已付 ' + esc(l.pay) : '<span class="m">未付</span>') + '</td><td><button class="btn l s" data-pv="hist" data-k="' + esc(l.key) + '">紀錄</button> ' + (l.stock ? '<button class="btn l s" data-sk="del" data-id="' + esc(l.oid) + '">刪除</button>' : '<button class="btn a s" data-a="ord" data-id="' + esc(l.oid) + '">編輯</button>') + '</td></tr>';
     }).join('') || '<tr><td colspan="19" class="m">沒有符合的品項</td></tr>') + '</tbody></table><p class="m">按右邊「紀錄」可看這個品項的操作紀錄(誰、什麼時候做了什麼)。</p>';
   pvSum(); pvAllState(); pvZoom(0);
 }
@@ -903,7 +904,7 @@ document.addEventListener('click', function (e) {
   else if (a === 'pdt') {
     var q = PV.payments.filter(function (x) { return x.id === id; })[0];
     d.innerHTML = '<h3>廠商付款明細 ' + esc(q.id) + ' — ' + esc(q.vendor) + '</h3>' +
-      '<p>付款日期:<b>' + esc(q.date) + '</b> · 實付:<b>' + money(q.amount) + '</b> · 品項成本合計:' + money(q.expect) + ' · 差額:' + (q.amount - q.expect) + '</p>' +
+      '<p>付款日期:<b>' + esc(q.date) + '</b> · 實付:<b>' + money(q.amount) + '</b> · 品項成本合計:' + money(q.expect) + ' · 差額:' + nf(q.amount - q.expect) + '</p>' +
       '<p>匯款備註:' + (esc(q.note) || '<span class="m">無</span>') + '</p><p class="m">建立:' + esc(q.by) + ' ' + esc(q.at) + '</p>' +
       '<h4>包含品項(' + q.count + ')</h4><ul style="margin-top:0">' + q.items.split(';').filter(Boolean).map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>' +
       '<h4>圖片(' + q.imgs.length + ')</h4><div class="pimg">' + (q.imgs.map(function (u) { return '<a href="' + esc(u) + '" target="_blank" rel="noopener"><img src="' + esc(u) + '" alt="" style="max-width:220px;max-height:220px;margin:0 8px 8px 0;border:1px solid var(--line)"></a>'; }).join('') || '<span class="m">沒有上傳圖片</span>') + '</div>' +
@@ -1309,7 +1310,7 @@ function poHtml(sid) {
     '<tr><td>配送/收件</td><td colspan="3" style="white-space:normal">' + esc(s.ship) + '</td></tr><tr><td>付款方式</td><td>' + esc(s.pay) + (s.last5 ? ' (後五碼 ' + esc(s.last5) + ')' : '') + '</td><td>建立時間</td><td>' + esc(s.cr.slice(0, 16)) + '</td></tr>' +
     '<tr><td>訂單</td><td colspan="3">' + esc(s.oids.join('、')) + '</td></tr></tbody></table>' +
     '<table style="min-width:0;width:100%"><thead><tr><th>品名</th><th>規格</th><th style="text-align:right">數量</th><th style="text-align:right">單價</th><th style="text-align:right">小計</th><th>檢貨</th></tr></thead><tbody>' +
-    items.map(function (i) { return '<tr><td style="white-space:normal">' + esc(i.name) + '</td><td>' + esc(i.spec) + '</td><td style="text-align:right">' + i.qty + '</td><td style="text-align:right">' + i.unit + '</td><td style="text-align:right">' + i.sub + '</td><td>☐</td></tr>'; }).join('') + '</tbody></table>' +
+    items.map(function (i) { return '<tr><td style="white-space:normal">' + esc(i.name) + '</td><td>' + esc(i.spec) + '</td><td style="text-align:right">' + nf(i.qty) + '</td><td style="text-align:right">' + nf(i.unit) + '</td><td style="text-align:right">' + nf(i.sub) + '</td><td>☐</td></tr>'; }).join('') + '</tbody></table>' +
     '<table style="min-width:0;width:260px;margin:10px 0 0 auto"><tbody><tr><td>商品合計</td><td style="text-align:right">' + money(s.sub) + '</td></tr>' + (s.disc ? '<tr><td>優惠</td><td style="text-align:right">-' + money(s.disc) + '</td></tr>' : '') + (s.cred ? '<tr><td>購物金</td><td style="text-align:right">-' + money(s.cred) + '</td></tr>' : '') +
     '<tr><td>運費</td><td style="text-align:right">' + money(s.fee) + '</td></tr><tr><td><b>應付</b></td><td style="text-align:right"><b>' + money(s.total) + '</b></td></tr></tbody></table>' +
     (s.note ? '<p>備註:' + esc(s.note) + '</p>' : '') + '</div>';
@@ -1334,9 +1335,9 @@ function loadReport() {
   call('adminReport', T, RF).then(function (r) {
     RD = r; var st = $('#rst'); if (st) st.innerHTML = '<option value="">全部</option>' + r.statuses.map(function (x) { return '<option' + (x === RF.status ? ' selected' : '') + '>' + esc(x) + '</option>'; }).join('');
     var m = r.sum;
-    $('#rpb').innerHTML = '<div class="rp"><div>總營收(訂單金額)<b>' + money(m.revenue) + '</b></div><div>利潤<b>' + money(m.profit) + '</b></div><div>銷售數量<b>' + m.qty + '</b></div><div>下單筆數<b>' + m.orders + '</b></div><div>出貨單數<b>' + m.ships + '</b></div><div>成本<b>' + money(m.cost) + '</b></div></div>' +
-      '<p class="m">營收為訂單金額(商品小計扣掉折扣,未扣購物金、未含運費);利潤也是用扣掉折扣後的金額計算;' + (m.noCost ? m.noCost + ' 項未填成本,未計入成本與利潤。' : '') + '出貨日期篩選只會包含已建立出貨單的品項。</p>' +
-      '<table><thead><tr><th>商品</th><th>數量</th><th>營收</th><th>成本</th><th>利潤</th></tr></thead><tbody>' + (r.prods.map(function (p) { return '<tr><td style="white-space:normal">' + esc(p.name) + '</td><td>' + p.qty + '</td><td>' + p.revenue + '</td><td>' + p.cost + '</td><td>' + p.profit + '</td></tr>'; }).join('') || '<tr><td colspan="5" class="m">沒有資料</td></tr>') + '</tbody></table>';
+    $('#rpb').innerHTML = '<div class="rp"><div>總營收(訂單金額)<b>' + money(m.revenue) + '</b></div><div>利潤<b>' + money(m.profit) + '</b></div><div>銷售數量<b>' + nf(m.qty) + '</b></div><div>下單筆數<b>' + nf(m.orders) + '</b></div><div>出貨單數<b>' + nf(m.ships) + '</b></div><div>成本<b>' + money(m.cost) + '</b></div></div>' +
+      '<p class="m">營收為訂單金額(商品小計扣掉折扣,未扣購物金、未含運費);利潤也是用扣掉折扣後的金額計算;' + (m.noCost ? nf(m.noCost) + ' 項未填成本,未計入成本與利潤。' : '') + '出貨日期篩選只會包含已建立出貨單的品項。</p>' +
+      '<table><thead><tr><th>商品</th><th>數量</th><th>營收</th><th>成本</th><th>利潤</th></tr></thead><tbody>' + (r.prods.map(function (p) { return '<tr><td style="white-space:normal">' + esc(p.name) + '</td><td>' + nf(p.qty) + '</td><td>' + nf(p.revenue) + '</td><td>' + nf(p.cost) + '</td><td>' + nf(p.profit) + '</td></tr>'; }).join('') || '<tr><td colspan="5" class="m">沒有資料</td></tr>') + '</tbody></table>';
   }).catch(function (e) { $('#rpb').innerHTML = '<p class="er">' + esc(e.message) + '</p>'; });
 }
 document.addEventListener('change', function (e) { var k = e.target.dataset && e.target.dataset.r; if (!k || !e.target.closest('#rpf')) return; RF[k] = e.target.value; loadReport(); });
@@ -1352,12 +1353,12 @@ function drawStock() {
   var P2 = SK.products;
   $('#v').innerHTML = '<h2 style="margin-top:0">庫存表</h2><p class="m">一批貨到了,一部分是客人訂的、一部分是要放庫存:客訂在「訂單明細」,庫存部分在這裡新增「庫存進貨」。兩種都會出現在「訂單明細」(庫存的訂購人顯示【庫存】),可以一起勾選做廠商付款。庫存進貨改成「已到貨」時才會增加商品數量。</p>' +
     '<table><thead><tr><th>商品</th><th>型態</th><th>目前數量</th><th>待到貨(客訂)</th><th>待到貨(庫存進貨)</th><th>預設廠商</th><th>成本</th></tr></thead><tbody>' +
-    P2.map(function (p) { return '<tr><td style="white-space:normal">' + esc(p.name) + ' <span class="m">' + esc(p.id) + '</span></td><td>' + esc(p.type) + '</td><td>' + (p.stock === '' ? '無限' : p.stock) + '</td><td>' + p.waitOrders + '</td><td>' + p.waitStock + '</td><td>' + esc(p.vendor) + '</td><td>' + (p.cost === '' ? '' : p.cost) + '</td></tr>'; }).join('') + '</tbody></table>' +
+    P2.map(function (p) { return '<tr><td style="white-space:normal">' + esc(p.name) + ' <span class="m">' + esc(p.id) + '</span></td><td>' + esc(p.type) + '</td><td>' + (p.stock === '' ? '無限' : nf(p.stock)) + '</td><td>' + nf(p.waitOrders) + '</td><td>' + nf(p.waitStock) + '</td><td>' + esc(p.vendor) + '</td><td>' + (p.cost === '' ? '' : nf(p.cost)) + '</td></tr>'; }).join('') + '</tbody></table>' +
     '<h3 style="margin-top:22px">新增庫存進貨</h3><form id="skf" style="max-width:760px"><div class="g"><label>商品<select name="pid" id="skp">' + P2.map(function (p) { return '<option value="' + esc(p.id) + '">' + esc(p.name) + '</option>'; }).join('') + '</select></label>' +
     '<label>規格<select name="spec" id="sks"></select></label>' + fld('數量', 'qty', '', 'number') + '<label>廠商<select name="vendor">' + vopt('', '(用商品預設)') + '</select></label>' + fld('單件成本(空白=用商品預設)', 'cost', '', 'number') + fld('貨源(空白=用商品預設)', 'src', '') + '</div>' +
     '<label class="ck"><input type="checkbox" name="arrived"> 已到貨(直接增加商品數量)</label><p class="er" id="ske" role="alert"></p><button class="btn a">新增</button></form>' +
     '<h3 style="margin-top:22px">庫存進貨紀錄</h3><table><thead><tr><th>編號</th><th>日期</th><th>商品</th><th>規格</th><th>數量</th><th>狀態</th><th>廠商</th><th>成本</th><th></th></tr></thead><tbody>' +
-    (SK.ins.map(function (l) { return '<tr><td>' + esc(l.id) + '</td><td>' + esc(l.at) + '</td><td style="white-space:normal">' + esc(l.name) + '</td><td>' + esc(l.spec) + '</td><td>' + l.qty + '</td><td>' + esc(l.arr) + '</td><td>' + esc(l.vendor) + '</td><td>' + l.cost + '</td><td><button class="btn l s" data-sk="del" data-id="' + esc(l.id) + '">刪除</button></td></tr>'; }).join('') || '<tr><td colspan="9" class="m">還沒有庫存進貨</td></tr>') + '</tbody></table><p class="m">到貨狀態、廠商、成本請到「訂單明細」勾選後用「批次修改」;付款也在那邊一起做。</p>';
+    (SK.ins.map(function (l) { return '<tr><td>' + esc(l.id) + '</td><td>' + esc(l.at) + '</td><td style="white-space:normal">' + esc(l.name) + '</td><td>' + esc(l.spec) + '</td><td>' + nf(l.qty) + '</td><td>' + esc(l.arr) + '</td><td>' + esc(l.vendor) + '</td><td>' + nf(l.cost) + '</td><td><button class="btn l s" data-sk="del" data-id="' + esc(l.id) + '">刪除</button></td></tr>'; }).join('') || '<tr><td colspan="9" class="m">還沒有庫存進貨</td></tr>') + '</tbody></table><p class="m">到貨狀態、廠商、成本請到「訂單明細」勾選後用「批次修改」;付款也在那邊一起做。</p>';
   skSpecs();
 }
 function skSpecs() {
