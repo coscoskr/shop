@@ -2278,7 +2278,7 @@ function hProducts_(u, all, dry, out) {
       specStr = g.specs.join('|');
       Object.keys(g.etas).forEach(function (e) { if (g.etas[e] > best) { best = g.etas[e]; eta = e; } });
     }
-    var on = !hasStock && g.pend > 0;
+    var on = false; // 匯入的商品一律先下架,由店家逐一確認後再上架
     created.push(id + ' ' + g.name + (on ? '(上架)' : '(下架)'));
     if (!dry) {
       var brand = g.brand ? brandResolve_(u, { newBrand: g.brand }) : '';
