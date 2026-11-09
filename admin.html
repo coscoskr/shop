@@ -530,6 +530,15 @@ function histRun(rows, dry) {
 function histBindLoad() {
   call('adminHistBindList', T).then(histBindDraw).catch(function (e) { if ($('#hbind')) $('#hbind').textContent = e.message; });
 }
+function hbCheck(inp) {
+  var v = inp.value.trim(), st = document.querySelector('[data-hs="' + inp.dataset.hn + '"]'), ok = !!(HB && HB._nick && HB._nick[v]);
+  inp.style.outline = ''; inp.style.borderColor = '';
+  if (!v) { if (st) { st.textContent = ''; st.style.color = ''; } return; }
+  inp.style.border = '2px solid ' + (ok ? '#2e9e5b' : '#d64545');
+  if (st) { st.textContent = ok ? '✓ 完全符合的 LINE 會員' : '✗ 沒有符合的會員(請選清單裡的暱稱,或清空這格)'; st.style.color = ok ? '#2e9e5b' : '#d64545'; }
+}
+document.addEventListener('input', function (e) { if (e.target.dataset && e.target.dataset.hn !== undefined) hbCheck(e.target); });
+document.addEventListener('change', function (e) { if (e.target.dataset && e.target.dataset.hn !== undefined) hbCheck(e.target); });
 function histBindDraw(r) {
   var b = $('#hbind'); if (!b) return; HB = r;
   var nick = {}, dup = {}; r.members.forEach(function (m) { var k = m.nick.trim().toLowerCase(); dup[k] = (dup[k] || 0) + 1; });
@@ -541,9 +550,10 @@ function histBindDraw(r) {
     r.groups.map(function (g, i) {
       var low = g.name.trim().toLowerCase(), ex = r.members.filter(function (m) { return m.nick.trim().toLowerCase() === low; }), fz = low.length >= 2 ? r.members.filter(function (m) { var n = m.nick.toLowerCase(); return n !== low && (n.indexOf(low) >= 0 || low.indexOf(n) >= 0 && n.length >= 2); }).slice(0, 3) : [];
       var pre = ex.length === 1 ? lab(ex[0]) : '';
-      return '<tr><td>' + esc(g.name) + '</td><td><input list="hdl" data-hn="' + i + '" value="' + esc(pre) + '" style="min-width:180px" placeholder="輸入 LINE 暱稱搜尋並選擇"></td><td>' +
+      return '<tr><td>' + esc(g.name) + '</td><td><input list="hdl" data-hn="' + i + '" value="' + esc(pre) + '" style="min-width:180px" placeholder="輸入 LINE 暱稱搜尋並選擇"><div class="hbs m" data-hs="' + i + '" style="font-size:12px;margin-top:3px"></div></td><td>' +
         fz.concat(ex.length > 1 ? ex : []).map(function (m) { return '<button type="button" class="btn l s" data-a="hfill" data-i="' + i + '" data-v="' + esc(lab(m)) + '">' + esc(m.nick) + '</button>'; }).join(' ') + '</td></tr>';
     }).join('') + '</tbody></table></div>';
+  [].forEach.call(document.querySelectorAll('[data-hn]'), hbCheck);
 }
 function setView() {
   $('#v').innerHTML = '<p class="m">載入中…</p>';
@@ -702,9 +712,11 @@ document.addEventListener('click', function (e) {
   if (a === 'sbp') { var ids2 = selShips(); if (!ids2.length) { tell('請先勾選出貨單'); return; } openPO(ids2); return; }
   if (a === 'bradd') { brandAdd(); return; }
   if (a === 'hdry' || a === 'hrun') { var dry = a === 'hdry'; histRows(function (rows) { if (dry) histRun(rows, true); else ask('確定正式匯入?\n會新增商品、訂單、出貨單和庫存進貨。建議先看過試跑的數字。', function () { histRun(rows, false); }); }); return; }
-  if (a === 'hfill') { var inp = document.querySelector('[data-hn="' + b.dataset.i + '"]'); if (inp) inp.value = b.dataset.v; return; }
+  if (a === 'hfill') { var inp = document.querySelector('[data-hn="' + b.dataset.i + '"]'); if (inp) { inp.value = b.dataset.v; hbCheck(inp); } return; }
   if (a === 'hbind') {
     var pairs = []; [].forEach.call(document.querySelectorAll('[data-hn]'), function (i) { var id = HB && HB._nick[i.value.trim()]; if (id) pairs.push({ name: HB.groups[Number(i.dataset.hn)].name, id: id }); });
+    var bad = 0; [].forEach.call(document.querySelectorAll('[data-hn]'), function (i) { if (i.value.trim() && !(HB && HB._nick[i.value.trim()])) bad++; });
+    if (bad) { tell('有 ' + bad + ' 格填的暱稱找不到對應的 LINE 會員(紅框)。請改選清單裡的暱稱,或把那格清空,再按綁定。'); return; }
     if (!pairs.length) { tell('還沒有填任何暱稱(要從清單選到正確的暱稱)'); return; }
     ask('確定綁定 ' + pairs.length + ' 位?', function () { wait('綁定中…請稍候'); call('adminHistBind', T, pairs).then(function (r) { var d = $('#dq'); d.oncancel = null; if (d.open) d.close(); histBindDraw(r); tell(r.msg); }).catch(function (e) { var d = $('#dq'); d.oncancel = null; if (d.open) d.close(); tell(e.message); }); }); return;
   }
