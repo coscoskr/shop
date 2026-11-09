@@ -2303,6 +2303,7 @@ function hOrders_(u, cust, dry, out) {
     if (!items.length) return;
     var oid = hNext_(om, 'O', od), sub = 0, notes = {}, rowsL = [];
     items.forEach(function (it) { sub += it.c.qty * it.c.unit; if (it.c.note) notes[it.c.note] = 1; });
+    items.forEach(function (it) { if (!it.c.arrived && it.c.paid) notes['已收款 ' + it.c.paid + '(' + it.c.name + (it.c.spec ? '-' + it.c.spec : '') + '),待到貨後再開出貨單'] = 1; });
     // 已到貨且已收款的品項 → 依收款日合併成一張「已查帳待出貨」出貨單
     var sg = {}, sorder = [];
     items.forEach(function (it) { if (it.c.arrived && it.c.paid) { if (!sg[it.c.paid]) { sg[it.c.paid] = []; sorder.push(it.c.paid); } sg[it.c.paid].push(it); } });
