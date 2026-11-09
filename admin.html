@@ -116,7 +116,7 @@ fieldset{border:1px solid var(--line);border-radius:2px;margin:14px 0;padding:10
 <script src="api.js"></script>
 <script>
 var CR = [], BL = [], T = '', P = [], C = [], A = [], O = null, VL = [], FL = {}, tab = 'o', SEL = {};
-var OF = { from: '', to: '', q: '', st: '', pay: '' }, SF = { from: '', to: '', q: '', st: '', pay: '' }, PF = { q: '', type: '', lock: '' };
+var OF = { from: '', to: '', q: '', st: '', pay: '' }, SF = { from: '', to: '', q: '', st: '', pay: '' }, PF = { q: '', type: '', on: '', lock: '' };
 var ALLST = ['待刷卡', '已刷卡待出貨', '待匯款', '已匯款待查帳', '已查帳待出貨', '待出貨', '已出貨待送達', '已出貨待收貨', '已送達', '已收貨付款'];
 var $ = function (s) { return document.querySelector(s); };
 function vopt(cur, blank) {
@@ -124,8 +124,8 @@ function vopt(cur, blank) {
   return '<option value="">' + blank + '</option>' + l.map(function (x) { return '<option' + (x === cur ? ' selected' : '') + '>' + esc(x) + '</option>'; }).join('');
 }
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
-function nf(n) { return n === '' || n == null || isNaN(Number(n)) ? (n == null ? '' : n) : Number(n).toLocaleString('en-US'); }
-function money(n) { return 'NT$ ' + Number(n || 0).toLocaleString('en-US'); }
+function nf(n) { return n === '' || n == null || isNaN(Number(n)) ? (n == null ? '' : n) : Math.round(Number(n)).toLocaleString('en-US'); }
+function money(n) { return 'NT$ ' + Math.round(Number(n || 0)).toLocaleString('en-US'); }
 var BUSY = 0, BT = 0;
 function busy(d) {
   BUSY += d; if (BUSY < 0) BUSY = 0; clearTimeout(BT);
@@ -278,10 +278,11 @@ function openShip(sid) {
 /* ---------- 商品 ---------- */
 function prodView() {
   var k = PF.q.toLowerCase();
-  var rows = P.filter(function (p) { return (!k || (p.id + p.name + p.brand + p.cats.join() + p.vendor).toLowerCase().indexOf(k) >= 0) && (!PF.type || p.type === PF.type); });
+  var rows = P.filter(function (p) { return (!k || (p.id + p.name + p.brand + p.cats.join() + p.vendor).toLowerCase().indexOf(k) >= 0) && (!PF.type || p.type === PF.type) && (!PF.on || (PF.on === 'Y') === !!p.on); });
 
   $('#v').innerHTML = '<h2 style="margin-top:0">商品</h2><div class="fb" id="pfb"><label>搜尋<input data-k="q" placeholder="編號、品名、品牌、類別、廠商" value="' + esc(PF.q) + '"></label>' +
     '<label>型態<select data-k="type">' + opts(['現貨', '預購'], PF.type, '全部') + '</select></label>' +
+    '<label>上架<select data-k="on"><option value="">全部</option><option value="Y"' + (PF.on === 'Y' ? ' selected' : '') + '>上架中</option><option value="N"' + (PF.on === 'N' ? ' selected' : '') + '>已下架</option></select></label>' +
     '<button class="btn a" data-a="np">新增商品</button></div>' +
     '<div class="bt"><span class="m">已勾選 <b id="sn">' + selIds().length + '</b> 項:</span><button class="btn l" data-a="pon">批次上架</button><button class="btn l" data-a="poff">批次下架</button><button class="btn l" data-a="pdel">批次刪除</button></div>' +
 
