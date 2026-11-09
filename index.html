@@ -186,6 +186,7 @@ function bp(k) { return String(k).split('~')[0]; }
 function sp(k) { return String(k).split('~')[1] || ''; }
 function baseQty(id, except) { var n = 0; for (var k in cart) if (bp(k) === id && k !== except) n += cart[k]; return n; }
 function room(p) { return maxQ(p) - baseQty(p.id); }
+function specRoom(p, sp) { var q = sp && p.specQty ? p.specQty[sp] : null; return q == null ? 99 : q - (cart[p.id + '~' + sp] || 0); }
 function maxQ(p) { return p.stock === null ? 99 : Math.min(99, p.stock); }
 function tag(p) { return p.type === '預購' ? '預購' + (p.arrival ? ',預計' + md(p.arrival) + '左右' : '') : '現貨'; }
 
@@ -447,16 +448,17 @@ document.addEventListener('click', function (e) {
   else if (a === 'pg') { PAGE = +b.dataset.p || 1; grid(); toTop(); }
   else if (a === 'open') { cur = byId(id); dq = 1; show(detail(cur)); }
   else if (a === 'bigimg') { $('#bigimg').src = b.dataset.u; [].slice.call(document.querySelectorAll('.th img')).forEach(function (n) { n.classList.toggle('on', n === b); }); }
-  else if (a === 'up') { if (dq < room(cur)) dq++; $('#qn').textContent = dq; }
+  else if (a === 'up') { var sv = $('#spsel') ? $('#spsel').value : '', lim = Math.min(room(cur), sv ? specRoom(cur, sv) : 99); if (dq < lim) dq++; else $('#dte').textContent = '最多只能買 ' + Math.max(lim, 0) + ' 件(庫存上限)'; $('#qn').textContent = dq; }
   else if (a === 'dn') { if (dq > 1) dq--; $('#qn').textContent = dq; }
   else if (a === 'add') {
     var spv = ''; if (cur.specs && cur.specs.length) { spv = $('#spsel').value; if (!spv) { $('#dte').textContent = '請先選擇規格'; return; } }
-    var key = spv ? cur.id + '~' + spv : cur.id, rm = room(cur);
+    var key = spv ? cur.id + '~' + spv : cur.id, rm = Math.min(room(cur), spv ? specRoom(cur, spv) : 99);
     if (rm < 1) { $('#dte').textContent = '已達可購買數量上限'; return; }
-    cart[key] = (cart[key] || 0) + Math.min(dq, rm); count(); show(cartHtml());
+    if (dq > rm) { dq = rm; $('#dte').textContent = '庫存只剩 ' + rm + ' 件,已幫你調整數量'; $('#qn').textContent = dq; return; }
+    cart[key] = (cart[key] || 0) + dq; count(); show(cartHtml());
   }
   else if (a === 'cart') show(cartHtml());
-  else if (a === 'inc') { var p = byId(bp(id)); if (room(p) > 0) cart[id]++; count(); show(cartHtml()); }
+  else if (a === 'inc') { var p = byId(bp(id)), isp = id.indexOf('~') > 0 ? id.slice(id.indexOf('~') + 1) : ''; if (room(p) > 0 && (!isp || specRoom(p, isp) > 0)) cart[id]++; count(); show(cartHtml()); }
   else if (a === 'dec') { if (--cart[id] < 1) delete cart[id]; count(); show(cartHtml()); }
   else if (a === 'del') { delete cart[id]; count(); show(cartHtml()); }
   else if (a === 'co' && $('#cdi') && $('#cdi').value.trim() && $('#cdi').value.trim() !== CODE) { cdWarn(); }
@@ -688,6 +690,7 @@ document.addEventListener('change', function (e) {
 document.addEventListener('change', function (e) {
   if (e.target.id !== 'spsel') return;
   var n = $('#spn'), v = e.target.value, q = cur && cur.specQty ? cur.specQty[v] : null;
+  var lim0 = v ? specRoom(cur, v) : 99; if (v && dq > Math.max(lim0, 1)) { dq = Math.max(lim0, 1); var qn = $('#qn'); if (qn) qn.textContent = dq; }
   if (n) n.innerHTML = !v ? '請選擇規格查看剩餘數量' : (q == null ? (cur.stock === null ? '庫存充足' : '剩餘數量:<b>' + cur.stock + '</b> 件') : q === 0 ? '此規格已售完' : '剩餘數量:<b>' + q + '</b> 件');
 });
 document.addEventListener('input', function (e) { if (e.target.name === 'l5') e.target.value = e.target.value.replace(/\D/g, '').slice(0, 5); });
