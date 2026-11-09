@@ -537,11 +537,11 @@ function histBindDraw(r) {
   r.members.forEach(function (m) { nick[lab(m)] = m.id; }); r._nick = nick;
   if (!r.groups.length) { b.innerHTML = '<p class="m">' + (r.msg ? esc(r.msg) + '<br>' : '') + '目前沒有待綁定的舊訂單。</p>'; return; }
   b.innerHTML = (r.msg ? '<p class="m">' + esc(r.msg) + '</p>' : '') + '<datalist id="hdl">' + Object.keys(nick).map(function (k) { return '<option value="' + esc(k) + '">'; }).join('') + '</datalist>' +
-    '<p><button class="btn a" data-a="hbind">綁定已填的</button> <span class="m">共 ' + r.groups.length + ' 位待綁定</span></p><div style="overflow:auto"><table><thead><tr><th>舊檔案裡的購買人<br><span class="m" style="font-weight:400">(Excel「購買人」欄的名字)</span></th><th>這位購買人的舊訂單<br><span class="m" style="font-weight:400">(幾張訂單 / 幾個品項)</span></th><th>要綁定的 LINE 會員<br><span class="m" style="font-weight:400">(從系統已有的 LINE 會員中選)</span></th><th>可能是這幾位<br><span class="m" style="font-weight:400">(系統猜的,點一下自動填入)</span></th></tr></thead><tbody>' +
+    '<p><button class="btn a" data-a="hbind">綁定已填的</button> <span class="m">共 ' + r.groups.length + ' 位待綁定</span></p><div style="overflow:auto"><table><thead><tr><th>舊檔案裡的購買人<br><span class="m" style="font-weight:400">(Excel「購買人」欄的名字)</span></th><th>要綁定的 LINE 會員<br><span class="m" style="font-weight:400">(從系統已有的 LINE 會員中選)</span></th><th>可能是這幾位<br><span class="m" style="font-weight:400">(系統猜的,點一下自動填入)</span></th></tr></thead><tbody>' +
     r.groups.map(function (g, i) {
       var low = g.name.trim().toLowerCase(), ex = r.members.filter(function (m) { return m.nick.trim().toLowerCase() === low; }), fz = low.length >= 2 ? r.members.filter(function (m) { var n = m.nick.toLowerCase(); return n !== low && (n.indexOf(low) >= 0 || low.indexOf(n) >= 0 && n.length >= 2); }).slice(0, 3) : [];
       var pre = ex.length === 1 ? lab(ex[0]) : '';
-      return '<tr><td>' + esc(g.name) + '</td><td>' + g.orders + ' / ' + g.items + '</td><td><input list="hdl" data-hn="' + i + '" value="' + esc(pre) + '" style="min-width:180px" placeholder="輸入 LINE 暱稱搜尋並選擇"></td><td>' +
+      return '<tr><td>' + esc(g.name) + '</td><td><input list="hdl" data-hn="' + i + '" value="' + esc(pre) + '" style="min-width:180px" placeholder="輸入 LINE 暱稱搜尋並選擇"></td><td>' +
         fz.concat(ex.length > 1 ? ex : []).map(function (m) { return '<button type="button" class="btn l s" data-a="hfill" data-i="' + i + '" data-v="' + esc(lab(m)) + '">' + esc(m.nick) + '</button>'; }).join(' ') + '</td></tr>';
     }).join('') + '</tbody></table></div>';
 }
