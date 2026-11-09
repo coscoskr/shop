@@ -327,10 +327,10 @@ function batchInfo() {
   d.showModal();
 }
 var CUR = '';
-var CSEL = [];
+var CSEL = [], CDET = false;
 function catBigs() { var o = []; C.forEach(function (c) { var k = c.split('/')[0]; if (o.indexOf(k) < 0) o.push(k); }); return o; }
 function catGroups(sel) {
-  CSEL = (sel || []).slice();
+  CSEL = (sel || []).slice(); CDET = false;
   return '<div id="cpk"></div>';
 }
 function drawCats(keepBig) {
@@ -340,14 +340,15 @@ function drawCats(keepBig) {
   var shown = bigs.filter(function (k) { return !q || k.toLowerCase().indexOf(q) >= 0 || C.some(function (c) { return c.split('/')[0] === k && c.toLowerCase().indexOf(q) >= 0; }); });
   if (cur && shown.indexOf(cur) < 0 && keepBig === undefined) cur = '';
   var chips = CSEL.map(function (c, i) { return '<span class="chip" style="display:inline-block;background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:2px 4px 2px 10px;margin:0 6px 6px 0">' + esc(c.replace('/', ' › ')) + ' <button type="button" class="btn l s" style="border:0;padding:0 6px" data-a="crm" data-i="' + i + '" aria-label="移除">×</button></span>'; }).join('') || '<span class="m">尚未選擇類別</span>';
-  var subs = cur ? C.filter(function (c) { return c.split('/')[0] === cur && CSEL.indexOf(c) < 0; }) : [];
-  var subSel = '<select id="csub" style="flex:1;min-width:140px"' + (cur ? '' : ' disabled') + '><option value="">' + (cur ? '② 選小項目…(選了就加入)' : '② 先選大項目') + '</option>' + subs.map(function (c) { var lab = c === cur ? '不分小分類' : c.slice(cur.length + 1); return '<option value="' + esc(c) + '">' + esc(lab) + '</option>'; }).join('') + '</select>';
+  var subs = cur ? C.filter(function (c) { return c.split('/')[0] === cur; }) : [];
+  var nsel = subs.filter(function (c) { return CSEL.indexOf(c) >= 0; }).length;
+  var subSel = '<details id="cdet" style="flex:1;min-width:160px;position:relative"' + (CDET && cur ? ' open' : '') + '><summary style="cursor:pointer;padding:9px 10px;border:1px solid var(--line);border-radius:6px;background:#fff;list-style:revert' + (cur ? '' : ';opacity:.5;pointer-events:none') + '">' + (cur ? '② 小項目(可複選)' + (nsel ? ' — 已選 ' + nsel : '') : '② 先選大項目') + '</summary><div style="padding:8px 10px;border:1px solid var(--line);border-top:0;background:#fff;max-height:220px;overflow:auto">' + subs.map(function (c) { var lab = c === cur ? '不分小分類' : c.slice(cur.length + 1); return '<label style="display:block;padding:4px 0"><input type="checkbox" data-cs="' + esc(c) + '"' + (CSEL.indexOf(c) >= 0 ? ' checked' : '') + '> ' + esc(lab) + '</label>'; }).join('') + '</div></details>';
   b.innerHTML = '<div>' + chips + '</div><div style="display:flex;gap:8px;flex-wrap:wrap"><input id="cq" placeholder="搜尋" value="' + esc($('#cq') ? $('#cq').value : '') + '" style="width:90px;flex:none" autocomplete="off"><select id="cbig" style="flex:1;min-width:140px"><option value="">① 選大項目…</option>' + shown.map(function (k) { return '<option value="' + esc(k) + '"' + (k === cur ? ' selected' : '') + '>' + esc(k) + '</option>'; }).join('') + '</select>' + subSel + '</div>';
 }
 document.addEventListener('input', function (e) { if (e.target.id === 'cq') { var v = e.target.value, p = e.target.selectionStart; drawCats(); var n = $('#cq'); n.focus(); try { n.setSelectionRange(p, p); } catch (x) { } } });
 document.addEventListener('change', function (e) {
-  if (e.target.id === 'cbig') drawCats(e.target.value);
-  else if (e.target.id === 'csub') { var c = e.target.value; if (c && CSEL.indexOf(c) < 0) CSEL.push(c); drawCats($('#cbig').value); }
+  if (e.target.id === 'cbig') { CDET = false; drawCats(e.target.value); }
+  else if (e.target.dataset && e.target.dataset.cs !== undefined) { var c = e.target.dataset.cs, k = CSEL.indexOf(c); if (e.target.checked && k < 0) CSEL.push(c); else if (!e.target.checked && k >= 0) CSEL.splice(k, 1); CDET = true; drawCats($('#cbig').value); }
 });
 document.addEventListener('click', function (e) { var b = e.target.closest && e.target.closest('[data-a=crm]'); if (b) { CSEL.splice(+b.dataset.i, 1); drawCats($('#cbig').value); } });
 var SPL = [];
