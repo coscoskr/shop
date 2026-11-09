@@ -376,7 +376,7 @@ function saveAdmin_(acc, name, pw, on) {
   if (pw) { o.鹽 = Utilities.getUuid(); o.密碼雜湊 = hash_(pw, o.鹽); }
   put_('管理員', ex ? ex._r : 0, o);
 }
-function adminLogin(acc, pw) {
+function adminLogin(acc, pw, remember) {
   acc = String(acc || '').trim();
   var c = CacheService.getScriptCache(), k = 'f_' + acc, n = Number(c.get(k) || 0);
   if (n >= 5) return { ok: false, msg: '嘗試次數過多,請10分鐘後再試' };
@@ -386,7 +386,7 @@ function adminLogin(acc, pw) {
     return { ok: false, msg: '帳號或密碼錯誤' };
   }
   var tk = Utilities.getUuid() + Utilities.getUuid().replace(/-/g, '');
-  c.put('t_' + tk, JSON.stringify({ acc: acc, name: a.顯示名稱 }), 21600);
+  c.put('t_' + tk, JSON.stringify({ acc: acc, name: a.顯示名稱 }), remember ? 2592000 : 21600);
   c.remove(k);
   log_(acc, '登入', '', '');
   return { ok: true, token: tk, name: a.顯示名稱 };
