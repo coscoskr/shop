@@ -2183,9 +2183,199 @@ function adminSaveSettings(tk, v) {
   return adminSettings(tk);
 }
 
+/* ================= 匯入舊 Excel 訂單(一次性工具) =================
+   資料由後台「匯入舊資料」頁選擇 JSON 檔後,分段送來(商品 → 訂單 → 庫存)。
+   已出貨(出貨日期有填日期)的列不匯入;客人欄空白 = 公司庫存。 */
+function hNum_(v) { if (v === '' || v == null) return null; var n = Number(String(v).replace(/,/g, '')); return isFinite(n) ? n : null; }
+function hDate_(v) { var m = String(v == null ? '' : v).trim().match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[1] + '-' + m[2] + '-' + m[3] : ''; }
+function hNorm_(s) { return String(s || '').toLowerCase().replace(/[\s\-_－—（）()・·.．]/g, ''); }
+function hEta_(s) { var m = String(s || '').match(/(\d{1,2})\/(\d{1,2})/); if (!m) return ''; var mo = Number(m[1]); return (mo < 6 ? 2027 : 2026) + '-' + ('0' + mo).slice(-2) + '-' + ('0' + Number(m[2])).slice(-2); }
+function hCls_(r) {
+  var name = String(r['品名'] == null ? '' : r['品名']).trim(), st = String(r['出貨日期'] == null ? '' : r['出貨日期']).trim();
+  if (!name || name === '+') return { skip: '空白列' };
+  if (/^\d{4}-\d{2}-\d{2}/.test(st) || /^202\/\d/.test(st)) return { skip: '已出貨' };
+  var buyer = String(r['購買人'] == null ? '' : r['購買人']).trim(), spec0 = String(r['規格'] == null ? '' : r['規格']).trim();
+  var spec = /^x$/i.test(spec0) ? '' : spec0.split('|').join('/').split('~').join('-').split('=').join('-');
+  var s5 = String(r['入庫日期'] == null ? '' : r['入庫日期']).trim(), inD = hDate_(s5), m5 = s5.match(/^(\d{4})(\d{1,2})\/(\d{1,2})$/);
+  if (!inD && m5) inD = m5[1] + '-' + ('0' + m5[2]).slice(-2) + '-' + ('0' + m5[3]).slice(-2);
+  var c = hNum_(r['含稅成本']), cu = hNum_(r['未稅成本']);
+  var prices = [r['含稅售價'], r['未稅售價'], r['群友價'], r['定價']].map(hNum_).filter(function (x) { return x !== null && x > 0; });
+  var unit = prices[0] || 0, plist = hNum_(r['群友價']) || hNum_(r['定價']) || unit;
+  var o = { kind: buyer ? 'cust' : 'stock', buyer: buyer, brand: String(r['品牌'] == null ? '' : r['品牌']).trim(), name: name, spec: spec, st: st,
+    vendor: String(r['廠商'] == null ? '' : r['廠商']).trim(), cost: c !== null ? c : (cu !== null ? cu : ''), tax: c !== null ? 'Y' : 'N', unit: unit, plist: plist,
+    eta: hEta_(s5), inDate: inD, pdate: hDate_(r['乙瑄訂購日期']), note: String(r['備註'] == null ? '' : r['備註']).trim(), fee: hNum_(r['運費']) || 0, paid: hDate_(r['售價收款日期']) };
+  o.pkey = hNorm_(o.brand) + '|' + hNorm_(name);
+  if (o.kind === 'cust') {
+    o.odate = hDate_(r['客人訂購日期']) || o.pdate; if (!o.odate) return { skip: '沒有訂購日期' };
+    var q = hNum_(r['銷售數量']); o.qty = q && q >= 1 ? Math.floor(q) : 1;
+    o.arrived = st === '已通知付款' || st === '在庫中'; o.ptype = st === '在庫中' ? '現貨' : '預購';
+  } else {
+    var q2 = hNum_(r['入庫數量']); o.qty = q2 && q2 >= 1 ? Math.floor(q2) : 1;
+    o.odate = o.pdate || inD || today_(); o.arrived = st !== '預購中' && !!inD; o.ptype = '現貨';
+  }
+  return o;
+}
+function hPmap_() {
+  var m = { byKey: {}, byName: {} };
+  rows_('商品').forEach(function (p) { var n = hNorm_(p.名稱); m.byKey[hNorm_(p.品牌) + '|' + n] = p; (m.byName[n] = m.byName[n] || []).push(p); });
+  return m;
+}
+function hFind_(c, pm) { var h = pm.byKey[c.pkey]; if (h) return h; var l = pm.byName[hNorm_(c.name)]; return l && l.length === 1 ? l[0] : null; }
+function hMaxSeq_(sheet, prefix) {
+  var m = {}; rows_(sheet).forEach(function (r) { var id = String(r[H[sheet][0]]); if (id.indexOf(prefix) === 0 && id.length === prefix.length + 9) { var k = id.slice(0, prefix.length + 6); m[k] = Math.max(m[k] || 0, Number(id.slice(-3)) || 0); } });
+  return m;
+}
+function hNext_(m, prefix, date) { var k = prefix + date.slice(2, 4) + date.slice(5, 7) + date.slice(8, 10); m[k] = (m[k] || 0) + 1; return k + ('000' + m[k]).slice(-3); }
+function hVendor_(v) { if (!v) return; var has = rows_('廠商').some(function (r) { return String(r.廠商).trim() === v; }) || rows_('商品_內部').some(function (r) { return String(r.廠商).trim() === v; }); if (!has) put_('廠商', 0, { '廠商': v }); }
+
+function adminHistImport(tk, step, rows, dry) {
+  var u = me_(tk); rows = rows || []; dry = !!dry;
+  if (rows.length > 3000) throw new Error('一次資料太多');
+  var out = { ok: true, dry: dry, step: step, skipped: {} };
+  lk_(function () {
+    var cl = rows.map(hCls_), all = [];
+    cl.forEach(function (c) { if (c.skip) out.skipped[c.skip] = (out.skipped[c.skip] || 0) + 1; else all.push(c); });
+    if (step === 'products') hProducts_(u, all, dry, out);
+    else if (step === 'orders') hOrders_(u, all.filter(function (c) { return c.kind === 'cust'; }), dry, out);
+    else if (step === 'stock') hStock_(u, all.filter(function (c) { return c.kind === 'stock'; }), dry, out);
+    else throw new Error('未知步驟');
+    if (!dry) log_(u.acc, '匯入舊資料', step, JSON.stringify({ n: rows.length, created: out.created, orders: out.orders, lines: out.lines, ships: out.ships, stock: out.stock }));
+  });
+  return out;
+}
+
+function hProducts_(u, all, dry, out) {
+  var G = {}, ks = [];
+  all.forEach(function (c) {
+    var g = G[c.pkey]; if (!g) { g = G[c.pkey] = { brand: c.brand, name: c.name, specs: [], pend: 0, stockRows: 0, sq: {}, etas: {}, price: 0, vendor: '', cost: '', tax: 'N', cd: '' }; ks.push(c.pkey); }
+    if (c.spec && g.specs.indexOf(c.spec) < 0) g.specs.push(c.spec);
+    if (c.kind === 'cust' && !c.arrived) { g.pend++; if (c.eta) g.etas[c.eta] = (g.etas[c.eta] || 0) + 1; }
+    if (c.kind === 'stock') { g.stockRows++; if (c.arrived) g.sq[c.spec] = (g.sq[c.spec] || 0) + c.qty; if (!c.arrived && c.eta) g.etas[c.eta] = (g.etas[c.eta] || 0) + 1; }
+    if (c.plist) g.price = c.plist;
+    if (c.cost !== '' && (c.pdate >= g.cd)) { g.vendor = c.vendor || g.vendor; g.cost = c.cost; g.tax = c.tax; g.cd = c.pdate; }
+    else if (!g.vendor && c.vendor) g.vendor = c.vendor;
+  });
+  var pm = hPmap_(), mx = 0;
+  rows_('商品').forEach(function (p) { mx = Math.max(mx, parseInt(String(p.商品ID).slice(1), 10) || 0); });
+  var created = [], matched = [], filled = 0;
+  ks.forEach(function (k) {
+    var g = G[k], ex = hFind_({ pkey: k, name: g.name }, pm);
+    if (ex) {
+      matched.push(g.name + ' → ' + ex.商品ID);
+      var oi = rows_('商品_內部').filter(function (r) { return String(r.商品ID) === String(ex.商品ID); })[0];
+      if (g.cost !== '' && (!oi || oi.成本 === '' || oi.成本 === undefined)) {
+        filled++;
+        if (!dry) { hVendor_(g.vendor); put_('商品_內部', oi ? oi._r : 0, { '商品ID': String(ex.商品ID), '廠商': g.vendor || (oi ? oi.廠商 : ''), '成本': g.cost, '成本含稅': g.tax, '貨源': oi ? oi.貨源 : '', '鎖定': oi ? oi.鎖定 : 'N' }); }
+      }
+      return;
+    }
+    var sumArr = 0; Object.keys(g.sq).forEach(function (s0) { sumArr += g.sq[s0]; });
+    mx++; var id = 'P' + ('000' + mx).slice(-3), hasStock = sumArr > 0, specStr = '', total = '', eta = '', best = 0;
+    if (hasStock) {
+      if (g.specs.length) { total = 0; specStr = g.specs.map(function (s) { var q = g.sq[s] || 0; total += q; return s + '=' + q; }).join('|'); }
+      else total = g.sq[''] || 0;
+    } else {
+      specStr = g.specs.join('|');
+      Object.keys(g.etas).forEach(function (e) { if (g.etas[e] > best) { best = g.etas[e]; eta = e; } });
+    }
+    var on = !hasStock && g.pend > 0;
+    created.push(id + ' ' + g.name + (on ? '(上架)' : '(下架)'));
+    if (!dry) {
+      var brand = g.brand ? brandResolve_(u, { newBrand: g.brand }) : '';
+      hVendor_(g.vendor);
+      put_('商品', 0, { '商品ID': id, '名稱': g.name, '類別': '', '銷售型態': hasStock ? '現貨' : '預購', '單價': g.price || 0, '數量': total, '到貨日期': eta, '說明': '', '階梯價': '', '圖片': '', '上架': on ? 'Y' : 'N', '規格': specStr, '品牌': brand });
+      put_('商品_內部', 0, { '商品ID': id, '廠商': g.vendor, '成本': g.cost, '成本含稅': g.tax, '貨源': '', '鎖定': 'N' });
+    }
+  });
+  out.created = created.length; out.createdList = created; out.matched = matched.length; out.matchedList = matched; out.costFilled = filled;
+}
+
+function hOrders_(u, cust, dry, out) {
+  var pm = hPmap_(), om = hMaxSeq_('訂單', 'O'), sm = hMaxSeq_('出貨單', 'S'), have = {};
+  rows_('訂單').forEach(function (o) { if (String(o.備註).indexOf('[匯入]') === 0) have[String(o.姓名) + '|' + String(o.下單時間).slice(0, 10)] = 1; });
+  var G = {}, ks = [];
+  cust.forEach(function (c) { var k = c.buyer + '|' + c.odate; if (!G[k]) { G[k] = []; ks.push(k); } G[k].push(c); });
+  var nOrd = 0, nLine = 0, nShip = 0, dup = 0, miss = [], shipLines = 0;
+  ks.forEach(function (k) {
+    if (have[k]) { dup++; return; }
+    var ls = G[k], b = ls[0].buyer, od = ls[0].odate, items = [];
+    ls.forEach(function (c) { var p = hFind_(c, pm); if (!p && dry) p = { '商品ID': '(新商品)' }; if (!p) { miss.push(c.name); return; } items.push({ c: c, p: p }); });
+    if (!items.length) return;
+    var oid = hNext_(om, 'O', od), sub = 0, notes = {}, rowsL = [];
+    items.forEach(function (it) { sub += it.c.qty * it.c.unit; if (it.c.note) notes[it.c.note] = 1; });
+    // 已到貨且已收款的品項 → 依收款日合併成一張「已查帳待出貨」出貨單
+    var sg = {}, sorder = [];
+    items.forEach(function (it) { if (it.c.arrived && it.c.paid) { if (!sg[it.c.paid]) { sg[it.c.paid] = []; sorder.push(it.c.paid); } sg[it.c.paid].push(it); } });
+    var sidOf = [];
+    sorder.forEach(function (pd) {
+      var g = sg[pd], sid = hNext_(sm, 'S', pd), s = 0, fee = 0;
+      g.forEach(function (it) { s += it.c.qty * it.c.unit; fee = Math.max(fee, it.c.fee); it.sid = sid; });
+      nShip++; shipLines += g.length;
+      if (!dry) put_('出貨單', 0, { '出貨單ID': sid, '訂單ID': oid, '狀態': '已查帳待出貨', '物流': '', '物流單號': '', '品項': g.map(function (it) { return it.c.name + (it.c.spec ? '-' + it.c.spec : '') + '×' + it.c.qty; }).join('、'), '建立時間': pd + ' 12:00:00', '出貨時間': '',
+        'LINE ID': '', '姓名': b, '電話': '', '付款方式': '匯款', '收件資訊': '', '備註': '[匯入]', '商品金額': s, '優惠折抵': 0, '購物金折抵': 0, '運費': fee, '總額': s + fee, '付款連結': '', '匯款後五碼': '', '會員等級': '一般會員', '折抵明細': JSON.stringify((function () { var x = {}; x[oid] = [0, 0]; return x; })()), '配送方式': '', '購物金明細': '{}' });
+    });
+    var inShip = items.filter(function (it) { return it.sid; }).length, st = inShip === 0 ? '已下訂' : (inShip < items.length ? '部分出貨' : '已全部出貨');
+    nOrd++; nLine += items.length;
+    if (!dry) {
+      put_('訂單', 0, { '訂單ID': oid, '下單時間': od + ' 12:00:00', '姓名': b, '電話': '', '付款方式': '', '狀態': st, '商品金額': sub, '運費': 0, '總額': sub, '收件資訊': '', '備註': '[匯入]' + Object.keys(notes).join(' / '), 'LINE ID': '', '付款連結': '', '匯款後五碼': '', '會員等級': '一般會員', '優惠名稱': '', '優惠折抵': 0, '購物金折抵': 0, '購物金明細': '{}', '電子郵件': '', '折扣碼': '' });
+      items.forEach(function (it) {
+        var c = it.c, ar = c.arrived;
+        put_('訂單明細', 0, { '訂單ID': oid, '商品ID': String(it.p.商品ID) + (c.spec ? '~' + c.spec : ''), '品名': c.name, '數量': c.qty, '單價': c.unit, '小計': c.qty * c.unit, '到貨狀態': ar ? '已到貨' : '待到貨', '可出貨': ar ? 'Y' : 'N', '申請出貨': '', '出貨單ID': it.sid || '', '型態': c.ptype,
+          '廠商': c.vendor, '成本': c.cost, '成本含稅': c.tax, '貨源': '', '廠商付款ID': '', '規格': c.spec, '到貨操作人': ar ? '匯入' : '', '到貨時間': ar ? ((c.inDate || od) + ' 00:00:00') : '', '叫貨狀態': '已叫貨', '叫貨人': '匯入', '叫貨時間': od + ' 00:00:00' });
+      });
+    }
+  });
+  out.orders = nOrd; out.lines = nLine; out.ships = nShip; out.shipLines = shipLines; out.dup = dup; out.missing = miss.slice(0, 20);
+  hVendors_(cust, dry);
+}
+function hVendors_(cust, dry) { if (dry) return; var seen = {}; cust.forEach(function (c) { if (c.vendor && !seen[c.vendor]) { seen[c.vendor] = 1; hVendor_(c.vendor); } }); }
+
+function hStock_(u, stock, dry, out) {
+  var pm = hPmap_(), km = hMaxSeq_('庫存進貨', 'K'), have = rows_('庫存進貨').some(function (r) { return String(r.建立人) === '匯入'; }), n = 0, miss = [], arr = 0;
+  if (have && !dry) throw new Error('庫存已經匯入過了');
+  stock.forEach(function (c) {
+    var p = hFind_(c, pm); if (!p && dry) p = { '商品ID': '(新商品)' }; if (!p) { miss.push(c.name); return; }
+    n++; if (c.arrived) arr++;
+    if (dry) return;
+    var d = c.inDate || c.pdate || today_();
+    put_('庫存進貨', 0, { '訂單ID': hNext_(km, 'K', d), '商品ID': String(p.商品ID), '品名': c.name, '規格': c.spec, '數量': c.qty, '到貨狀態': c.arrived ? '已到貨' : '待到貨', '廠商': c.vendor, '成本': c.cost, '成本含稅': c.tax, '貨源': '', '廠商付款ID': '',
+      '到貨操作人': c.arrived ? '匯入' : '', '到貨時間': c.arrived ? d + ' 00:00:00' : '', '日期': d, '建立人': '匯入', '出貨單ID': '' });
+  });
+  out.stock = n; out.stockArrived = arr; out.missing = miss.slice(0, 20);
+}
+
+/** 舊訂單綁定 LINE 會員:列出尚未綁定的購買人,與目前所有會員(供後台搜尋) */
+function adminHistBindList(tk) {
+  me_(tk);
+  var cnt = {}, items = {};
+  rows_('訂單明細').forEach(function (l) { items[String(l.訂單ID)] = (items[String(l.訂單ID)] || 0) + 1; });
+  rows_('訂單').forEach(function (o) {
+    if (String(o.備註).indexOf('[匯入]') !== 0 || String(o['LINE ID'] || '')) return;
+    var k = String(o.姓名); cnt[k] = cnt[k] || { name: k, orders: 0, items: 0 }; cnt[k].orders++; cnt[k].items += items[String(o.訂單ID)] || 0;
+  });
+  var gs = Object.keys(cnt).map(function (k) { return cnt[k]; }).sort(function (a, b) { return b.items - a.items; });
+  var ms = rows_('會員').map(function (m) { return { id: String(m['LINE ID']), nick: String(m.暱稱 || ''), real: String(m.姓名 || '') }; });
+  return { groups: gs, members: ms };
+}
+function adminHistBind(tk, pairs) {
+  var u = me_(tk), done = 0, skip = [];
+  lk_(function () {
+    var mem = {}; rows_('會員').forEach(function (m) { mem[String(m['LINE ID'])] = m; });
+    (pairs || []).slice(0, 300).forEach(function (p) {
+      var name = String(p.name), lid = String(p.id);
+      if (!mem[lid]) { skip.push(name + ':找不到會員'); return; }
+      var n = 0;
+      rows_('訂單').forEach(function (o) { if (String(o.姓名) === name && String(o.備註).indexOf('[匯入]') === 0 && !String(o['LINE ID'] || '')) { var x = cp_(o); x['LINE ID'] = lid; put_('訂單', o._r, x); n++; } });
+      rows_('出貨單').forEach(function (s) { if (String(s.姓名) === name && String(s.備註).indexOf('[匯入]') === 0 && !String(s['LINE ID'] || '')) { var x = cp_(s); x['LINE ID'] = lid; put_('出貨單', s._r, x); } });
+      if (n) { done++; log_(u.acc, '綁定舊訂單', name, '→ ' + String(mem[lid].暱稱) + ' ' + n + ' 張'); } else skip.push(name + ':沒有可綁定的訂單');
+    });
+  });
+  var r = adminHistBindList(tk); r.msg = '已綁定 ' + done + ' 位' + (skip.length ? ',略過 ' + skip.length + ':' + skip.join('、') : ''); return r;
+}
+
 
 /* ===== 以下由 build.py 加入 ===== */
-export const API = {resetAdmin, getShop, placeOrder, adminProxyQuote, adminPlaceOrder, adminLogin, adminVendors, adminBrands, adminAddBrand, adminRenameBrand, adminDeleteBrand, adminCats, adminAddCat, adminRenameCat, adminRenameBig, adminDeleteBig, adminDeleteCat, adminAddVendor, adminDeleteVendor, adminCarriers, adminSaveCarrier, adminDeleteCarrier, trackLink, adminInit, adminSaveProduct, adminDeleteProduct, adminBatchProducts, adminCodes, adminSaveCode, adminSetCodeOn, adminDeleteCode, adminSaveAdmin, adminLogs, memberLogin, memberOrders, memberSaveProfile, memberReportPay, adminBatchArrival, adminLineHistory, adminBatchOrder, adminPurchaseList, adminLineInfo, adminRecordPayment, adminUpdatePayment, adminDeletePayment, adminStockView, adminAddStockIn, adminDeleteStockIn, adminBatchDeleteLines, adminReport, adminOrders, adminOrderAdjust, adminUpdateOrder, adminEditLine, adminEditLineFull, adminDeleteOrder, adminBatchDeleteOrders, adminCreateShip, adminUpdateShip, adminBatchShipStatus, adminDeleteShip, adminBatchDeleteShips, adminShipHistory, adminBatch, memberCheckout, memberShipQuote, memberCreateShip, adminShipQuote, adminCreateShipFor, lineStart, lineLiff, quote, adminMembers, adminMemberGrants, adminSetLevel, adminGrant, adminVoidGrant, adminLevels, adminSaveLevel, adminDeleteLevel, adminActivities, adminSaveActivity, adminDeleteActivity, adminSettings, adminSaveSettings};
-export const INTERNAL = {catHit_, page_, doGet, setup, resetAdmin, ss_, raw_, sh_, t_, txt_, rows_, put_, log_, major_, diff_, settings_, cats_, cs_, tiers_, unit_, img_, imgList_, bp_, spec_, specParse_, specs_, specQty_, availOf_, adjStock_, imgs_, pub_, getShop, shopData_, placeOrder, placeCore_, proxyCtx_, proxyWant_, adminProxyQuote, adminPlaceOrder, contactSeen_, hex_, hash_, admins_, saveAdmin_, adminLogin, me_, adminProducts_, vendors_, adminVendors, brandSheet_, brands_, brandKey_, brandPick_, brandResolve_, brandList_, brandName_, adminBrands, adminAddBrand, adminRenameBrand, adminDeleteBrand, catList_, catName_, adminCats, adminAddCat, renameCats_, adminRenameCat, adminRenameBig, adminDeleteBig, adminDeleteCat, adminAddVendor, adminDeleteVendor, carriers_, trackUrl_, shortTrack_, saveCarriers_, adminCarriers, adminSaveCarrier, adminDeleteCarrier, trackLink, adminInit, adminSaveProduct, adminDeleteProduct, adminBatchProducts, codeSheet_, codes_, dstr_, codeState_, findCode_, codeUsed_, codeList_, adminCodes, adminSaveCode, adminSetCodeOn, adminDeleteCode, adminSaveAdmin, adminLogs, nz_, mk_, mem_, lineMeta_, mine_, memberLogin, shipObj_, memberOrders, memberSaveProfile, memberReportPay, authDrive, adminUploadImage, adminBatchArrival, stockMove_, adminLineHistory, adminBatchOrder, allPurch_, purchaseList_, adminPurchaseList, pickPurchase_, adminLineInfo, adminRecordPayment, adminUpdatePayment, adminDeletePayment, stockView_, adminStockView, adminAddStockIn, deleteStockIn_, adminDeleteStockIn, adminBatchDeleteLines, adminReport, lk_, ri_, si_, paidOk_, now_, cp_, ord_, seq_, adminOrders, adminOrderAdjust, adminUpdateOrder, adminEditLine, adminEditLineFull, deleteOrder_, adminDeleteOrder, adminBatchDeleteOrders, adminCreateShip, syncOrderStatus_, adminUpdateShip, shipNotice_, adminBatchShipStatus, deleteShip_, adminDeleteShip, adminBatchDeleteShips, adminShipHistory, adminBatch, memberCheckout, shipCalc_, pickLines_, memberShipQuote, memberCreateShip, shipCtx_, shipRecv_, adminShipQuote, adminCreateShipFor, ensureSettings_, prop_, lineOn_, lineId_, appUrl_, sha_, tot_, lineStart, lineCallback_, lineLiff, newSession_, upsertMember_, memberRow_, levels_, levelOf_, pushLine_, notifyShipped_, mailTo_, authAll, notifyArrival_, today_, grants_, balance_, addGrant_, spend_, refund_, meInfo_, eligSub_, calc_, quote, awardCredits_, adminMembers, adminMemberGrants, adminSetLevel, adminGrant, adminVoidGrant, adminLevels, adminSaveLevel, adminDeleteLevel, actOut_, adminActivities, adminSaveActivity, adminDeleteActivity, defSet_, adminSettings, adminSaveSettings};
+export const API = {resetAdmin, getShop, placeOrder, adminProxyQuote, adminPlaceOrder, adminLogin, adminVendors, adminBrands, adminAddBrand, adminRenameBrand, adminDeleteBrand, adminCats, adminAddCat, adminRenameCat, adminRenameBig, adminDeleteBig, adminDeleteCat, adminAddVendor, adminDeleteVendor, adminCarriers, adminSaveCarrier, adminDeleteCarrier, trackLink, adminInit, adminSaveProduct, adminDeleteProduct, adminBatchProducts, adminCodes, adminSaveCode, adminSetCodeOn, adminDeleteCode, adminSaveAdmin, adminLogs, memberLogin, memberOrders, memberSaveProfile, memberReportPay, adminBatchArrival, adminLineHistory, adminBatchOrder, adminPurchaseList, adminLineInfo, adminRecordPayment, adminUpdatePayment, adminDeletePayment, adminStockView, adminAddStockIn, adminDeleteStockIn, adminBatchDeleteLines, adminReport, adminOrders, adminOrderAdjust, adminUpdateOrder, adminEditLine, adminEditLineFull, adminDeleteOrder, adminBatchDeleteOrders, adminCreateShip, adminUpdateShip, adminBatchShipStatus, adminDeleteShip, adminBatchDeleteShips, adminShipHistory, adminBatch, memberCheckout, memberShipQuote, memberCreateShip, adminShipQuote, adminCreateShipFor, lineStart, lineLiff, quote, adminMembers, adminMemberGrants, adminSetLevel, adminGrant, adminVoidGrant, adminLevels, adminSaveLevel, adminDeleteLevel, adminActivities, adminSaveActivity, adminDeleteActivity, adminSettings, adminSaveSettings, adminHistImport, adminHistBindList, adminHistBind};
+export const INTERNAL = {catHit_, page_, doGet, setup, resetAdmin, ss_, raw_, sh_, t_, txt_, rows_, put_, log_, major_, diff_, settings_, cats_, cs_, tiers_, unit_, img_, imgList_, bp_, spec_, specParse_, specs_, specQty_, availOf_, adjStock_, imgs_, pub_, getShop, shopData_, placeOrder, placeCore_, proxyCtx_, proxyWant_, adminProxyQuote, adminPlaceOrder, contactSeen_, hex_, hash_, admins_, saveAdmin_, adminLogin, me_, adminProducts_, vendors_, adminVendors, brandSheet_, brands_, brandKey_, brandPick_, brandResolve_, brandList_, brandName_, adminBrands, adminAddBrand, adminRenameBrand, adminDeleteBrand, catList_, catName_, adminCats, adminAddCat, renameCats_, adminRenameCat, adminRenameBig, adminDeleteBig, adminDeleteCat, adminAddVendor, adminDeleteVendor, carriers_, trackUrl_, shortTrack_, saveCarriers_, adminCarriers, adminSaveCarrier, adminDeleteCarrier, trackLink, adminInit, adminSaveProduct, adminDeleteProduct, adminBatchProducts, codeSheet_, codes_, dstr_, codeState_, findCode_, codeUsed_, codeList_, adminCodes, adminSaveCode, adminSetCodeOn, adminDeleteCode, adminSaveAdmin, adminLogs, nz_, mk_, mem_, lineMeta_, mine_, memberLogin, shipObj_, memberOrders, memberSaveProfile, memberReportPay, authDrive, adminUploadImage, adminBatchArrival, stockMove_, adminLineHistory, adminBatchOrder, allPurch_, purchaseList_, adminPurchaseList, pickPurchase_, adminLineInfo, adminRecordPayment, adminUpdatePayment, adminDeletePayment, stockView_, adminStockView, adminAddStockIn, deleteStockIn_, adminDeleteStockIn, adminBatchDeleteLines, adminReport, lk_, ri_, si_, paidOk_, now_, cp_, ord_, seq_, adminOrders, adminOrderAdjust, adminUpdateOrder, adminEditLine, adminEditLineFull, deleteOrder_, adminDeleteOrder, adminBatchDeleteOrders, adminCreateShip, syncOrderStatus_, adminUpdateShip, shipNotice_, adminBatchShipStatus, deleteShip_, adminDeleteShip, adminBatchDeleteShips, adminShipHistory, adminBatch, memberCheckout, shipCalc_, pickLines_, memberShipQuote, memberCreateShip, shipCtx_, shipRecv_, adminShipQuote, adminCreateShipFor, ensureSettings_, prop_, lineOn_, lineId_, appUrl_, sha_, tot_, lineStart, lineCallback_, lineLiff, newSession_, upsertMember_, memberRow_, levels_, levelOf_, pushLine_, notifyShipped_, mailTo_, authAll, notifyArrival_, today_, grants_, balance_, addGrant_, spend_, refund_, meInfo_, eligSub_, calc_, quote, awardCredits_, adminMembers, adminMemberGrants, adminSetLevel, adminGrant, adminVoidGrant, adminLevels, adminSaveLevel, adminDeleteLevel, actOut_, adminActivities, adminSaveActivity, adminDeleteActivity, defSet_, adminSettings, adminSaveSettings, hNum_, hDate_, hNorm_, hEta_, hCls_, hPmap_, hFind_, hMaxSeq_, hNext_, hVendor_, adminHistImport, hProducts_, hOrders_, hVendors_, hStock_, adminHistBindList, adminHistBind};
 export { H };
 export function __reset() { SS_ = null; SHC_ = {}; RC_ = {}; }
