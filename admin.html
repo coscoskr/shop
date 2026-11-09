@@ -199,7 +199,7 @@ function inRange(d, f) { d = String(d).slice(0, 10); return (!f.from || d >= f.f
 function orderView() { loadOrders(function () { $('#v').innerHTML = '<h2 style="margin-top:0">訂單明細</h2>' + filterBar('ofb', OF, false, ['待到貨', '已到貨']) + '<div id="tb"></div>'; bindFilter('ofb', OF, orderRows); orderRows(); }); }
 function orderRows() { if (tab === 'o') purchView(); }
 function openOrder(id) {
-  if (!O || !ordById(id)) { call('adminOrders', T).then(function (d) { setO(d); PVDIRTY = false; openOrder(id); }).catch(function (e) { tell(e.message); }); return; }
+  if (!O || !OT || Date.now() - OT > 120000 || !ordById(id)) { call('adminOrders', T).then(function (d) { setO(d); PVDIRTY = false; openOrder(id); }).catch(function (e) { tell(e.message); }); return; }
   var o = ordById(id); if (!o) return;
   var d = $('#dlg');
   var h = '<h3>訂單 ' + esc(o.id) + ' <span class="m">' + esc(o.at) + ' · <span class="chip">' + esc(o.st) + '</span></span></h3>' +
@@ -778,7 +778,7 @@ document.addEventListener('change', function (e) {
   if (e.target.id === 'pvall') { pvLines().forEach(function (l) { PSEL[l.key] = e.target.checked; }); pvRows(); return; }
   if (e.target.classList && e.target.classList.contains('pvk')) { PSEL[e.target.dataset.k] = e.target.checked; pvSum(); pvAllState(); }
 });
-function pvSet(d, msg) { var m = d.msg; OT = 0; PVT = Date.now(); PV = d; VL = d.vlist || VL; PSEL = {}; pvDraw(); if (msg || m) tell(msg || m); }
+function pvSet(d, msg) { var m = d.msg; OT = 0; O = null; PVT = Date.now(); PV = d; VL = d.vlist || VL; PSEL = {}; pvDraw(); if (msg || m) tell(msg || m); }
 document.addEventListener('click', function (e) {
   var b = e.target.closest('[data-pv]'); if (!b) return;
   var a = b.dataset.pv, id = b.dataset.id, d = $('#dlg');
