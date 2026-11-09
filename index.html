@@ -199,6 +199,7 @@ google.script.run.withSuccessHandler(function (d) {
     google.script.run.withSuccessHandler(function (r) { LCHK = false; MD = r; setLg(); })
       .withFailureHandler(function () { LCHK = false; if (mt === LT) { LT = ''; mt = ''; try { localStorage.removeItem('lt'); } catch (x) {} } setLg(); }).memberOrders(LT);
   }
+  try { var c1 = new URLSearchParams(location.search).get('c'); if (c1 && D.cats.some(function (x) { return x === c1 || x.indexOf(c1 + '/') === 0; })) cat = c1; } catch (e1) {}
   nav(); grid();
   if (BOOT.token) memLoad(function () { show(memList()); });
   try { var pid0 = new URLSearchParams(location.search).get('p'); if (pid0 && !BOOT.token) { var pp0 = byId(pid0); if (pp0) { cur = pp0; dq = 1; show(detail(cur)); } } } catch (e0) {}
@@ -234,8 +235,9 @@ function goLogin() {
   if (D && D.line && D.line.liff) { location.href = 'https://liff.line.me/' + D.line.liff; return; }
   google.script.run.withSuccessHandler(function (u) { location.href = u; }).withFailureHandler(function () { show(loginHtml()); }).lineStart();
 }
+function urlCat() { try { var u = new URL(location.href); if (cat) u.searchParams.set('c', cat); else u.searchParams.delete('c'); if (u.href !== location.href) history.replaceState(null, '', u.pathname + u.search + u.hash); } catch (e) { } }
 function nav() {
-  setLg();
+  setLg(); urlCat();
   var big = [], subs = {};
   D.cats.forEach(function (c) {
     if (!D.products.some(function (p) { return p.cats.indexOf(c) >= 0; })) return;
