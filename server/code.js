@@ -877,7 +877,7 @@ function lineMeta_(admin) {
   if (admin) rows_('商品_內部').forEach(function (r) { im[String(r.商品ID)] = r; });
   return function (r) {
     var p = pm[bp_(r.商品ID)] || {}, i = im[bp_(r.商品ID)] || {};
-    var m = { typ: String(r.型態 || p.銷售型態 || ''), eta: String(p.到貨日期 || '') };
+    var m = { typ: String(r.型態 || p.銷售型態 || ''), eta: String(p.到貨日期 || ''), brand: String(p.品牌 || '') };
     if (admin) {
       var has = ['廠商', '成本', '貨源'].some(function (k) { return r[k] !== undefined && r[k] !== ''; });
       if (has) { m.vendor = String(r.廠商 || ''); m.cost = (r.成本 === undefined || r.成本 === '') ? '' : Number(r.成本); m.tax = r.成本含稅 === 'Y'; m.src = String(r.貨源 || ''); }
@@ -1011,7 +1011,7 @@ function purchaseList_() {
     var m = lm(r), st = r._sh === '庫存進貨', o = ords[String(r.訂單ID)] || {};
     return { key: String(r.訂單ID) + '|' + String(r.商品ID), oid: String(r.訂單ID), pid: String(r.商品ID), stock: st, at: st ? String(r.日期 || '') : String(o.下單時間 || '').slice(0, 10), name: String(r.品名), qty: Number(r.數量), unit: st ? 0 : Number(r.單價),
       code: st ? '' : String(o.折扣碼 || ''), dname: st ? '' : String(o.優惠名稱 || ''), disc: st ? 0 : Number(o.優惠折抵 || 0),
-      buyer: st ? '【庫存】' : String(o.姓名 || ''), spec: String(r.規格 || ''), sid: String(r.出貨單ID || ''), arrBy: String(r.到貨操作人 || ''), arrAt: String(r.到貨時間 || ''), ord: st ? '' : String(r.叫貨狀態 || ''), ordBy: st ? '' : String(r.叫貨人 || ''), ordAt: st ? '' : String(r.叫貨時間 || ''), typ: st ? '庫存' : m.typ, arr: String(r.到貨狀態), vendor: m.vendor, cost: m.cost, tax: m.tax, src: m.src, pay: m.pay };
+      buyer: st ? '【庫存】' : String(o.姓名 || ''), spec: String(r.規格 || ''), sid: String(r.出貨單ID || ''), arrBy: String(r.到貨操作人 || ''), arrAt: String(r.到貨時間 || ''), ord: st ? '' : String(r.叫貨狀態 || ''), ordBy: st ? '' : String(r.叫貨人 || ''), ordAt: st ? '' : String(r.叫貨時間 || ''), brand: m.brand || '', typ: st ? '庫存' : m.typ, arr: String(r.到貨狀態), vendor: m.vendor, cost: m.cost, tax: m.tax, src: m.src, pay: m.pay };
   }).sort(function (a, b) { return a.at < b.at ? 1 : a.at > b.at ? -1 : (a.oid < b.oid ? 1 : -1); });
   var vs = {}; lines.forEach(function (l) { if (l.vendor) vs[l.vendor] = 1; });
   rows_('商品_內部').forEach(function (i) { if (i.廠商) vs[String(i.廠商)] = 1; });
