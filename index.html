@@ -370,7 +370,7 @@ function detail(p) {
   return '<div class="tb">' + (!LT && D.line && D.line.on ? '<button type="button" class="lgb" data-a="lgd">LINE 登入</button>' : '') + '<button type="button" class="xb" data-a="x" aria-label="關閉">✕</button></div><h2>' + bn(p) + '</h2>' + (p.imgs && p.imgs.length ? '<img class="big" id="bigimg" src="' + esc(p.imgs[0]) + '" alt="" referrerpolicy="no-referrer">' + (p.imgs.length > 1 ? '<div class="th">' + p.imgs.map(function (u, k) { return '<img src="' + esc(u) + '" referrerpolicy="no-referrer" alt="商品圖片 ' + (k + 1) + '" data-a="bigimg" data-u="' + esc(u) + '" class="' + (k ? '' : 'on') + '">'; }).join('') + '</div>' : '') : '') +
     '<p><span class="pr">' + money(p.price) + '</span> <span class="tg">' + tag(p) + '</span></p>' + (t ? '<p class="tg">' + t + '</p>' : '') +
     '<p class="ds">' + esc(p.desc) + '</p>' +
-    (p.stock === 0 ? '<p>這項商品已售完。</p><p><button class="btn l shb" data-a="shr">分享給朋友</button></p>' : (p.specs && p.specs.length ? '<label>規格<select id="spsel"><option value="">請選擇規格</option>' + p.specs.map(function (x) { var q = (p.specQty || {})[x], so = q === 0; return '<option' + (so ? ' disabled' : '') + ' value="' + esc(x) + '">' + esc(x) + (so ? '(售完)' : (q != null && q <= 3 ? '(剩' + q + '件)' : '')) + '</option>'; }).join('') + '</select></label>' : '') + '<p id="dte" class="tg" role="alert"></p><div class="r"><button class="btn l" data-a="dn">−</button><b id="qn">1</b><button class="btn l" data-a="up">+</button><button class="btn a" data-a="add">加入購物車</button><button type="button" class="btn l shb" data-a="shr">分享給朋友</button></div>') +
+    (p.stock === 0 ? '<p>這項商品已售完。</p><p><button class="btn l shb" data-a="shr">分享給朋友</button></p>' : (p.specs && p.specs.length ? '<label>規格<select id="spsel"><option value="">請選擇規格</option>' + p.specs.map(function (x) { var q = (p.specQty || {})[x], so = q === 0; return '<option' + (so ? ' disabled' : '') + ' value="' + esc(x) + '">' + esc(x) + (so ? '(售完)' : (q != null ? '(剩' + q + '件)' : '')) + '</option>'; }).join('') + '</select></label><p id="spn" class="m" style="margin:4px 0">請選擇規格查看剩餘數量</p>' : (p.stock !== null ? '<p class="m" style="margin:4px 0">剩餘數量:<b>' + p.stock + '</b> 件</p>' : '')) + '<p id="dte" class="tg" role="alert"></p><div class="r"><button class="btn l" data-a="dn">−</button><b id="qn">1</b><button class="btn l" data-a="up">+</button><button class="btn a" data-a="add">加入購物車</button><button type="button" class="btn l shb" data-a="shr">分享給朋友</button></div>') +
     '';
 }
 function cdWarn() {
@@ -684,6 +684,11 @@ document.addEventListener('click', function (e) {
 });
 document.addEventListener('change', function (e) {
   if (e.target.classList && e.target.classList.contains('sk')) { var k = e.target.dataset.k; if (e.target.checked) MSEL[k] = 1; else delete MSEL[k]; var g = $('#sgo'); if (g) { g.disabled = !selCount(); g.textContent = '確定出貨(' + selCount() + ')'; } }
+});
+document.addEventListener('change', function (e) {
+  if (e.target.id !== 'spsel') return;
+  var n = $('#spn'), v = e.target.value, q = cur && cur.specQty ? cur.specQty[v] : null;
+  if (n) n.innerHTML = !v ? '請選擇規格查看剩餘數量' : (q == null ? (cur.stock === null ? '庫存充足' : '剩餘數量:<b>' + cur.stock + '</b> 件') : q === 0 ? '此規格已售完' : '剩餘數量:<b>' + q + '</b> 件');
 });
 document.addEventListener('input', function (e) { if (e.target.name === 'l5') e.target.value = e.target.value.replace(/\D/g, '').slice(0, 5); });
 document.addEventListener('change', function (e) { if (e.target.id === 'ucr') { useCr = e.target.checked; refreshQuote(); } });
