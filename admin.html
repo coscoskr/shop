@@ -170,6 +170,9 @@ $('#side').addEventListener('click', function (e) {
 });
 
 function render() { ({ o: purchView, x: proxyView, y: shipForView, s: shipView, p: prodView, k: stockPage, r: reportPage, m: memberView, c: actView, d: codeView, g: setView, a: adminView, l: logView })[tab](); }
+/* 中文輸入法:組字(注音/拼音)過程中不重畫畫面,等選字完成才處理,避免變成ㄅㄆㄇ */
+document.addEventListener('input', function (e) { if (e.isComposing) e.stopImmediatePropagation(); }, true);
+document.addEventListener('compositionend', function (e) { var t = e.target; if (t && t.dispatchEvent && /^(INPUT|TEXTAREA)$/.test(t.tagName)) setTimeout(function () { t.dispatchEvent(new Event('input', { bubbles: true })); }, 0); }, true);
 var OT = 0;
 function loadOrders(cb, force) {
   if (!force && O && Date.now() - OT < 60000) { cb(); return; }
