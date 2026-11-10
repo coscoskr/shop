@@ -281,7 +281,7 @@ function openShip(sid) {
 /* ---------- 商品 ---------- */
 function prodView() {
   var k = PF.q.toLowerCase();
-  var rows = P.filter(function (p) { return (!k || (p.id + p.name + p.brand + p.cats.join() + p.vendor).toLowerCase().indexOf(k) >= 0) && (!PF.type || p.type === PF.type) && (!PF.on || (PF.on === 'Y') === !!p.on); });
+  var rows = P.filter(function (p) { return (!k || k.split(/[\s,，、]+/).filter(Boolean).every(function (w) { return (p.id + p.name + p.brand + p.cats.join() + p.vendor).toLowerCase().indexOf(w) >= 0; })) && (!PF.type || p.type === PF.type) && (!PF.on || (PF.on === 'Y') === !!p.on); });
 
   $('#v').innerHTML = '<h2 style="margin-top:0">商品</h2><div class="fb" id="pfb"><label>搜尋<input data-k="q" placeholder="編號、品名、品牌、類別、廠商" value="' + esc(PF.q) + '"></label>' +
     '<label>型態<select data-k="type">' + opts(['現貨', '預購'], PF.type, '全部') + '</select></label>' +
@@ -784,7 +784,7 @@ function pvLines() {
     if (f.arr && pvSt(l) !== f.arr) return false;
     if (f.ord === 'no' && (l.stock || l.ord)) return false; if (f.ord === 'yes' && !l.ord) return false;
     if (f.from && l.at < f.from) return false; if (f.to && l.at > f.to) return false;
-    if (q && (l.oid + ' ' + l.buyer + ' ' + (l.brand || '') + ' ' + l.name + ' ' + l.spec + ' ' + l.vendor + ' ' + l.src + ' ' + l.code + ' ' + l.dname).toLowerCase().indexOf(q) < 0) return false;
+    if (q) { var hay = (l.oid + ' ' + l.buyer + ' ' + (l.brand || '') + ' ' + l.name + ' ' + l.spec + ' ' + l.vendor + ' ' + l.src + ' ' + l.code + ' ' + l.dname).toLowerCase(); if (q.split(/[\s,，、]+/).filter(Boolean).some(function (w) { return hay.indexOf(w) < 0; })) return false; }
     return true;
   });
 }
@@ -801,7 +801,7 @@ function pvDraw() {
     '<label>狀態<select data-k="arr">' + opts(['未到貨', '已到貨', '已出貨'], VF.arr, '全部') + '</select></label>' +
     '<label>叫貨<select data-k="ord"><option value="">全部</option><option value="no"' + (VF.ord === 'no' ? ' selected' : '') + '>未叫貨</option><option value="yes"' + (VF.ord === 'yes' ? ' selected' : '') + '>已叫貨</option></select></label>' +
     '<label>下單從<input type="date" data-k="from" value="' + esc(VF.from) + '"></label><label>到<input type="date" data-k="to" value="' + esc(VF.to) + '"></label>' +
-    '<label>關鍵字<input data-k="q" placeholder="訂單、訂購人、品名、廠商、貨源、折扣碼" value="' + esc(VF.q) + '"></label><button class="btn l" data-pv="rs">清除篩選</button></div>' +
+    '<label>關鍵字<input data-k="q" placeholder="訂單、訂購人、品名、規格、廠商…(可用空格分隔多個,例如:毛帽 黑色)" value="' + esc(VF.q) + '"></label><button class="btn l" data-pv="rs">清除篩選</button></div>' +
     '<p style="margin:8px 0"><span class="zm" role="group" aria-label="表格縮放"><button class="btn l s" data-pv="zo" aria-label="縮小">－</button><b id="pvzv" style="min-width:48px;display:inline-block;text-align:center">' + PZ + '%</b><button class="btn l s" data-pv="zi" aria-label="放大">＋</button><button class="btn l s" data-pv="zr">還原</button><button class="btn l s" data-pv="zf">符合寬度</button></span> <button class="btn a" data-pv="bo">批次訂貨</button> <button class="btn l" data-pv="bos">全選未叫貨</button> <button class="btn l" data-pv="boc">取消叫貨</button> <button class="btn a" data-pv="info">批次修改(到貨/成本/廠商/貨源)</button> <button class="btn a" data-pv="pay">廠商付款紀錄</button> <button class="btn l" data-pv="bdel">批次刪除</button> <span class="sum" id="pvsum"></span></p>' +
     '<div id="pvt"></div>';
   $('#v').innerHTML = h; pvRows();
