@@ -613,7 +613,7 @@ function shipForm() {
     '<div id="mcvs"><label>超商<select name="cvs"><option>7-11</option><option>全家</option></select></label><label>取貨門市(店名或店號)<input name="store" maxlength="60"></label></div>' +
     '<div id="mhome" hidden><label>收件地址<input name="addr" maxlength="150" value="' + esc((MD.me && MD.me.addr) || '') + '"></label></div>' +
     (bal > 0 ? '<label>使用購物金(餘額 ' + money(bal) + ')<input name="credit" type="number" min="0" step="1" value="0" inputmode="numeric"></label><small class="ds" id="crh"></small>' : '') +
-    '<fieldset><legend>付款方式</legend><label><input type="radio" name="pay" value="匯款" checked> 匯款</label><label><input type="radio" name="pay" value="賣貨便"> 賣貨便(僅店到店)</label><label><input type="radio" name="pay" value="付現金"> 付現金(僅自取)</label><label style="color:var(--mute)"><input type="radio" name="pay" value="刷卡" disabled> 信用卡(籌備中)</label></fieldset>' +
+    '<fieldset><legend>付款方式</legend><label><input type="radio" name="pay" value="匯款" checked> 匯款(先轉帳,確認收款後出貨)</label><label><input type="radio" name="pay" value="賣貨便"> 賣貨便(貨到付款,僅店到店)</label><label><input type="radio" name="pay" value="付現金"> 付現金(僅自取)</label><label style="color:var(--mute)"><input type="radio" name="pay" value="刷卡" disabled> 信用卡(籌備中)</label></fieldset>' +
     '<label>備註<textarea name="note" rows="2" maxlength="200"></textarea></label>' +
     '<p id="sfe" class="tg" role="alert"></p><button class="btn a">確認出貨</button> <button type="button" class="btn l" data-a="mb">返回</button></form>';
 }
