@@ -494,7 +494,8 @@ var mt = LT, MD = null, LCHK = false;
 var FLOW = {
   '刷卡': ['待刷卡', '已刷卡待出貨', '已出貨待送達', '已送達'],
   '匯款': ['待匯款', '已匯款待查帳', '已查帳待出貨', '已出貨待送達', '已送達'],
-  '賣貨便': ['待出貨', '已出貨待收貨', '已收貨付款']
+  '賣貨便': ['待出貨', '已出貨待收貨', '已收貨付款'],
+  '付現金': ['待自取', '已自取付款']
 };
 function steps(o) {
   var f = FLOW[o.pay] || [], i = f.indexOf(o.st);
@@ -579,6 +580,7 @@ function memAct(o) {
   if (o.pay === '匯款' && o.st === '待匯款')
     return '<div class="bkc"><div class="am">請匯款 <b>' + money(o.total) + '</b> 至下列帳戶</div>' + bankHtml(MD.bank) + '</div>' +
       (o.last5 ? '<p class="tg" style="margin:4px 0">已回報後五碼 ' + esc(o.last5) + ',等待我們核對。</p>' : '') + l5Form(o, '回報已匯款', 'a');
+  if (o.pay === '付現金' && o.st === '待自取') return '<p class="ds">請到店自取並當面付現金,商品可以取貨時我們會再通知你。</p>';
   if (o.pay === '賣貨便' && o.st === '待出貨') return '<p class="ds">我們會安排賣貨便出貨,出貨後這裡會更新物流資訊。</p>';
   if (/待出貨/.test(o.st)) return '<p class="ds">已收到款項,我們會盡快安排出貨。</p>';
   if (/待送達|待收貨/.test(o.st)) return '<p class="ds">包裹已寄出,物流資訊請看下方。</p>';
@@ -604,27 +606,28 @@ function shipForm() {
     '<table><thead><tr><th>品名</th><th class="n">數量</th><th class="n">單價</th><th class="n">小計</th></tr></thead><tbody>' +
     picked.map(function (i) { var spc = sp(i.pid); return '<tr><td>' + esc(i.name) + (spc ? '<br><small>' + esc(spc) + '</small>' : '') + '</td><td class="n">' + i.qty + '</td><td class="n">' + i.unit + '</td><td class="n">' + i.sub + '</td></tr>'; }).join('') + '</tbody></table>' +
     '<div id="sq" class="ds" style="margin-top:8px">計算金額中…</div></div>' +
-    '<form id="sf"><fieldset><legend>配送方式</legend><label><input type="radio" name="method" value="店到店" checked> 店到店 ' + money(MD.feeCvs) + '</label><label><input type="radio" name="method" value="宅配"> 宅配 ' + money(MD.fee) + '</label>' + (MD.free ? '<small class="ds">滿 ' + money(MD.free) + ' 免運</small>' : '') + '</fieldset>' +
+    '<form id="sf"><fieldset><legend>配送方式</legend><label><input type="radio" name="method" value="店到店" checked> 店到店 ' + money(MD.feeCvs) + '</label><label><input type="radio" name="method" value="宅配"> 宅配 ' + money(MD.fee) + '</label><label><input type="radio" name="method" value="自取"> 自取(免運)</label>' + (MD.free ? '<small class="ds">滿 ' + money(MD.free) + ' 免運</small>' : '') + '</fieldset>' +
     '<label>收件人姓名<input name="rname" required maxlength="30" value="' + esc((MD.me && MD.me.pname) || o0.nm || '') + '"></label>' +
     '<label>聯絡電話<input name="phone" required inputmode="tel" value="' + esc((MD.me && MD.me.phone) || o0.ph || '') + '"></label>' +
     '<div id="mcvs"><label>超商<select name="cvs"><option>7-11</option><option>全家</option></select></label><label>取貨門市(店名或店號)<input name="store" maxlength="60"></label></div>' +
     '<div id="mhome" hidden><label>收件地址<input name="addr" maxlength="150" value="' + esc((MD.me && MD.me.addr) || '') + '"></label></div>' +
     (bal > 0 ? '<label>使用購物金(餘額 ' + money(bal) + ')<input name="credit" type="number" min="0" step="1" value="0" inputmode="numeric"></label><small class="ds" id="crh"></small>' : '') +
-    '<fieldset><legend>付款方式</legend><label><input type="radio" name="pay" value="匯款" checked> 匯款</label><label><input type="radio" name="pay" value="賣貨便"> 賣貨便(僅店到店)</label><label style="color:var(--mute)"><input type="radio" name="pay" value="刷卡" disabled> 信用卡(籌備中)</label></fieldset>' +
+    '<fieldset><legend>付款方式</legend><label><input type="radio" name="pay" value="匯款" checked> 匯款</label><label><input type="radio" name="pay" value="賣貨便"> 賣貨便(僅店到店)</label><label><input type="radio" name="pay" value="付現金"> 付現金(僅自取)</label><label style="color:var(--mute)"><input type="radio" name="pay" value="刷卡" disabled> 信用卡(籌備中)</label></fieldset>' +
     '<label>備註<textarea name="note" rows="2" maxlength="200"></textarea></label>' +
     '<p id="sfe" class="tg" role="alert"></p><button class="btn a">確認出貨</button> <button type="button" class="btn l" data-a="mb">返回</button></form>';
 }
-function sfState() {
+function sfState(ch) {
   var f = $('#sf'); if (!f) return {};
-  if (f.pay.value === '賣貨便') { f.method.value = '店到店'; }
-  var cv = f.method.value === '店到店';
-  $('#mcvs').hidden = !cv; $('#mhome').hidden = cv;
-  f.store.required = cv; f.addr.required = !cv;
+  if (ch === 'method') { if (f.method.value !== '自取' && f.pay.value === '付現金') f.pay.value = '匯款'; if (f.method.value === '自取' && f.pay.value === '賣貨便') f.pay.value = '匯款'; }
+  else if (ch === 'pay') { if (f.pay.value === '賣貨便') f.method.value = '店到店'; else if (f.pay.value === '付現金') f.method.value = '自取'; }
+  var cv = f.method.value === '店到店', hm = f.method.value === '宅配';
+  $('#mcvs').hidden = !cv; $('#mhome').hidden = !hm;
+  f.store.required = cv; f.addr.required = hm;
   return { method: f.method.value, credit: f.credit ? Number(f.credit.value) || 0 : 0 };
 }
 var SQT = 0;
-function sfQuote() {
-  var st = sfState(), items = Object.keys(MSEL).map(function (k) { return { oid: k.split('|')[0], pid: k.split('|')[1] }; });
+function sfQuote(ch) {
+  var st = sfState(ch), items = Object.keys(MSEL).map(function (k) { return { oid: k.split('|')[0], pid: k.split('|')[1] }; });
   clearTimeout(SQT);
   SQT = setTimeout(function () {
     google.script.run.withSuccessHandler(function (q) {
@@ -635,7 +638,7 @@ function sfQuote() {
   }, 250);
 }
 document.addEventListener('input', function (e) { if (e.target.form && e.target.form.id === 'sf' && (e.target.name === 'credit')) sfQuote(); });
-document.addEventListener('change', function (e) { if (e.target.form && e.target.form.id === 'sf' && (e.target.name === 'method' || e.target.name === 'pay')) sfQuote(); });
+document.addEventListener('change', function (e) { if (e.target.form && e.target.form.id === 'sf' && (e.target.name === 'method' || e.target.name === 'pay')) sfQuote(e.target.name); });
 function memLoad(cb) {
   google.script.run.withSuccessHandler(function (d) { MD = d; cb(); })
     .withFailureHandler(function (e) { if (mt === LT) { LT = ''; try { localStorage.removeItem('lt'); } catch (x) {} } mt = ''; show(memLogin()); if ($('#me')) $('#me').textContent = e.message; }).memberOrders(mt);

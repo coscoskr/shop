@@ -191,7 +191,7 @@ function filterBar(id, f, withPay, statuses) {
   return '<div class="fb" id="' + id + '"><label>日期從<input type="date" data-k="from" value="' + esc(f.from) + '"></label><label>到<input type="date" data-k="to" value="' + esc(f.to) + '"></label>' +
     '<label>關鍵字<input data-k="q" placeholder="編號、姓名、電話" value="' + esc(f.q) + '"></label>' +
     '<label>狀態<select data-k="st">' + opts(statuses, f.st, '全部') + '</select></label>' +
-    (withPay ? '<label>付款方式<select data-k="pay">' + opts(['刷卡', '匯款', '賣貨便'], f.pay, '全部') + '</select></label>' : '') +
+    (withPay ? '<label>付款方式<select data-k="pay">' + opts(['刷卡', '匯款', '賣貨便', '付現金'], f.pay, '全部') + '</select></label>' : '') +
     '<button class="btn l" data-a="reset">清除篩選</button><span class="sum" id="sum"></span></div>';
 }
 function bindFilter(id, f, redraw) {
@@ -251,8 +251,8 @@ function shipRows() {
   $('#sum').textContent = '共 ' + rows.length + ' 張,合計 ' + money(sum) + ';待處理(已到貨、客人尚未出貨)' + pend + ' 項';
   var allOn = rows.length > 0 && rows.every(function (x) { return SSEL[x.s.id]; });
   $('#tb').innerHTML = '<div class="bt"><span class="m">已勾選 <b id="ssn">' + selShips().length + '</b> 張:</span><button class="btn l" data-a="sbq">改為「已查帳待出貨」</button> <label style="display:inline-block;margin:0">改為 <select id="sbst">' + ALLST.map(function (x) { return '<option>' + esc(x) + '</option>'; }).join('') + '</select></label><button class="btn l" data-a="sbgo">套用狀態</button><button class="btn a" data-a="sbp">批次列印訂購單</button><button class="btn l" data-a="sbd">批次刪除</button></div>' +
-    '<table class="sht"><thead><tr><th class="c"><input type="checkbox" id="sall" aria-label="全選目前清單"' + (allOn ? ' checked' : '') + '></th><th>出貨單</th><th>訂單編號</th><th>姓名 / 電話</th><th>品項</th><th class="c">付款</th><th class="c">後五碼</th><th class="n">應付</th><th class="c">狀態</th><th>物流 / 單號</th><th class="c">建立</th><th class="c">出貨</th></tr></thead><tbody>' +
-    rows.map(function (x) { var s = x.s; return '<tr data-a="ship" data-id="' + esc(s.id) + '"><td class="c"><input type="checkbox" class="ssel" data-id="' + esc(s.id) + '"' + (SSEL[s.id] ? ' checked' : '') + '></td><td><b>' + esc(s.id) + '</b></td><td>' + esc(s.oids.join('、')) + '</td><td>' + esc(s.name) + '<br><small class="m">' + esc(s.phone) + '</small></td><td class="it">' + esc(s.it) + '</td><td class="c">' + esc(s.pay) + '</td><td class="c">' + (s.last5 ? '<b>' + esc(s.last5) + '</b>' : '<span class="m">—</span>') + '</td><td class="n">' + money(s.total) + '</td><td class="c"><span class="chip ' + ((FL[s.pay] || []).indexOf(s.st) <= 0 ? '' : 'd') + '">' + esc(s.st) + '</span></td><td>' + (s.co || s.no ? esc(s.co) + '<br><small class="m">' + esc(s.no) + '</small>' : '<span class="m">—</span>') + '</td><td class="c">' + dt2(s.cr) + '</td><td class="c">' + dt2(s.at) + '</td></tr>'; }).join('') + '</tbody></table>' +
+    '<table class="sht"><thead><tr><th class="c"><input type="checkbox" id="sall" aria-label="全選目前清單"' + (allOn ? ' checked' : '') + '></th><th>出貨單</th><th>訂單編號</th><th>姓名 / 電話</th><th>品項</th><th class="c">付款</th><th class="c">後五碼</th><th class="c">匯款日期</th><th class="n">應付</th><th class="c">狀態</th><th>物流 / 單號</th><th class="c">建立</th><th class="c">出貨</th></tr></thead><tbody>' +
+    rows.map(function (x) { var s = x.s; return '<tr data-a="ship" data-id="' + esc(s.id) + '"><td class="c"><input type="checkbox" class="ssel" data-id="' + esc(s.id) + '"' + (SSEL[s.id] ? ' checked' : '') + '></td><td><b>' + esc(s.id) + '</b></td><td>' + esc(s.oids.join('、')) + '</td><td>' + esc(s.name) + '<br><small class="m">' + esc(s.phone) + '</small></td><td class="it">' + esc(s.it) + '</td><td class="c">' + esc(s.pay) + '</td><td class="c">' + (s.last5 ? '<b>' + esc(s.last5) + '</b>' : '<span class="m">—</span>') + '</td><td class="c">' + (s.rdate ? esc(s.rdate) : '<span class="m">—</span>') + '</td><td class="n">' + money(s.total) + '</td><td class="c"><span class="chip ' + ((FL[s.pay] || []).indexOf(s.st) <= 0 ? '' : 'd') + '">' + esc(s.st) + '</span></td><td>' + (s.co || s.no ? esc(s.co) + '<br><small class="m">' + esc(s.no) + '</small>' : '<span class="m">—</span>') + '</td><td class="c">' + dt2(s.cr) + '</td><td class="c">' + dt2(s.at) + '</td></tr>'; }).join('') + '</tbody></table>' +
     (rows.length ? '' : '<p class="m">沒有符合的出貨單。客人在前台勾選已到貨商品並按「確定出貨」後會出現在這裡。</p>');
   window.SROWS = rows.map(function (x) { return x.s.id; });
 }
@@ -263,9 +263,9 @@ function openShip(sid) {
   d.innerHTML = '<h3>出貨單 ' + esc(s.id) + ' <span class="m">訂單 ' + esc(s.oids.join('、')) + ' · ' + esc(s.name) + ' · ' + esc(s.pay) + '</span></h3>' +
     '<p><button type="button" class="btn a" data-a="po" data-id="' + esc(s.id) + '">開啟訂購單(列印給倉庫)</button></p><p>' + esc(s.it) + '</p><p class="m">商品 ' + money(s.sub) + (s.disc ? ' − 優惠 ' + money(s.disc) : '') + (s.cred ? ' − 購物金 ' + money(s.cred) : '') + ' + 運費 ' + money(s.fee) + ' = <b>' + money(s.total) + '</b></p>' +
     '<form id="shf" data-id="' + esc(s.id) + '"><div class="g"><label>狀態<select name="st">' + opts(FL[s.pay] || [s.st], s.st) + '</select></label>' + '<label>物流<select name="co"><option value="">(未選擇)</option>' + opts(CR.map(function (c) { return c.name; }).concat(s.co && !CR.some(function (c) { return c.name === s.co; }) ? [s.co] : []), s.co) + '</select></label>' + fld('物流單號', 'no', s.no) +
-    fld('運費', 'fee', s.fee, 'number') + fld('電話', 'phone', s.phone) + fld('匯款後五碼', 'last5', s.last5) + '<div class="f">' + fld('付款連結(https,客人刷卡用)', 'link', s.link) + '</div><div class="f">' + fld('收件資訊', 'ship', s.ship) + '</div><div class="f">' + fld('備註', 'note', s.note) + '</div></div>' +
+    fld('運費', 'fee', s.fee, 'number') + fld('電話', 'phone', s.phone) + fld('匯款後五碼', 'last5', s.last5) + fld('匯款日期', 'rdate', s.rdate, 'date') + '<div class="f">' + fld('付款連結(https,客人刷卡用)', 'link', s.link) + '</div><div class="f">' + fld('收件資訊', 'ship', s.ship) + '</div><div class="f">' + fld('備註', 'note', s.note) + '</div></div>' +
     '<p class="m">狀態依付款方式走流程;改成「已出貨…」會記錄出貨時間;出貨單全部走到最後一個狀態時,訂單自動變「已完成」。</p><p class="er" id="se" role="alert"></p>' +
-    '<button class="btn a">儲存</button> <button type="button" class="btn l" data-a="x">關閉</button> <button type="button" class="btn l" data-a="dship" data-id="' + esc(s.id) + '">刪除出貨單</button></form>' +
+    '<button class="btn a">儲存</button> <button type="button" class="btn l" data-a="x">關閉</button> <button type="button" class="btn l" data-a="dship" data-id="' + esc(s.id) + '">刪除出貨單</button>' + (s.pay === '匯款' && (s.st === '待匯款' || s.st === '已匯款待查帳') ? ' <button type="button" class="btn l" data-a="rmiss" data-id="' + esc(s.id) + '" style="border-color:#d64545;color:#d64545">沒收到匯款</button>' : '') + '</form>' +
     '<h4>狀態紀錄</h4><div id="shh" data-id="' + esc(s.id) + '" class="m">載入中…</div>';
   if (!d.open) d.showModal();
   call('adminShipHistory', T, s.id).then(function (r) {
@@ -567,7 +567,7 @@ function drawSettings() {
     '<div class="warn">LINE 登入:' + (l.login ? '已設定' : '尚未設定(缺 LINE_LOGIN_SECRET)') + ';LINE 推播:' + (l.msg ? '已設定' : '尚未設定(缺 LINE_MSG_TOKEN)') + '\n網站網址(LINE Callback URL 要填這個):' + esc(l.url) + '</div>' +
     '<form id="stf" style="max-width:760px"><div class="g">' + fld('店名', '店名', v.店名) + fld('店到店運費', '店到店運費', v.店到店運費, 'number') + fld('宅配運費', '宅配運費', v.宅配運費, 'number') + fld('免運門檻(訂單金額扣掉優惠後滿多少免運)', '免運門檻', v.免運門檻, 'number') +
     fld('購物金使用門檻(訂單滿多少才能用)', '購物金使用門檻', v.購物金使用門檻, 'number') + fld('購物金折抵上限(每筆最多折幾元,空白=不限)', '購物金折抵上限', v.購物金折抵上限, 'number') + fld('購物金預設有效天數', '購物金預設有效天數', v.購物金預設有效天數, 'number') +
-    '<div class="f">' + fld('加好友連結', '加好友連結', v.加好友連結) + '</div>' + ta('匯款資訊', 3) + ta('公告', 2) + ta('到貨通知內容', 3) + ta('下單成功通知內容', 5) + ta('出貨通知內容', 7) + ta('送達通知內容', 4) + '</div><h3 style="margin-top:20px">公司資訊(顯示在前台最下方)</h3><div class="g">' + fld('公司名稱', '公司名稱', v.公司名稱) + fld('統一編號', '統一編號', v.統一編號) + '<div class="f">' + fld('公司地址', '公司地址', v.公司地址) + '</div>' + fld('Instagram 連結(https)', 'IG連結', v.IG連結) + fld('LINE 社群連結(https)', 'LINE社群連結', v.LINE社群連結) + '</div>' +
+    '<div class="f">' + fld('加好友連結', '加好友連結', v.加好友連結) + '</div>' + ta('匯款資訊', 3) + ta('公告', 2) + ta('到貨通知內容', 3) + ta('下單成功通知內容', 5) + ta('出貨通知內容', 7) + ta('未收到匯款通知內容', 4) + ta('送達通知內容', 4) + '</div><h3 style="margin-top:20px">公司資訊(顯示在前台最下方)</h3><div class="g">' + fld('公司名稱', '公司名稱', v.公司名稱) + fld('統一編號', '統一編號', v.統一編號) + '<div class="f">' + fld('公司地址', '公司地址', v.公司地址) + '</div>' + fld('Instagram 連結(https)', 'IG連結', v.IG連結) + fld('LINE 社群連結(https)', 'LINE社群連結', v.LINE社群連結) + '</div>' +
     '<p class="m">到貨通知可用:{姓名} {品名} {訂單} {連結}<br>下單成功通知(客人下單後自動用官方 LINE 傳給他,只有 LINE 登入的會員收得到;內容留空就不發送)可用:{姓名} {訂單編號} {品項} {金額} {連結}<br>出貨通知(出貨單改成「已出貨」時自動用 LINE 發送)可用:{出貨單號} {物流} {物流單號} {追蹤連結} {姓名} {連結};某個變數沒有值時,那一整行會自動省略。<br>送達通知(出貨單改成「已送達」或「已收貨付款」時自動發送,LINE 或 Email)可用:{出貨單號} {物流} {物流單號} {姓名} {連結}。<br>物流清單請在下方「物流管理」新增與修改。例:黑貓=https://網址?no={單號}。物流欄位包含該名稱就會套用。</p><p class="er" id="ste" role="alert"></p><button class="btn a">儲存設定</button></form>' +
     carrierSec() + '<h3 style="margin-top:28px">廠商管理</h3><p class="m">商品與訂單明細的「廠商」都從這裡的清單選。刪除廠商不會改動已經存在的商品和訂單。</p><table style="max-width:420px;min-width:0"><tbody>' +
     (VL.map(function (x) { return '<tr><td>' + esc(x) + '</td><td><button class="btn l s" data-vd="del" data-name="' + esc(x) + '">刪除</button></td></tr>'; }).join('') || '<tr><td class="m">還沒有廠商</td></tr>') + '</tbody></table>' +
@@ -621,6 +621,11 @@ document.addEventListener('click', function (e) {
       wait('刪除中…請稍候');
       call('adminDeleteOrder', T, id).then(function (d) { setO(d); $('#dlg').close(); render(); tell('已刪除訂單 ' + id); }).catch(function (er) { tell(er.message); });
     });
+  } else if (a === 'rmiss') {
+    ask('確定通知客人「沒有確認到款項」?\n會用 LINE(或 Email)請客人跟我們聯繫,出貨單狀態不會改變。', function () {
+      wait('通知中…請稍候');
+      call('adminRemitMissing', T, b.dataset.id).then(function (r) { var d = $('#dq'); d.oncancel = null; if (d.open) d.close(); tell('已處理\n' + (r.msg || '')); }).catch(function (e) { var d = $('#dq'); d.oncancel = null; if (d.open) d.close(); tell(e.message); });
+    }); return;
   } else if (a === 'dship') {
     ask('確定刪除出貨單 ' + id + '?品項會回到「未出貨」。', function () {
       call('adminDeleteShip', T, id).then(function (d) { setO(d); $('#dlg').close(); render(); }).catch(function (er) { tell(er.message); });
@@ -678,7 +683,7 @@ document.addEventListener('submit', function (e) {
     call('adminOrderAdjust', T, f.dataset.id, { code: f.code.value, discount: f.discount.value, dname: f.dname.value }).then(function (d) { refreshOpen(d, f.dataset.id); tell('優惠已調整'); }).catch(fail('#oae'));
   } else if (f.id === 'shf') {
     $('#se').textContent = '';
-    call('adminUpdateShip', T, f.dataset.id, { st: f.st.value, co: f.co.value, no: f.no.value, fee: f.fee.value, phone: f.phone.value, last5: f.last5.value, link: f.link.value, ship: f.ship.value, note: f.note.value }).then(function (d) { setO(d); if (tab === 's') shipRows(); else if (tab === 'o') orderRows(); $('#dlg').close(); tell('出貨單 ' + f.dataset.id + ' 已更新' + (d.shipNotify ? '\n' + d.shipNotify : '')); }).catch(fail('#se'));
+    call('adminUpdateShip', T, f.dataset.id, { st: f.st.value, co: f.co.value, no: f.no.value, fee: f.fee.value, phone: f.phone.value, last5: f.last5.value, rdate: f.rdate ? f.rdate.value : undefined, link: f.link.value, ship: f.ship.value, note: f.note.value }).then(function (d) { setO(d); if (tab === 's') shipRows(); else if (tab === 'o') orderRows(); $('#dlg').close(); tell('出貨單 ' + f.dataset.id + ' 已更新' + (d.shipNotify ? '\n' + d.shipNotify : '')); }).catch(fail('#se'));
   } else if (f.id === 'bf') {
     $('#be').textContent = '';
     var ids = selIds(), data = { vendor: f.vendor.value, source: f.source.value, cost: f.cost.value, tax: f.tax.value };
@@ -760,7 +765,7 @@ document.addEventListener('submit', function (e) {
       .then(function (r) { AC = r; $('#dlg').close(); drawActs(); }).catch(fail('#ace'));
   } else if (f.id === 'stf') {
     $('#ste').textContent = '';
-    var o = {}; ['店名', '店到店運費', '宅配運費', '免運門檻', '匯款資訊', '公告', '購物金使用門檻', '購物金折抵上限', '購物金預設有效天數', '到貨通知內容', '下單成功通知內容', '出貨通知內容', '送達通知內容', '加好友連結', '公司名稱', '公司地址', '統一編號', 'IG連結', 'LINE社群連結'].forEach(function (k) { if (f.elements[k]) o[k] = f.elements[k].value; });
+    var o = {}; ['店名', '店到店運費', '宅配運費', '免運門檻', '匯款資訊', '公告', '購物金使用門檻', '購物金折抵上限', '購物金預設有效天數', '到貨通知內容', '下單成功通知內容', '出貨通知內容', '送達通知內容', '未收到匯款通知內容', '加好友連結', '公司名稱', '公司地址', '統一編號', 'IG連結', 'LINE社群連結'].forEach(function (k) { if (f.elements[k]) o[k] = f.elements[k].value; });
     call('adminSaveSettings', T, o).then(function (r) { SG = r; drawSettings(); $('#ste').textContent = '已儲存'; $('#ste').className = 'm'; }).catch(fail('#ste'));
   } else if (f.id === 'lvl') {
     $('#lve').textContent = '';
@@ -1212,11 +1217,11 @@ function sxBody() {
 }
 function sxForm() {
   var c = SX.cust, h = '<div class="g" style="max-width:560px">' +
-    '<label>配送方式<select name="sxm"><option' + (SX.method === '店到店' ? ' selected' : '') + '>店到店</option><option' + (SX.method === '宅配' ? ' selected' : '') + '>宅配</option></select></label>' +
+    '<label>配送方式<select name="sxm"><option' + (SX.method === '店到店' ? ' selected' : '') + '>店到店</option><option' + (SX.method === '宅配' ? ' selected' : '') + '>宅配</option><option' + (SX.method === '自取' ? ' selected' : '') + '>自取</option></select></label>' +
     fld('收件人姓名', 'sxrn', SX.rname) + fld('聯絡電話', 'sxph', SX.phone);
   if (SX.method === '店到店') h += '<label>超商<select name="sxcvs"><option' + (SX.cvs === '7-11' ? ' selected' : '') + '>7-11</option><option' + (SX.cvs === '全家' ? ' selected' : '') + '>全家</option></select></label>' + fld('取貨門市(店名或店號)', 'sxst', SX.store);
-  else h += '<label style="grid-column:1/-1">收件地址<input name="sxad" value="' + esc(SX.addr) + '"></label>';
-  h += '<label>付款方式<select name="sxpay"><option' + (SX.pay === '匯款' ? ' selected' : '') + '>匯款</option><option' + (SX.pay === '賣貨便' ? ' selected' : '') + '>賣貨便</option></select></label>';
+  else if (SX.method === '宅配') h += '<label style="grid-column:1/-1">收件地址<input name="sxad" value="' + esc(SX.addr) + '"></label>';
+  h += '<label>付款方式<select name="sxpay"><option' + (SX.pay === '匯款' ? ' selected' : '') + '>匯款</option>' + (SX.method === '自取' ? '<option' + (SX.pay === '付現金' ? ' selected' : '') + '>付現金</option>' : '<option' + (SX.pay === '賣貨便' ? ' selected' : '') + '>賣貨便</option>') + '</select></label>';
   if (c.lid) h += fld('使用購物金(元,可留空)', 'sxcr', SX.credit, 'number');
   h += fld('備註(選填)', 'sxnt', SX.note) + '</div>' + (c.lid ? '<label style="display:block;margin-top:8px"><input type="checkbox" name="sxnf"' + (SX.notify ? ' checked' : '') + '> 建立後用 LINE 通知客人(含應付金額與匯款資訊)</label>' : '<p class="m">遊客沒有 LINE,建立後請自行用私訊把金額與匯款資訊告訴客人。</p>');
   $('#sxf').innerHTML = h;
@@ -1246,7 +1251,7 @@ document.addEventListener('input', function (e) {
 document.addEventListener('change', function (e) {
   var t = e.target; if (tab !== 'y' || !t.closest || !t.closest('#v')) return;
   if (t.classList.contains('sxs')) { SX.sel[t.dataset.k] = t.checked; SX.err = ''; sxQuote(); }
-  else if (t.name === 'sxm') { SX.method = t.value; sxForm(); sxQuote(); }
+  else if (t.name === 'sxm') { SX.method = t.value; if (t.value === '自取' && SX.pay === '賣貨便') SX.pay = '匯款'; if (t.value !== '自取' && SX.pay === '付現金') SX.pay = '匯款'; sxForm(); sxQuote(); }
   else if (t.name === 'sxcvs') { SX.cvs = t.value; }
   else if (t.name === 'sxpay') { SX.pay = t.value; sxQuote(); }
   else if (t.name === 'sxnf') { SX.notify = t.checked; }
@@ -1409,7 +1414,7 @@ var RF = { oFrom: '', oTo: '', sFrom: '', sTo: '', status: '', pay: '', q: '' },
 function reportPage() {
   $('#v').innerHTML = '<h2 style="margin-top:0">報表</h2><div class="fb" id="rpf"><label>訂貨日期從<input type="date" data-r="oFrom" value="' + esc(RF.oFrom) + '"></label><label>到<input type="date" data-r="oTo" value="' + esc(RF.oTo) + '"></label>' +
     '<label>出貨日期從<input type="date" data-r="sFrom" value="' + esc(RF.sFrom) + '"></label><label>到<input type="date" data-r="sTo" value="' + esc(RF.sTo) + '"></label>' +
-    '<label>結帳狀態<select data-r="status" id="rst"><option value="">全部</option></select></label><label>付款方式<select data-r="pay">' + opts(['匯款', '賣貨便', '刷卡'], RF.pay, '全部') + '</select></label>' +
+    '<label>結帳狀態<select data-r="status" id="rst"><option value="">全部</option></select></label><label>付款方式<select data-r="pay">' + opts(['匯款', '賣貨便', '付現金', '刷卡'], RF.pay, '全部') + '</select></label>' +
     '<label>關鍵字<input data-r="q" value="' + esc(RF.q) + '" placeholder="訂單、姓名、品名"></label><button class="btn l" data-rp="clr">清除</button></div><div id="rpb"><p class="m">載入中…</p></div>';
   loadReport();
 }
