@@ -780,7 +780,7 @@ function purchView() {
   $('#v').innerHTML = '<p class="m">載入中…</p>';
   call('adminPurchaseList', T).then(function (d) { PV = d; VL = d.vlist || VL; PVT = Date.now(); PVDIRTY = false; PSEL = {}; pvDraw(); }).catch(function (e) { $('#v').innerHTML = '<p class="er">' + esc(e.message) + '</p>'; });
 }
-function pvSt(l) { return l.sid && /已出貨|已送達/.test(l.sst || '') ? '已出貨' : l.arr === '已到貨' ? '已到貨' : '未到貨'; }
+function pvSt(l) { return l.sid && !l.stock ? (/已出貨|已送達|已收貨付款|已自取付款/.test(l.sst || '') ? '已出貨' : '待出貨') : l.arr === '已到貨' ? '已到貨' : '未到貨'; }
 function pvLines() {
   var f = VF, q = f.q.toLowerCase();
   return PV.lines.filter(function (l) {
@@ -803,7 +803,7 @@ function pvDraw() {
   var arrs = {}; PV.lines.forEach(function (l) { if (l.arr) arrs[l.arr] = 1; });
   h += '<div class="fb" id="pvf"><label>廠商<select data-k="vendor">' + opts(PV.vendors, VF.vendor, '全部') + '</select></label>' +
     '<label>付款<select data-k="pay"><option value="">全部</option><option value="unpaid"' + (VF.pay === 'unpaid' ? ' selected' : '') + '>未付款</option><option value="paid"' + (VF.pay === 'paid' ? ' selected' : '') + '>已付款</option></select></label>' +
-    '<label>狀態<select data-k="arr">' + opts(['未到貨', '已到貨', '已出貨'], VF.arr, '全部') + '</select></label>' +
+    '<label>狀態<select data-k="arr">' + opts(['未到貨', '已到貨', '待出貨', '已出貨'], VF.arr, '全部') + '</select></label>' +
     '<label>叫貨<select data-k="ord"><option value="">全部</option><option value="no"' + (VF.ord === 'no' ? ' selected' : '') + '>未叫貨</option><option value="yes"' + (VF.ord === 'yes' ? ' selected' : '') + '>已叫貨</option></select></label>' +
     '<label>下單從<input type="date" data-k="from" value="' + esc(VF.from) + '"></label><label>到<input type="date" data-k="to" value="' + esc(VF.to) + '"></label>' +
     '<label>關鍵字<input data-k="q" placeholder="訂單、訂購人、品名、規格、廠商…(可用空格分隔多個,例如:毛帽 黑色)" value="' + esc(VF.q) + '"></label><button class="btn l" data-pv="rs">清除篩選</button></div>' +
