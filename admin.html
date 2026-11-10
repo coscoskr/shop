@@ -157,13 +157,20 @@ function call(fn) {
 }
 function logout() { T = ''; try { localStorage.removeItem('rt'); localStorage.removeItem('rn'); sessionStorage.removeItem('t'); } catch (e) {} $('#app').hidden = true; $('#lg').hidden = false; if ($('#dlg').open) $('#dlg').close(); }
 function ask(msg, yes) {
-  var d = $('#dq'); d.dataset.mine = ''; d.dataset.tok = ''; d.innerHTML = '<p style="white-space:pre-line;margin-top:0">' + esc(msg) + '</p><p style="margin-bottom:0"><button class="btn a" id="dqy">確定</button> <button class="btn l" id="dqn">取消</button></p>';
+  var d = $('#dq'); d.dataset.mine = ''; d.dataset.tok = ''; d.oncancel = null; d.innerHTML = '<p style="white-space:pre-line;margin-top:0">' + esc(msg) + '</p><p style="margin-bottom:0"><button class="btn a" id="dqy">確定</button> <button class="btn l" id="dqn">取消</button></p>';
   d.showModal(); $('#dqy').onclick = function () { d.close(); yes(); }; $('#dqn').onclick = function () { d.close(); };
 }
 function tell(msg) {
   var d = $('#dq'); d.oncancel = null; d.dataset.mine = ''; d.dataset.tok = ''; d.innerHTML = '<p style="white-space:pre-line;margin-top:0">' + esc(msg) + '</p><p style="margin-bottom:0"><button class="btn a" id="dqy">知道了</button></p>';
   if (!d.open) d.showModal(); $('#dqy').onclick = function () { d.close(); };
 }
+// 點視窗外面(背景)就關閉視窗;處理中的視窗(會擋 cancel)不會被關掉
+document.addEventListener('mousedown', function (e) {
+  var d = e.target; if (!d || d.tagName !== 'DIALOG' || !d.open) return;
+  var r = d.getBoundingClientRect();
+  if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) return;
+  var ev = new Event('cancel', { cancelable: true }); d.dispatchEvent(ev); if (!ev.defaultPrevented) d.close();
+});
 function wait(msg) {
   var d = $('#dq'); d.dataset.mine = ''; d.dataset.tok = ''; d.innerHTML = '<p style="margin:6px 0;text-align:center;font-weight:700">' + esc(msg) + '</p>';
   d.oncancel = function (e) { e.preventDefault(); }; if (!d.open) d.showModal();
