@@ -514,8 +514,7 @@ function actToggle() {
 /* ---------- 匯入舊資料 ---------- */
 var HB = null;
 function histView() {
-  $('#v').innerHTML = '<h2 style="margin-top:0">匯入舊資料</h2><p class="m">選擇整理好的舊訂單 JSON 檔。建議先按「試跑」看數字(不會寫入任何資料),沒問題再「正式匯入」。已出貨的列不會匯入;重複按正式匯入不會產生重複訂單。</p>' +
-    '<p><input type="file" id="hf" accept=".json,application/json"></p><p><button class="btn l" data-a="hdry">先試跑(不寫入)</button> <button class="btn a" data-a="hrun">正式匯入</button></p><pre id="hout" style="white-space:pre-wrap;background:var(--soft);padding:10px;border-radius:6px;min-height:40px"></pre>' +
+  $('#v').innerHTML = '<h2 style="margin-top:0">匯入舊資料</h2><p class="m">舊資料已匯入完成。</p>' +
     '<h3>綁定舊訂單到 LINE 會員</h3><p class="m">匯入的訂單沒有 LINE 帳號。這裡列出還沒綁定的舊訂單購買人(名字取自舊 Excel 的「購買人」欄)。請在第三欄輸入並選擇這位客人在 LINE 上的暱稱,只能選系統裡已有的 LINE 會員(客人登入過網站,或傳過訊息給官方帳號)。填好後按「綁定已填的」,這位購買人的所有舊訂單就會綁到那位會員,客人登入會員專區就看得到。LINE 暱稱和購買人名字完全相同的,已先幫你填好。</p><div id="hbind"><p class="m">載入中…</p></div>';
   histBindLoad();
 }
