@@ -1436,9 +1436,10 @@ function openPO(sids) {
 }
 
 /* ---------- 報表 ---------- */
-var RF = { oFrom: '', oTo: '', sFrom: '', sTo: '', status: '', pay: '', q: '' }, RD = null;
+function ymd(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+var RF = (function () { var t = ymd(new Date()); return { oFrom: t, oTo: t, sFrom: '', sTo: '', status: '', pay: '', q: '' }; })(), RD = null;
 function reportPage() {
-  $('#v').innerHTML = '<h2 style="margin-top:0">報表</h2><div class="fb" id="rpf"><label>訂貨日期從<input type="date" data-r="oFrom" value="' + esc(RF.oFrom) + '"></label><label>到<input type="date" data-r="oTo" value="' + esc(RF.oTo) + '"></label>' +
+  $('#v').innerHTML = '<h2 style="margin-top:0">報表</h2><div class="fb" id="rpf"><div style="display:flex;gap:6px;align-items:flex-end"><button class="btn ' + (RF.oFrom === RF.oTo && RF.oFrom === ymd(new Date()) ? 'a' : 'l') + '" data-rp="day">當日</button><button class="btn ' + (RF.oFrom === ymd(new Date(new Date().getFullYear(), new Date().getMonth(), 1)) && RF.oTo === ymd(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)) ? 'a' : 'l') + '" data-rp="mon">當月</button></div><label>訂貨日期從<input type="date" data-r="oFrom" value="' + esc(RF.oFrom) + '"></label><label>到<input type="date" data-r="oTo" value="' + esc(RF.oTo) + '"></label>' +
     '<label>出貨日期從<input type="date" data-r="sFrom" value="' + esc(RF.sFrom) + '"></label><label>到<input type="date" data-r="sTo" value="' + esc(RF.sTo) + '"></label>' +
     '<label>結帳狀態<select data-r="status" id="rst"><option value="">全部</option></select></label><label>付款方式<select data-r="pay">' + opts(['匯款', '賣貨便', '付現金', '刷卡'], RF.pay, '全部') + '</select></label>' +
     '<label>關鍵字<input data-r="q" value="' + esc(RF.q) + '" placeholder="訂單、姓名、品名"></label><button class="btn l" data-rp="clr">清除</button></div><div id="rpb"><p class="m">載入中…</p></div>';
@@ -1454,7 +1455,10 @@ function loadReport() {
   }).catch(function (e) { $('#rpb').innerHTML = '<p class="er">' + esc(e.message) + '</p>'; });
 }
 document.addEventListener('change', function (e) { var k = e.target.dataset && e.target.dataset.r; if (!k || !e.target.closest('#rpf')) return; RF[k] = e.target.value; loadReport(); });
-document.addEventListener('click', function (e) { if (e.target.dataset && e.target.dataset.rp === 'clr') { RF = { oFrom: '', oTo: '', sFrom: '', sTo: '', status: '', pay: '', q: '' }; reportPage(); } });
+document.addEventListener('click', function (e) { var rp0 = e.target.dataset && e.target.dataset.rp, nw = new Date();
+  if (rp0 === 'day') { RF.oFrom = RF.oTo = ymd(nw); reportPage(); return; }
+  if (rp0 === 'mon') { RF.oFrom = ymd(new Date(nw.getFullYear(), nw.getMonth(), 1)); RF.oTo = ymd(new Date(nw.getFullYear(), nw.getMonth() + 1, 0)); reportPage(); return; }
+  if (e.target.dataset && e.target.dataset.rp === 'clr') { RF = { oFrom: '', oTo: '', sFrom: '', sTo: '', status: '', pay: '', q: '' }; reportPage(); } });
 
 /* ---------- 庫存表 ---------- */
 var SK = null;
