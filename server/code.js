@@ -18,7 +18,7 @@ var H = {
   '訂單明細': ['訂單ID', '商品ID', '品名', '數量', '單價', '小計', '到貨狀態', '可出貨', '申請出貨', '出貨單ID', '型態', '廠商', '成本', '成本含稅', '貨源', '廠商付款ID', '規格', '到貨操作人', '到貨時間', '叫貨狀態', '叫貨人', '叫貨時間'],
   '庫存進貨': ['訂單ID', '商品ID', '品名', '規格', '數量', '到貨狀態', '廠商', '成本', '成本含稅', '貨源', '廠商付款ID', '到貨操作人', '到貨時間', '日期', '建立人', '出貨單ID'],
   '廠商付款': ['付款ID', '付款日期', '廠商', '金額', '匯款備註', '品項數', '應付成本', '品項', '建立人', '建立時間', '圖片'],
-  '出貨單': ['出貨單ID', '訂單ID', '狀態', '物流', '物流單號', '品項', '建立時間', '出貨時間', 'LINE ID', '姓名', '電話', '付款方式', '收件資訊', '備註', '商品金額', '優惠折抵', '購物金折抵', '運費', '總額', '付款連結', '匯款後五碼', '會員等級', '折抵明細', '配送方式', '購物金明細', '匯款日期'],
+  '出貨單': ['出貨單ID', '訂單ID', '狀態', '物流', '物流單號', '品項', '建立時間', '出貨時間', 'LINE ID', '姓名', '電話', '付款方式', '收件資訊', '備註', '商品金額', '優惠折抵', '購物金折抵', '運費', '總額', '付款連結', '匯款後五碼', '會員等級', '折抵明細', '配送方式', '購物金明細', '匯款日期', '收款帳號'],
   '會員': ['LINE ID', '暱稱', '頭像', '等級', '加入時間', '最近登入', '已加好友', '備註', '姓名', '電話', 'Email', '收件地址'],
   '購物金': ['序號', 'LINE ID', '發放時間', '金額', '剩餘', '到期日', '來源', '備註', '操作人', '訂單ID', '活動ID'],
   '等級': ['等級', '折扣率', '適用類別'],
@@ -63,7 +63,7 @@ function setup() {
   txt_('訂單明細', ['訂單ID', '商品ID', '出貨單ID']);
   txt_('廠商付款', ['付款ID', '付款日期']);
   txt_('庫存進貨', ['訂單ID', '商品ID', '日期', '出貨單ID']);
-  txt_('出貨單', ['出貨單ID', '訂單ID', '物流單號', '品項', '建立時間', '出貨時間', '電話', '收件資訊', '付款連結', '匯款後五碼', '匯款日期']);
+  txt_('出貨單', ['出貨單ID', '訂單ID', '物流單號', '品項', '建立時間', '出貨時間', '電話', '收件資訊', '付款連結', '匯款後五碼', '匯款日期', '收款帳號']);
   txt_('操作紀錄', ['時間']);
   if (!rows_('類別').length) CATS_DEFAULT.forEach(function (c) { put_('類別', 0, { '類別': c }); });
   ensureSettings_();
@@ -904,7 +904,7 @@ function shipObj_(r) {
   return { id: String(r.出貨單ID), oids: String(r.訂單ID).split(','), st: String(r.狀態), pay: String(r.付款方式), co: String(r.物流 || ''), no: String(r.物流單號 || ''), it: String(r.品項 || ''),
     cr: String(r.建立時間 || ''), at: String(r.出貨時間 || ''), name: String(r.姓名 || ''), phone: String(r.電話 || ''), ship: String(r.收件資訊 || ''), note: String(r.備註 || ''),
     sub: Number(r.商品金額), disc: Number(r.優惠折抵), cred: Number(r.購物金折抵), fee: Number(r.運費), total: Number(r.總額),
-    link: /^https:\/\//.test(String(r.付款連結)) ? String(r.付款連結) : '', last5: String(r.匯款後五碼 || ''), rdate: String(r.匯款日期 || ''), method: String(r.配送方式 || ''), trk: shortTrack_(r) };
+    link: /^https:\/\//.test(String(r.付款連結)) ? String(r.付款連結) : '', last5: String(r.匯款後五碼 || ''), rdate: String(r.匯款日期 || ''), bank: String(r.收款帳號 || ''), method: String(r.配送方式 || ''), trk: shortTrack_(r) };
 }
 function memberOrders(tk) {
   var ctx = mem_(tk), lm = lineMeta_(false), items = {}, sh = {};
@@ -1477,7 +1477,7 @@ function adminUpdateShip(tk, sid, d) {
     var ship = t_(d.ship, 200); if (!ship) throw new Error('請填寫收件資訊');
     var link = t_(d.link, 500); if (link && !/^https:\/\//.test(link)) throw new Error('付款連結需以 https:// 開頭');
     var n = cp_(s);
-    n.付款方式 = payNew; n.狀態 = d.st; n.物流 = t_(d.co, 30); n.物流單號 = t_(d.no, 40); n.付款連結 = link; n.匯款後五碼 = t_(d.last5, 5); if (d.rdate !== undefined) { var rd = String(d.rdate || ''); if (rd && !/^\d{4}-\d{2}-\d{2}$/.test(rd)) throw new Error('匯款日期格式不正確'); n.匯款日期 = rd; } n.收件資訊 = ship; n.備註 = t_(d.note, 200); n.電話 = t_(d.phone, 20) || s.電話;
+    n.付款方式 = payNew; n.狀態 = d.st; if (payChanged && payNew === '匯款') n.收款帳號 = String(settings_().匯款資訊 || ''); n.物流 = t_(d.co, 30); n.物流單號 = t_(d.no, 40); n.付款連結 = link; n.匯款後五碼 = t_(d.last5, 5); if (d.rdate !== undefined) { var rd = String(d.rdate || ''); if (rd && !/^\d{4}-\d{2}-\d{2}$/.test(rd)) throw new Error('匯款日期格式不正確'); n.匯款日期 = rd; } n.收件資訊 = ship; n.備註 = t_(d.note, 200); n.電話 = t_(d.phone, 20) || s.電話;
     n.運費 = fee; n.總額 = Math.max(0, Number(s.商品金額) - Number(s.優惠折抵 || 0) - Number(s.購物金折抵 || 0)) + fee;
     var shippedNow = f.indexOf(d.st) >= si_(payNew);
     if (!shippedNow) n.出貨時間 = ''; else if (!s.出貨時間) n.出貨時間 = now_();
@@ -1759,7 +1759,7 @@ function memberCreateShip(tk, items, d) {
     var oids = {}; lines.forEach(function (l) { oids[String(l.訂單ID)] = 1; });
     put_('出貨單', 0, { '出貨單ID': sid, '訂單ID': Object.keys(oids).join(','), '狀態': PAY[pay], '物流': '', '物流單號': '', '品項': lines.map(function (l) { return l.品名 + '×' + l.數量; }).join('、'), '建立時間': now_(), '出貨時間': '',
       'LINE ID': ctx.lid || '', '姓名': String(o0.姓名), '電話': phone, '付款方式': pay, '收件資訊': ship, '備註': t_(d.note, 200), '商品金額': c.sub, '優惠折抵': c.disc, '購物金折抵': c.cred + c.pick, '運費': c.fee, '總額': c.total,
-      '付款連結': '', '匯款後五碼': '', '會員等級': String(o0.會員等級 || ''), '折抵明細': JSON.stringify(c.alloc), '配送方式': method, '購物金明細': JSON.stringify(cdetail) });
+      '付款連結': '', '匯款後五碼': '', '會員等級': String(o0.會員等級 || ''), '折抵明細': JSON.stringify(c.alloc), '配送方式': method, '購物金明細': JSON.stringify(cdetail), '收款帳號': pay === '匯款' ? String(settings_().匯款資訊 || '') : '' });
     lines.forEach(function (l) { var n = cp_(l); n.出貨單ID = sid; put_('訂單明細', l._r, n); });
     log_('客人 ' + o0.姓名, '建立出貨單', sid, pay + (method ? ',' + method : '') + (c.pick ? ',購物金 -' + c.pick : '') + ',應付 ' + c.total + ':' + lines.map(function (l) { return l.品名 + '×' + l.數量; }).join('、'));
     Object.keys(oids).forEach(function (oid) { syncOrderStatus_(oid, '客人'); });
@@ -1814,7 +1814,7 @@ function adminCreateShipFor(tk, items, d) {
     itemsTxt = lines.map(function (l) { return l.品名 + '×' + l.數量; }).join('、'); total = c.total; name = String(o0.姓名); lidOut = ctx.lid || ''; oidsOut = Object.keys(oids).join(',');
     put_('出貨單', 0, { '出貨單ID': sid, '訂單ID': oidsOut, '狀態': PAY[pay], '物流': '', '物流單號': '', '品項': itemsTxt, '建立時間': now_(), '出貨時間': '',
       'LINE ID': ctx.lid || '', '姓名': name, '電話': phone, '付款方式': pay, '收件資訊': ship, '備註': t_(d.note, 200), '商品金額': c.sub, '優惠折抵': c.disc, '購物金折抵': c.cred + c.pick, '運費': c.fee, '總額': c.total,
-      '付款連結': '', '匯款後五碼': '', '會員等級': String(o0.會員等級 || ''), '折抵明細': JSON.stringify(c.alloc), '配送方式': method, '購物金明細': JSON.stringify(cdetail) });
+      '付款連結': '', '匯款後五碼': '', '會員等級': String(o0.會員等級 || ''), '折抵明細': JSON.stringify(c.alloc), '配送方式': method, '購物金明細': JSON.stringify(cdetail), '收款帳號': pay === '匯款' ? String(settings_().匯款資訊 || '') : '' });
     lines.forEach(function (l) { var n = cp_(l); n.出貨單ID = sid; put_('訂單明細', l._r, n); });
     log_(u.acc, '代客出貨', sid, name + ':' + pay + (method ? ',' + method : '') + (c.pick ? ',購物金 -' + c.pick : '') + ',應付 ' + c.total + ':' + itemsTxt);
     Object.keys(oids).forEach(function (oid) { syncOrderStatus_(oid, u.acc); });
