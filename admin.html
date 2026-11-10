@@ -802,7 +802,8 @@ function pvDraw() {
     '<label>叫貨<select data-k="ord"><option value="">全部</option><option value="no"' + (VF.ord === 'no' ? ' selected' : '') + '>未叫貨</option><option value="yes"' + (VF.ord === 'yes' ? ' selected' : '') + '>已叫貨</option></select></label>' +
     '<label>下單從<input type="date" data-k="from" value="' + esc(VF.from) + '"></label><label>到<input type="date" data-k="to" value="' + esc(VF.to) + '"></label>' +
     '<label>關鍵字<input data-k="q" placeholder="訂單、訂購人、品名、規格、廠商…(可用空格分隔多個,例如:毛帽 黑色)" value="' + esc(VF.q) + '"></label><button class="btn l" data-pv="rs">清除篩選</button></div>' +
-    '<p style="margin:8px 0"><span class="zm" role="group" aria-label="表格縮放"><button class="btn l s" data-pv="zo" aria-label="縮小">－</button><b id="pvzv" style="min-width:48px;display:inline-block;text-align:center">' + PZ + '%</b><button class="btn l s" data-pv="zi" aria-label="放大">＋</button><button class="btn l s" data-pv="zr">還原</button><button class="btn l s" data-pv="zf">符合寬度</button></span> <button class="btn a" data-pv="bo">批次訂貨</button> <button class="btn l" data-pv="bos">全選未叫貨</button> <button class="btn l" data-pv="boc">取消叫貨</button> <button class="btn a" data-pv="info">批次修改(到貨/成本/廠商/貨源)</button> <button class="btn a" data-pv="pay">廠商付款紀錄</button> <button class="btn l" data-pv="bdel">批次刪除</button> <span class="sum" id="pvsum"></span></p>' +
+    '<p style="margin:8px 0"><span class="zm" role="group" aria-label="表格縮放"><button class="btn l s" data-pv="zo" aria-label="縮小">－</button><b id="pvzv" style="min-width:48px;display:inline-block;text-align:center">' + PZ + '%</b><button class="btn l s" data-pv="zi" aria-label="放大">＋</button><button class="btn l s" data-pv="zr">還原</button><button class="btn l s" data-pv="zf">符合寬度</button></span> <button class="btn a" data-pv="bo">批次訂貨</button> <button class="btn l" data-pv="bos">全選未叫貨</button> <button class="btn l" data-pv="boc">取消叫貨</button> <button class="btn a" data-pv="info">批次修改(到貨/成本/廠商/貨源)</button> <button class="btn a" data-pv="pay">廠商付款紀錄</button> <button class="btn l" data-pv="bdel">批次刪除</button></p>' +
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 10px"><div id="pvflt" style="flex:1;min-width:300px;border:1px solid var(--line);border-radius:6px;padding:8px 12px"></div><div id="pvsum" style="flex:1;min-width:300px;border:1px solid var(--line);border-radius:6px;padding:8px 12px;background:#fafafa"></div></div>' +
     '<div id="pvt"></div>';
   $('#v').innerHTML = h; pvRows();
 }
@@ -829,7 +830,8 @@ function pvRows() {
   var L = pvLines(), tot = 0, cost = 0, profit = 0, nc = 0;
   var vis0 = {}; L.forEach(function (l) { vis0[l.key] = 1; }); Object.keys(PSEL).forEach(function (k) { if (!vis0[k]) delete PSEL[k]; });
   L.forEach(function (l) { if (l.stock) return; tot += l.qty * l.unit; if (l.cost === '') nc++; else { cost += l.cost * l.qty; profit += (l.unit - l.cost) * l.qty; } });
-  $('#pvt').innerHTML = '<p class="m">共 ' + L.length + ' 項,複價 ' + money(tot) + ',成本 ' + money(cost) + ',利潤 ' + money(profit) + (nc ? '(' + nc + ' 項未填成本,未計入成本與利潤)' : '') + '</p>' +
+  var fl = $('#pvflt'); if (fl) fl.innerHTML = '<b>篩選資料</b><div class="m" style="font-size:12px">條件:' + esc(pvFilterText()) + '</div><div>' + pvAgg(L) + '</div><div class="m" style="font-size:12px">複價 ' + money(tot) + ',利潤 ' + money(profit) + (nc ? '(' + nc + ' 項未填成本,未計入利潤)' : '') + '</div>';
+  $('#pvt').innerHTML = '' +
     '<table><thead><tr><th><input type="checkbox" id="pvall"></th><th>叫貨</th><th>訂單編號</th><th>訂購日期</th><th>訂購人</th><th>品牌</th><th>品名</th><th>規格</th><th>數量</th><th>成本</th><th>單價</th><th>複價</th><th>折扣碼</th><th>折扣</th><th>訂單金額</th><th>利潤</th><th>狀態</th><th>訂單紀錄 / 編輯</th></tr></thead><tbody>' +
     (L.map(function (l) {
       var hc = l.cost !== '';
@@ -879,8 +881,6 @@ function pvBatchHtml() {
   var box = 'border:1px solid var(--line);border-radius:6px;padding:8px 12px;margin:8px 0';
   var vo = vopt(ven === null ? '' : ven, ven === null ? '(多個值,不修改)' : '(未填)');
   return '<div style="max-width:560px"><h3 style="margin:0 0 6px">批次修改</h3>' +
-    '<div style="' + box + '"><b>篩選資料</b><div class="m" style="font-size:12px">目前條件:' + esc(pvFilterText()) + '</div><div>列表 ' + pvAgg(flt) + '</div></div>' +
-    '<div style="' + box + ';background:#fafafa"><b>勾選資料</b><div>已勾選 ' + pvAgg(sel) + '</div></div>' +
     '<p class="m" style="margin:6px 0">欄位先帶入勾選品項目前的值;改過的欄位會出現紅框,只有紅框的欄位會被修改。已記錄付款的品項不能改廠商/成本/貨源;已建立出貨單的品項不能改到貨狀態。</p>' +
     '<form id="pvinfo" class="pvb"><style>.pvb{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px}.pvb label{font-size:12px;margin:0}.pvb input:not([type=checkbox]),.pvb select{padding:5px 7px;font-size:13px;width:100%;min-width:0}.pvb .full{grid-column:1/-1}</style>' +
     '<label>到貨狀態' + mix(arr) + '<select name="arr">' + (arr === null ? '<option value="">(多個值,不修改)</option>' : '') + ['已到貨', '待到貨'].map(function (x) { return '<option' + (x === arr ? ' selected' : '') + '>' + x + '</option>'; }).join('') + '</select></label>' +
@@ -913,7 +913,7 @@ function pvSum() {
   var c = 0, n = 0, miss = 0, q = 0, nq = 0, nn = 0;
   PV.lines.forEach(function (l) { if (PSEL[l.key]) { n++; q += l.qty; if (!l.stock && !l.ord) { nn++; nq += l.qty; } if (l.cost === '') miss += l.qty; else c += l.cost * l.qty; } });
   var vis = pvLines().filter(function (l) { return !l.stock && !l.ord; }), vq = vis.reduce(function (a, l) { return a + l.qty; }, 0);
-  var el = $('#pvsum'); if (el) el.innerHTML = '已勾選 數量合計 <b>' + nf(q) + '</b> 件(其中未叫貨 <b>' + nf(nq) + '</b> 件),成本合計 ' + money(c) + (miss ? '(另有 ' + nf(miss) + ' 件未填成本,未計入)' : '') + '<br><span class="m">目前列表未叫貨:' + nf(vq) + ' 件</span>';
+  var el = $('#pvsum'); if (el) el.innerHTML = '<b>勾選資料</b>' + (n ? '<div>已勾選 ' + pvAgg(PV.lines.filter(function (l) { return PSEL[l.key]; })) + '</div>' : '<div class="m">尚未勾選品項</div>');
 }
 document.addEventListener('input', function (e) { var c = e.target.classList; if (!c) return; if (c.contains('spi')) { SPL[Number(e.target.dataset.i)].n = e.target.value; syncStock(); } else if (c.contains('spq')) { SPL[Number(e.target.dataset.i)].q = e.target.value; syncStock(); } });
 document.addEventListener('input', function (e) {
