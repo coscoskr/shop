@@ -694,7 +694,7 @@ function adminSaveProduct(tk, d) {
       if (!(stock >= 0)) throw new Error('數量不正確');
     }
     if (['現貨', '預購'].indexOf(d.type) < 0) throw new Error('請選擇現貨或預購');
-    if (d.arrival && !/^\d{4}-\d{2}-\d{2}$/.test(d.arrival)) throw new Error('到貨日期格式不正確');
+    if (d.arrival && d.arrival !== '排隊中' && !/^\d{4}-\d{2}-\d{2}$/.test(d.arrival)) throw new Error('到貨日期格式不正確');
     tiers_(d.tiers, true);
     var ps = rows_('商品'), id = d.id;
     var old = id ? ps.filter(function (p) { return p.商品ID === id; })[0] : null;
@@ -1360,7 +1360,7 @@ function adminEditLineFull(tk, oid, pid, d) {
       if (chg && l.廠商付款ID) throw new Error('此品項已記錄廠商付款(' + l.廠商付款ID + '),請先到「進貨付款」刪除該筆付款紀錄,才能改廠商、成本、貨源');
       if (!chg) newInfo = null; else extra += ';廠商/成本/貨源已更新';
       var eta = String(d.eta || '');
-      if (eta && !/^\d{4}-\d{2}-\d{2}$/.test(eta)) throw new Error('到貨日期格式不正確');
+      if (eta && eta !== '排隊中' && !/^\d{4}-\d{2}-\d{2}$/.test(eta)) throw new Error('到貨日期格式不正確');
       if (p && eta !== String(p.到貨日期 || '')) { var pn = cp_(p); pn.到貨日期 = eta; put_('商品', p._r, pn); extra += ';到貨日期→' + eta; }
     }
     var n = cp_(l);

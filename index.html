@@ -189,7 +189,7 @@ function baseQty(id, except) { var n = 0; for (var k in cart) if (bp(k) === id &
 function room(p) { return maxQ(p) - baseQty(p.id); }
 function specRoom(p, sp) { var q = sp && p.specQty ? p.specQty[sp] : null; return q == null ? 99 : q - (cart[p.id + '~' + sp] || 0); }
 function maxQ(p) { return p.stock === null ? 99 : Math.min(99, p.stock); }
-function tag(p) { return p.type === '預購' ? '預購' + (p.arrival ? ',預計' + md(p.arrival) + '左右' : '') : '現貨'; }
+function tag(p) { return p.type === '預購' ? '預購' + (p.arrival === '排隊中' ? ',暫不確定,排隊中' : p.arrival ? ',預計' + md(p.arrival) + '左右' : '') : '現貨'; }
 
 google.script.run.withSuccessHandler(function (d) {
   D = d; drawFt(); $('#store').textContent = d.store || 'coscos韓國選物店'; document.title = d.store || 'coscos韓國選物店';
@@ -530,7 +530,7 @@ function memList() {
             var can = i.arr === '已到貨' && !i.sid, k = o.id + '|' + i.pid, spc = sp(i.pid);
             return '<div class="li' + (can ? ' pk' : '') + '"><div>' + (i.sid ? '' : '<input type="checkbox" class="sk" data-k="' + esc(k) + '"' + (can ? '' : ' disabled') + (MSEL[k] ? ' checked' : '') + ' aria-label="勾選 ' + esc(i.name) + '">') + '</div>' +
               '<div><div class="t">' + esc(i.name) + (spc ? ' <span class="s">(' + esc(spc) + ')</span>' : '') + '</div><div class="s">' + i.qty + ' 件 × ' + money(i.unit) + ' · ' +
-              (i.sid ? '<a href="#" data-a="sd" data-id="' + esc(i.sid) + '">已出貨 ' + esc(i.sid) + '</a>' : i.arr === '已到貨' ? '<b>已到貨</b>' : '<span class="tg">待到貨' + (i.eta ? '(預計' + esc(md(i.eta)) + '左右)' : '') + '</span>') + '</div></div>' +
+              (i.sid ? '<a href="#" data-a="sd" data-id="' + esc(i.sid) + '">已出貨 ' + esc(i.sid) + '</a>' : i.arr === '已到貨' ? '<b>已到貨</b>' : '<span class="tg">待到貨' + (i.eta === '排隊中' ? '(暫不確定,排隊中)' : i.eta ? '(預計' + esc(md(i.eta)) + '左右)' : '') + '</span>') + '</div></div>' +
               '<div class="p">' + money(i.sub) + '</div></div>';
           }).join('') + ((o.disc > 0 || o.cred > 0) ? '<div class="ot"><div><span>商品金額</span><span>' + money(o.sub) + '</span></div>' +
             (o.disc > 0 ? '<div class="dc"><span>折扣' + (o.code ? '(' + esc(o.code) + ')' : o.dname ? '(' + esc(o.dname) + ')' : '') + '</span><span>− ' + money(o.disc) + '</span></div>' : '') +

@@ -246,7 +246,7 @@ function openOrder(id) {
         '<div class="r2"><label>現貨/預購<select class="ln_t"' + dis + '>' + opts(['現貨', '預購'], i.typ) + '</select></label>' +
         '<label>單價<input class="lu" type="number" min="0" value="' + i.unit + '"' + dis + '></label><label>數量<input class="lq" type="number" min="1" value="' + i.qty + '"' + dis + '></label>' +
         '<label>複價<output class="lt">' + money(i.sub) + '</output></label>' +
-        '<label>到貨狀態<select class="ln_a"' + dis + '>' + opts(['待到貨', '已到貨'], i.arr) + '</select></label><label>到貨日期<input class="ln_e" type="date" value="' + esc(i.eta || '') + '"></label></div>' +
+        '<label>到貨狀態<select class="ln_a"' + dis + '>' + opts(['待到貨', '已到貨'], i.arr) + '</select></label><label>到貨日期<input class="ln_e" type="date" value="' + esc(i.eta === '排隊中' ? '' : i.eta || '') + '"' + (i.eta === '排隊中' ? ' disabled' : '') + '><span class="ck" style="display:block;margin-top:3px"><input type="checkbox" class="ln_q"' + (i.eta === '排隊中' ? ' checked' : '') + '> 暫不確定,排隊中</span></label></div>' +
         '<div class="r3"><label>廠商<select class="ln_v">' + vopt(i.vendor, '—') + '</select></label><label>成本<input class="ln_c" type="number" min="0" value="' + (i.cost === '' || i.cost == null ? '' : i.cost) + '"></label>' +
         '<label>稅<select class="ln_x">' + opts(['未稅', '含稅'], i.tax ? '含稅' : '未稅') + '</select></label><label>貨源<input class="ln_s" value="' + esc(i.src || '') + '"></label>' +
         '<label>出貨單<output>' + esc(i.sid || '—') + '</output></label><div class="sv"><button class="btn a" data-a="sl" data-oid="' + esc(o.id) + '" data-pid="' + esc(i.pid) + '">儲存後關閉</button></div></div></div>';
@@ -374,6 +374,10 @@ function drawCats(keepBig) {
 }
 document.addEventListener('input', function (e) { if (e.target.id === 'cq') { var v = e.target.value, p = e.target.selectionStart; drawCats(); var n = $('#cq'); n.focus(); try { n.setSelectionRange(p, p); } catch (x) { } } });
 document.addEventListener('change', function (e) {
+  var t = e.target;
+  if (t.name === 'arrivalq' || (t.classList && t.classList.contains('ln_q'))) { var dt = t.name === 'arrivalq' ? t.form.elements.arrival : t.closest('label').querySelector('.ln_e'); if (dt) { dt.disabled = t.checked; if (t.checked) dt.value = ''; } }
+});
+document.addEventListener('change', function (e) {
   if (e.target.id === 'cbig') { CDET = false; var bv = e.target.value, bs = C.filter(function (c) { return c.split('/')[0] === bv; }); if (bv && bs.length === 1 && bs[0] === bv && CSEL.indexOf(bv) < 0) CSEL.push(bv); drawCats(bv); }
   else if (e.target.dataset && e.target.dataset.cs !== undefined) { var c = e.target.dataset.cs, k = CSEL.indexOf(c); if (e.target.checked && k < 0) CSEL.push(c); else if (!e.target.checked && k >= 0) CSEL.splice(k, 1); CDET = true; drawCats($('#cbig').value); }
 });
@@ -403,7 +407,7 @@ function editProd(id) {
     '<div>' + fld('單價', 'price', p.price, 'number') + '<div style="margin-top:10px">' + fld('多數量優惠', 'tiers', p.tiers, 'text', '3=450,5=400 (買3件起每件450、買5件起每件400)') + '</div></div>' +
     '<label>銷售型態<select name="type">' + opts(['現貨', '預購'], p.type) + '</select></label>' +
     '<div><label>數量(必填)<span style="display:flex;gap:12px;align-items:center"><input name="stock" type="number" min="0" step="1" style="flex:1;min-width:0" value="' + (p.stock === '' ? '' : p.stock) + '"' + (p.stock === '' && id ? ' disabled' : '') + '><span class="ck" style="white-space:nowrap"><input type="checkbox" name="unlimited"' + (id && p.stock === '' ? ' checked' : '') + '> 無限數量</span></span></label><span class="m" id="sph"></span></div>' +
-    fld('預計到貨日(預購商品前台顯示「預計xx/xx左右」)', 'arrival', p.arrival, 'date') + '<div></div>' +
+    '<div><label>預計到貨日(預購商品前台顯示「預計xx/xx左右」)<input name="arrival" type="date" value="' + esc(p.arrival === '排隊中' ? '' : p.arrival) + '"' + (p.arrival === '排隊中' ? ' disabled' : '') + '></label><label class="ck" style="margin-top:4px"><input type="checkbox" name="arrivalq"' + (p.arrival === '排隊中' ? ' checked' : '') + '> 暫不確定,排隊中</label></div><div></div>' +
     '<div class="f"><span class="m">商品圖片(第一張是封面,最多 8 張)</span><div id="imgs" class="ig"></div><input type="file" id="imf" multiple accept="image/jpeg,image/png,image/webp"> <span id="ims" class="m"></span>' + fld('或貼上圖片網址(按 Enter 加入)', 'imgurl', '') + '<input type="hidden" name="img" value="' + esc(p.img) + '"></div>' +
     '<label class="f">說明<textarea name="desc" rows="3">' + esc(p.desc) + '</textarea></label>' +
     '<div class="f"><span class="m">類別(可複選)</span>' + catGroups(p.cats) + '</div>' +
@@ -640,7 +644,7 @@ document.addEventListener('click', function (e) {
   } else if (a === 'sl') {
     var tr = b.closest('.ln');
     var q = function (c) { return tr.querySelector(c).value; };
-    call('adminEditLineFull', T, b.dataset.oid, b.dataset.pid, { name: q('.ln_n'), spec: q('.ln_p'), type: q('.ln_t'), qty: q('.lq'), unit: q('.lu'), arr: q('.ln_a'), eta: q('.ln_e'), vendor: q('.ln_v'), cost: q('.ln_c'), tax: q('.ln_x') === '含稅', src: q('.ln_s'), notify: !!($('#ntf') && $('#ntf').checked) }).then(function (d) { setO(d); if (tab === 'o') orderRows(); else if (tab === 's') shipRows(); $('#dlg').close(); if (!d.notify) tell('品項已儲存'); if (d.notify) tell('已用 LINE 通知:送出 ' + d.notify.sent + ' 位' + (d.notify.noLine ? ',' + d.notify.noLine + ' 筆訂單沒有 LINE 登入' : '') + (d.notify.failed ? ',' + d.notify.failed + ' 位失敗(可能還沒加好友)' : '')); }).catch(function (er) { tell(er.message); });
+    call('adminEditLineFull', T, b.dataset.oid, b.dataset.pid, { name: q('.ln_n'), spec: q('.ln_p'), type: q('.ln_t'), qty: q('.lq'), unit: q('.lu'), arr: q('.ln_a'), eta: tr.querySelector('.ln_q').checked ? '排隊中' : q('.ln_e'), vendor: q('.ln_v'), cost: q('.ln_c'), tax: q('.ln_x') === '含稅', src: q('.ln_s'), notify: !!($('#ntf') && $('#ntf').checked) }).then(function (d) { setO(d); if (tab === 'o') orderRows(); else if (tab === 's') shipRows(); $('#dlg').close(); if (!d.notify) tell('品項已儲存'); if (d.notify) tell('已用 LINE 通知:送出 ' + d.notify.sent + ' 位' + (d.notify.noLine ? ',' + d.notify.noLine + ' 筆訂單沒有 LINE 登入' : '') + (d.notify.failed ? ',' + d.notify.failed + ' 位失敗(可能還沒加好友)' : '')); }).catch(function (er) { tell(er.message); });
   } else if (a === 'dord') {
     var o = ordById(id);
     ask('確定刪除訂單 ' + id + '(' + o.name + ',' + money(o.total) + ')?\n商品庫存會加回去,此動作無法復原。', function () {
@@ -719,7 +723,7 @@ document.addEventListener('submit', function (e) {
     call('adminBatch', T, ids, 'info', data).then(function (r) { batchDone(r, '批次修改'); }).catch(fail('#be'));
   } else if (f.id === 'pf') {
     var g = function (n) { return f.elements[n]; };
-    var o2 = { id: CUR, name: g('name').value, price: g('price').value, stock: g('stock').value, arrival: g('arrival').value, tiers: g('tiers').value, unlimited: g('unlimited').checked, brand: g('brand').value, newBrand: g('newBrand').value, specs: SPL.filter(function (x) { return String(x.n).trim(); }).map(function (x) { return { n: x.n.trim(), q: x.q }; }), img: g('img').value, desc: g('desc').value, type: g('type').value, on: g('on').checked,
+    var o2 = { id: CUR, name: g('name').value, price: g('price').value, stock: g('stock').value, arrival: g('arrivalq').checked ? '排隊中' : g('arrival').value, tiers: g('tiers').value, unlimited: g('unlimited').checked, brand: g('brand').value, newBrand: g('newBrand').value, specs: SPL.filter(function (x) { return String(x.n).trim(); }).map(function (x) { return { n: x.n.trim(), q: x.q }; }), img: g('img').value, desc: g('desc').value, type: g('type').value, on: g('on').checked,
       cats: CSEL.slice(),
       vendor: g('vendor').value, source: g('source').value, cost: g('cost').value, taxIncl: g('tax').value === 'Y'};
     $('#pe').textContent = ''; wait('商品儲存中…請稍候');
