@@ -884,7 +884,7 @@ function pvBatchHtml() {
     '<p class="m" style="margin:6px 0">欄位先帶入勾選品項目前的值;改過的欄位會出現紅框,只有紅框的欄位會被修改。已記錄付款的品項不能改廠商/成本/貨源;已建立出貨單的品項不能改到貨狀態。</p>' +
     '<form id="pvinfo" class="pvb"><style>.pvb{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px}.pvb label{font-size:12px;margin:0}.pvb input:not([type=checkbox]),.pvb select{padding:5px 7px;font-size:13px;width:100%;min-width:0}.pvb .full{grid-column:1/-1}</style>' +
     '<label>到貨狀態' + mix(arr) + '<select name="arr">' + (arr === null ? '<option value="">(多個值,不修改)</option>' : '') + ['已到貨', '待到貨'].map(function (x) { return '<option' + (x === arr ? ' selected' : '') + '>' + x + '</option>'; }).join('') + '</select></label>' +
-    '<label class="ck" style="align-self:end"><input type="checkbox" name="ntf" checked> 改成已到貨時通知客人</label>' +
+    '<div class="m" style="font-size:12px;align-self:end">改成「已到貨」時,會自動通知客人。</div>' +
     '<label>廠商' + mix(ven) + '<select name="vendor">' + vo + '</select></label>' +
     '<label>單件成本' + mix(cost) + '<input name="cost" type="number" min="0" step="any" value="' + esc(PBI.cost) + '"' + (cost === null ? ' placeholder="多個值"' : '') + '></label>' +
     '<label>成本含稅' + mix(tax) + '<select name="tax">' + (tax === '' || tax === null ? '<option value="">' + (tax === null ? '(多個值,不修改)' : '(未填)') + '</option>' : '') + '<option value="Y"' + (tax === 'Y' ? ' selected' : '') + '>含稅</option><option value="N"' + (tax === 'N' ? ' selected' : '') + '>未稅</option></select></label>' +
@@ -903,7 +903,7 @@ function pvBatchSubmit(f) {
   var ch = pvBatchChanged(f), er = $('#pve'); er.textContent = '';
   if (!Object.keys(ch).length) { er.textContent = '沒有任何欄位被修改(改過的欄位會出現紅框)'; return; }
   wait('修改中…請稍候');
-  call('adminLineInfo', T, pvSel(), { arr: ch.arr || '', notify: !!(f.ntf && f.ntf.checked), vendor: ch.vendor || '', cost: ch.cost || '', tax: ch.tax || '', src: ch.src || '' }).then(function (r) {
+  call('adminLineInfo', T, pvSel(), { arr: ch.arr || '', notify: true, vendor: ch.vendor || '', cost: ch.cost || '', tax: ch.tax || '', src: ch.src || '' }).then(function (r) {
     var dq = $('#dq'); dq.oncancel = null; if ($('#dlg').open) $('#dlg').close(); pvSet(r, '修改完成\n' + (r.msg || ''));
   }).catch(function (e) { var dq = $('#dq'); dq.oncancel = null; if (dq.open) dq.close(); var el = $('#pve'); if (el) el.textContent = e.message; else tell(e.message); });
 }
