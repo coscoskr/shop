@@ -855,9 +855,9 @@ function pvAllState() { var L = pvLines(), a = $('#pvall'); if (a) a.checked = L
 function pvSel() { return Object.keys(PSEL).filter(function (k) { return PSEL[k]; }); }
 function pvSum() {
   var c = 0, n = 0, miss = 0, q = 0, nq = 0, nn = 0;
-  PV.lines.forEach(function (l) { if (PSEL[l.key]) { n++; q += l.qty; if (!l.stock && !l.ord) { nn++; nq += l.qty; } if (l.cost === '') miss++; else c += l.cost * l.qty; } });
+  PV.lines.forEach(function (l) { if (PSEL[l.key]) { n++; q += l.qty; if (!l.stock && !l.ord) { nn++; nq += l.qty; } if (l.cost === '') miss += l.qty; else c += l.cost * l.qty; } });
   var vis = pvLines().filter(function (l) { return !l.stock && !l.ord; }), vq = vis.reduce(function (a, l) { return a + l.qty; }, 0);
-  var el = $('#pvsum'); if (el) el.innerHTML = '已勾選 <b>' + n + '</b> 項 / <b>' + q + '</b> 件(其中未叫貨 <b>' + nn + '</b> 項 / <b>' + nq + '</b> 件),成本合計 ' + money(c) + (miss ? '(' + miss + ' 項未填成本)' : '') + '<br><span class="m">目前列表未叫貨:' + vis.length + ' 項 / ' + vq + ' 件</span>';
+  var el = $('#pvsum'); if (el) el.innerHTML = '已勾選 數量合計 <b>' + nf(q) + '</b> 件(其中未叫貨 <b>' + nf(nq) + '</b> 件),成本合計 ' + money(c) + (miss ? '(另有 ' + nf(miss) + ' 件未填成本,未計入)' : '') + '<br><span class="m">目前列表未叫貨:' + nf(vq) + ' 件</span>';
 }
 document.addEventListener('input', function (e) { var c = e.target.classList; if (!c) return; if (c.contains('spi')) { SPL[Number(e.target.dataset.i)].n = e.target.value; syncStock(); } else if (c.contains('spq')) { SPL[Number(e.target.dataset.i)].q = e.target.value; syncStock(); } });
 document.addEventListener('input', function (e) {
