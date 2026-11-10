@@ -852,6 +852,61 @@ function pvFit() {
   PZ = Math.max(50, Math.min(100, Math.floor(avail / need * 100)));
   pvZoom(0);
 }
+var PBI = null;
+function pvFilterText() {
+  var t = [];
+  if (VF.vendor) t.push('廠商:' + (VF.vendor === '__none' ? '未填' : VF.vendor));
+  if (VF.pay) t.push(VF.pay === 'paid' ? '已付款' : '未付款');
+  if (VF.arr) t.push('狀態:' + VF.arr);
+  if (VF.ord) t.push(VF.ord === 'yes' ? '已叫貨' : '未叫貨');
+  if (VF.from || VF.to) t.push('下單 ' + (VF.from || '') + ' ~ ' + (VF.to || ''));
+  if (VF.q) t.push('關鍵字:' + VF.q);
+  return t.length ? t.join(';') : '無(顯示全部)';
+}
+function pvAgg(L) {
+  var q = 0, c = 0, miss = 0, nq = 0;
+  L.forEach(function (l) { q += l.qty; if (!l.stock && !l.ord) nq += l.qty; if (l.cost === '') miss += l.qty; else c += l.cost * l.qty; });
+  return '數量合計 <b>' + nf(q) + '</b> 件(其中未叫貨 <b>' + nf(nq) + '</b> 件),成本合計 ' + money(c) + (miss ? '(另有 ' + nf(miss) + ' 件未填成本,未計入)' : '');
+}
+function pvCommon(L, f) { if (!L.length) return ''; var v = f(L[0]); return L.every(function (l) { return f(l) === v; }) ? v : null; }
+function pvBatchHtml() {
+  var sel = PV.lines.filter(function (l) { return PSEL[l.key]; }), flt = pvLines();
+  var arr = pvCommon(sel, function (l) { return l.arr; }), ven = pvCommon(sel, function (l) { return l.vendor || ''; }),
+    cost = pvCommon(sel, function (l) { return l.cost === '' ? '' : String(l.cost); }), tax = pvCommon(sel, function (l) { return l.cost === '' ? '' : (l.tax ? 'Y' : 'N'); }),
+    src = pvCommon(sel, function (l) { return l.src || ''; });
+  PBI = { arr: arr === null ? '' : arr, vendor: ven === null ? '' : ven, cost: cost === null ? '' : cost, tax: tax === null ? '' : tax, src: src === null ? '' : src };
+  var mix = function (x) { return x === null ? ' <span class="m">(勾選的有不同值)</span>' : ''; };
+  var box = 'border:1px solid var(--line);border-radius:6px;padding:8px 12px;margin:8px 0';
+  var vo = vopt(ven === null ? '' : ven, ven === null ? '(多個值,不修改)' : '(未填)');
+  return '<div style="max-width:560px"><h3 style="margin:0 0 6px">批次修改</h3>' +
+    '<div style="' + box + '"><b>篩選資料</b><div class="m" style="font-size:12px">目前條件:' + esc(pvFilterText()) + '</div><div>列表 ' + pvAgg(flt) + '</div></div>' +
+    '<div style="' + box + ';background:#fafafa"><b>勾選資料</b><div>已勾選 ' + pvAgg(sel) + '</div></div>' +
+    '<p class="m" style="margin:6px 0">欄位先帶入勾選品項目前的值;改過的欄位會出現紅框,只有紅框的欄位會被修改。已記錄付款的品項不能改廠商/成本/貨源;已建立出貨單的品項不能改到貨狀態。</p>' +
+    '<form id="pvinfo" class="pvb"><style>.pvb{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px}.pvb label{font-size:12px;margin:0}.pvb input:not([type=checkbox]),.pvb select{padding:5px 7px;font-size:13px;width:100%;min-width:0}.pvb .full{grid-column:1/-1}</style>' +
+    '<label>到貨狀態' + mix(arr) + '<select name="arr">' + (arr === null ? '<option value="">(多個值,不修改)</option>' : '') + ['已到貨', '待到貨'].map(function (x) { return '<option' + (x === arr ? ' selected' : '') + '>' + x + '</option>'; }).join('') + '</select></label>' +
+    '<label class="ck" style="align-self:end"><input type="checkbox" name="ntf" checked> 改成已到貨時通知客人</label>' +
+    '<label>廠商' + mix(ven) + '<select name="vendor">' + vo + '</select></label>' +
+    '<label>單件成本' + mix(cost) + '<input name="cost" type="number" min="0" step="any" value="' + esc(PBI.cost) + '"' + (cost === null ? ' placeholder="多個值"' : '') + '></label>' +
+    '<label>成本含稅' + mix(tax) + '<select name="tax">' + (tax === '' || tax === null ? '<option value="">' + (tax === null ? '(多個值,不修改)' : '(未填)') + '</option>' : '') + '<option value="Y"' + (tax === 'Y' ? ' selected' : '') + '>含稅</option><option value="N"' + (tax === 'N' ? ' selected' : '') + '>未稅</option></select></label>' +
+    '<label>貨源' + mix(src) + '<input name="src" value="' + esc(PBI.src) + '"' + (src === null ? ' placeholder="多個值"' : '') + '></label>' +
+    '<p class="er full" id="pve" role="alert" style="margin:0"></p><div class="full"><button class="btn a">套用</button> <button type="button" class="btn l" data-a="x">取消</button></div></form></div>';
+}
+function pvBatchChanged(f) {
+  var ch = {}; ['arr', 'vendor', 'cost', 'tax', 'src'].forEach(function (k) { var v = String(f[k].value).trim(); if (v !== '' && v !== PBI[k]) ch[k] = v; }); return ch;
+}
+function pvBatchMark() {
+  var f = $('#pvinfo'); if (!f) return;
+  var upd = function () { var ch = pvBatchChanged(f); ['arr', 'vendor', 'cost', 'tax', 'src'].forEach(function (k) { f[k].style.border = ch[k] !== undefined ? '2px solid #d64545' : ''; }); };
+  f.addEventListener('input', upd); f.addEventListener('change', upd);
+}
+function pvBatchSubmit(f) {
+  var ch = pvBatchChanged(f), er = $('#pve'); er.textContent = '';
+  if (!Object.keys(ch).length) { er.textContent = '沒有任何欄位被修改(改過的欄位會出現紅框)'; return; }
+  wait('修改中…請稍候');
+  call('adminLineInfo', T, pvSel(), { arr: ch.arr || '', notify: !!(f.ntf && f.ntf.checked), vendor: ch.vendor || '', cost: ch.cost || '', tax: ch.tax || '', src: ch.src || '' }).then(function (r) {
+    var dq = $('#dq'); dq.oncancel = null; if ($('#dlg').open) $('#dlg').close(); pvSet(r, '修改完成\n' + (r.msg || ''));
+  }).catch(function (e) { var dq = $('#dq'); dq.oncancel = null; if (dq.open) dq.close(); var el = $('#pve'); if (el) el.textContent = e.message; else tell(e.message); });
+}
 function pvAllState() { var L = pvLines(), a = $('#pvall'); if (a) a.checked = L.length > 0 && L.every(function (l) { return PSEL[l.key]; }); }
 function pvSel() { return Object.keys(PSEL).filter(function (k) { return PSEL[k]; }); }
 function pvSum() {
@@ -919,7 +974,7 @@ document.addEventListener('click', function (e) {
   }
   else if (a === 'info') {
     var ks2 = pvSel(); if (!ks2.length) { tell('請先勾選品項'); return; }
-    d.innerHTML = '<h3>批次修改(' + ks2.length + ' 項)</h3><p class="m">只會修改有填的欄位,空白的保持原樣。已記錄付款的品項不能改廠商/成本/貨源;已建立出貨單的品項不能改到貨狀態。</p><form id="pvinfo"><label>到貨狀態<select name="arr"><option value="">(不修改)</option><option>已到貨</option><option>待到貨</option></select></label><label class="ck"><input type="checkbox" name="ntf" checked> 改成已到貨時,通知客人(LINE 或 Email)</label><label>廠商<select name="vendor">' + vopt('', '(不修改)') + '</select></label><label>單件成本<input name="cost" type="number" min="0" step="any"></label><label>成本是否含稅<select name="tax"><option value="">不修改</option><option value="Y">含稅</option><option value="N">未稅</option></select></label><label>貨源<input name="src"></label><p class="er" id="pve" role="alert"></p><button class="btn a">套用</button> <button type="button" class="btn l" data-a="x">取消</button></form>';
+    d.innerHTML = pvBatchHtml(); pvBatchMark();
     d.showModal();
   }
   else if (a === 'pe') {
@@ -948,7 +1003,7 @@ document.addEventListener('submit', function (e) {
   var f = e.target, v = function (n) { return f[n] ? f[n].value : ''; };
   var done = function (r) { $('#dlg').close(); pvSet(r); }, bad = fail('#pve');
   if (f.id === 'pvpay') call('adminRecordPayment', T, pvSel(), { date: v('date'), amount: v('amount'), note: v('note'), imgs: PIMG }).then(done).catch(bad);
-  else if (f.id === 'pvinfo') call('adminLineInfo', T, pvSel(), { arr: v('arr'), notify: !!(f.ntf && f.ntf.checked), vendor: v('vendor'), cost: v('cost'), tax: v('tax'), src: v('src') }).then(done).catch(bad);
+  else if (f.id === 'pvinfo') pvBatchSubmit(f);
   else if (f.id === 'pvedit') call('adminUpdatePayment', T, f.dataset.id, { date: v('date'), amount: v('amount'), note: v('note'), imgs: PIMG }).then(function (r) { $('#dlg').close(); OT = 0; PV = r; PVT = Date.now(); pvDraw(); }).catch(bad);
 });
 
