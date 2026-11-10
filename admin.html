@@ -1412,7 +1412,7 @@ function poHtml(sid) {
     items.map(function (i, k) { return '<tr><td class="c">' + (k + 1) + '</td><td>' + esc(i.name) + '</td><td>' + esc(i.spec) + '</td><td class="r"><b>' + nf(i.qty) + '</b></td><td class="r">' + nf(i.unit) + '</td><td class="r">' + nf(i.sub) + '</td><td class="c"><span class="pbx"></span></td></tr>'; }).join('') + '</tbody></table>' +
     '<div class="pft"><div class="pnote">' + (s.note ? '<b>備註</b><br>' + esc(s.note) : '') + '</div><table class="psum"><tbody><tr><td>共 ' + items.length + ' 項 / ' + nf(qty) + ' 件</td><td></td></tr><tr><td>商品合計</td><td class="r">' + money(s.sub) + '</td></tr>' + (s.disc ? '<tr><td>優惠</td><td class="r">-' + money(s.disc) + '</td></tr>' : '') + (s.cred ? '<tr><td>購物金</td><td class="r">-' + money(s.cred) + '</td></tr>' : '') +
     '<tr><td>運費</td><td class="r">' + money(s.fee) + '</td></tr><tr class="pto"><td>應付</td><td class="r">' + money(s.total) + '</td></tr></tbody></table></div>' +
-    '<div class="psg"><span>檢貨人員:</span><span>包裝人員:</span></div><div class="pthx">感謝您的訂購 · coscos 韓國選物店</div></div>';
+    '<div class="pthx">感謝您的訂購 · coscos 韓國選物店</div></div>';
 }
 (function () {
   var st = document.createElement('style');
