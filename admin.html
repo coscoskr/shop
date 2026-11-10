@@ -347,12 +347,12 @@ function drawCats(keepBig) {
   var chips = CSEL.map(function (c, i) { return '<span class="chip" style="display:inline-block;background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:2px 4px 2px 10px;margin:0 6px 6px 0">' + esc(c.replace('/', ' › ')) + ' <button type="button" class="btn l s" style="border:0;padding:0 6px" data-a="crm" data-i="' + i + '" aria-label="移除">×</button></span>'; }).join('') || '<span class="m">尚未選擇類別</span>';
   var subs = cur ? C.filter(function (c) { return c.split('/')[0] === cur; }) : [];
   var nsel = subs.filter(function (c) { return CSEL.indexOf(c) >= 0; }).length;
-  var subSel = '<details id="cdet" style="flex:1;min-width:160px;position:relative"' + (CDET && cur ? ' open' : '') + '><summary style="cursor:pointer;padding:9px 10px;border:1px solid var(--line);border-radius:6px;background:#fff;list-style:revert' + (cur ? '' : ';opacity:.5;pointer-events:none') + '">' + (cur ? '② 小項目(可複選)' + (nsel ? ' — 已選 ' + nsel : '') : '② 先選大項目') + '</summary><div style="padding:8px 10px;border:1px solid var(--line);border-top:0;background:#fff;max-height:220px;overflow:auto">' + subs.map(function (c) { var lab = c === cur ? '不分小分類' : c.slice(cur.length + 1); return '<label style="display:block;padding:4px 0"><input type="checkbox" data-cs="' + esc(c) + '"' + (CSEL.indexOf(c) >= 0 ? ' checked' : '') + '> ' + esc(lab) + '</label>'; }).join('') + '</div></details>';
+  var subSel = '<details id="cdet" style="flex:1;min-width:160px;position:relative"' + (CDET && cur ? ' open' : '') + '><summary style="cursor:pointer;padding:9px 10px;border:1px solid var(--line);border-radius:6px;background:#fff;list-style:revert' + (cur ? '' : ';opacity:.5;pointer-events:none') + '">' + (cur ? (subs.length === 1 && subs[0] === cur ? '② 此大項目沒有小項目(已自動選取)' : '② 小項目(可複選)' + (nsel ? ' — 已選 ' + nsel : '')) : '② 先選大項目') + '</summary><div style="padding:8px 10px;border:1px solid var(--line);border-top:0;background:#fff;max-height:220px;overflow:auto">' + subs.map(function (c) { var lab = c === cur ? '不分小分類' : c.slice(cur.length + 1); return '<label style="display:block;padding:4px 0"><input type="checkbox" data-cs="' + esc(c) + '"' + (CSEL.indexOf(c) >= 0 ? ' checked' : '') + '> ' + esc(lab) + '</label>'; }).join('') + '</div></details>';
   b.innerHTML = '<div>' + chips + '</div><div style="display:flex;gap:8px;flex-wrap:wrap"><input id="cq" placeholder="搜尋" value="' + esc($('#cq') ? $('#cq').value : '') + '" style="width:90px;flex:none" autocomplete="off"><select id="cbig" style="flex:1;min-width:140px"><option value="">① 選大項目…</option>' + shown.map(function (k) { return '<option value="' + esc(k) + '"' + (k === cur ? ' selected' : '') + '>' + esc(k) + '</option>'; }).join('') + '</select>' + subSel + '</div>';
 }
 document.addEventListener('input', function (e) { if (e.target.id === 'cq') { var v = e.target.value, p = e.target.selectionStart; drawCats(); var n = $('#cq'); n.focus(); try { n.setSelectionRange(p, p); } catch (x) { } } });
 document.addEventListener('change', function (e) {
-  if (e.target.id === 'cbig') { CDET = false; drawCats(e.target.value); }
+  if (e.target.id === 'cbig') { CDET = false; var bv = e.target.value, bs = C.filter(function (c) { return c.split('/')[0] === bv; }); if (bv && bs.length === 1 && bs[0] === bv && CSEL.indexOf(bv) < 0) CSEL.push(bv); drawCats(bv); }
   else if (e.target.dataset && e.target.dataset.cs !== undefined) { var c = e.target.dataset.cs, k = CSEL.indexOf(c); if (e.target.checked && k < 0) CSEL.push(c); else if (!e.target.checked && k >= 0) CSEL.splice(k, 1); CDET = true; drawCats($('#cbig').value); }
 });
 document.addEventListener('click', function (e) { var b = e.target.closest && e.target.closest('[data-a=crm]'); if (b) { CSEL.splice(+b.dataset.i, 1); drawCats($('#cbig').value); } });
@@ -542,7 +542,7 @@ document.addEventListener('change', function (e) { if (e.target.dataset && e.tar
 document.addEventListener('input', function (e) {
   if (e.target.id !== 'hsrch') return;
   var q = e.target.value.trim().toLowerCase(), n = 0, rows = document.querySelectorAll('#hbind tbody tr');
-  [].forEach.call(rows, function (tr) { var inp = tr.querySelector('input'), t = (tr.cells[0].textContent + ' ' + (inp ? inp.value : '') + ' ' + tr.cells[2].textContent).toLowerCase(), ok = !q || t.indexOf(q) >= 0; tr.style.display = ok ? '' : 'none'; if (ok) n++; });
+  [].forEach.call(rows, function (tr) { var inp = tr.querySelector('input'), t = (tr.cells[0].textContent + ' ' + (inp ? inp.value : '')).toLowerCase(), ok = !q || t.indexOf(q) >= 0; tr.style.display = ok ? '' : 'none'; if (ok) n++; });
   var c = $('#hcnt'); if (c) c.textContent = q ? '符合 ' + n + ' / 共 ' + rows.length + ' 位' : '共 ' + rows.length + ' 位待綁定';
 });
 function histBindDraw(r) {
@@ -552,12 +552,11 @@ function histBindDraw(r) {
   r.members.forEach(function (m) { nick[lab(m)] = m.id; }); r._nick = nick;
   if (!r.groups.length) { b.innerHTML = '<p class="m">' + (r.msg ? esc(r.msg) + '<br>' : '') + '目前沒有待綁定的舊訂單。</p>'; return; }
   b.innerHTML = (r.msg ? '<p class="m">' + esc(r.msg) + '</p>' : '') + '<datalist id="hdl">' + Object.keys(nick).map(function (k) { return '<option value="' + esc(k) + '">'; }).join('') + '</datalist>' +
-    '<p><button class="btn a" data-a="hbind">綁定已填的</button> <input id="hsrch" type="search" placeholder="搜尋購買人 / LINE 暱稱" style="width:200px;margin-left:8px"> <span class="m" id="hcnt">共 ' + r.groups.length + ' 位待綁定</span></p><div style="overflow:auto"><table><thead><tr><th>舊檔案裡的購買人<br><span class="m" style="font-weight:400">(Excel「購買人」欄的名字)</span></th><th>要綁定的 LINE 會員<br><span class="m" style="font-weight:400">(從系統已有的 LINE 會員中選)</span></th><th>可能是這幾位<br><span class="m" style="font-weight:400">(系統猜的,點一下自動填入)</span></th></tr></thead><tbody>' +
+    '<p><button class="btn a" data-a="hbind">綁定已填的</button> <input id="hsrch" type="search" placeholder="搜尋購買人 / LINE 暱稱" style="width:200px;margin-left:8px"> <span class="m" id="hcnt">共 ' + r.groups.length + ' 位待綁定</span></p><div style="overflow:auto"><table><thead><tr><th>舊檔案裡的購買人<br><span class="m" style="font-weight:400">(Excel「購買人」欄的名字)</span></th><th>要綁定的 LINE 會員<br><span class="m" style="font-weight:400">(從系統已有的 LINE 會員中選)</span></th></tr></thead><tbody>' +
     r.groups.map(function (g, i) {
       var low = g.name.trim().toLowerCase(), ex = r.members.filter(function (m) { return m.nick.trim().toLowerCase() === low; }), fz = low.length >= 2 ? r.members.filter(function (m) { var n = m.nick.toLowerCase(); return n !== low && (n.indexOf(low) >= 0 || low.indexOf(n) >= 0 && n.length >= 2); }).slice(0, 3) : [];
       var pre = ex.length === 1 ? lab(ex[0]) : '';
-      return '<tr><td>' + esc(g.name) + '</td><td><input list="hdl" data-hn="' + i + '" value="' + esc(pre) + '" style="min-width:180px" placeholder="輸入 LINE 暱稱搜尋並選擇"><div class="hbs m" data-hs="' + i + '" style="font-size:12px;margin-top:3px"></div></td><td>' +
-        fz.concat(ex.length > 1 ? ex : []).map(function (m) { return '<button type="button" class="btn l s" data-a="hfill" data-i="' + i + '" data-v="' + esc(lab(m)) + '">' + esc(m.nick) + '</button>'; }).join(' ') + '</td></tr>';
+      return '<tr><td>' + esc(g.name) + '</td><td><input list="hdl" data-hn="' + i + '" value="' + esc(pre) + '" style="min-width:180px" placeholder="輸入 LINE 暱稱搜尋並選擇"><div class="hbs m" data-hs="' + i + '" style="font-size:12px;margin-top:3px"></div></td></tr>';
     }).join('') + '</tbody></table></div>';
   [].forEach.call(document.querySelectorAll('[data-hn]'), hbCheck);
 }
