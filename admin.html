@@ -539,6 +539,12 @@ function hbCheck(inp) {
 }
 document.addEventListener('input', function (e) { if (e.target.dataset && e.target.dataset.hn !== undefined) hbCheck(e.target); });
 document.addEventListener('change', function (e) { if (e.target.dataset && e.target.dataset.hn !== undefined) hbCheck(e.target); });
+document.addEventListener('input', function (e) {
+  if (e.target.id !== 'hsrch') return;
+  var q = e.target.value.trim().toLowerCase(), n = 0, rows = document.querySelectorAll('#hbind tbody tr');
+  [].forEach.call(rows, function (tr) { var inp = tr.querySelector('input'), t = (tr.cells[0].textContent + ' ' + (inp ? inp.value : '') + ' ' + tr.cells[2].textContent).toLowerCase(), ok = !q || t.indexOf(q) >= 0; tr.style.display = ok ? '' : 'none'; if (ok) n++; });
+  var c = $('#hcnt'); if (c) c.textContent = q ? '符合 ' + n + ' / 共 ' + rows.length + ' 位' : '共 ' + rows.length + ' 位待綁定';
+});
 function histBindDraw(r) {
   var b = $('#hbind'); if (!b) return; HB = r;
   var nick = {}, dup = {}; r.members.forEach(function (m) { var k = m.nick.trim().toLowerCase(); dup[k] = (dup[k] || 0) + 1; });
@@ -546,7 +552,7 @@ function histBindDraw(r) {
   r.members.forEach(function (m) { nick[lab(m)] = m.id; }); r._nick = nick;
   if (!r.groups.length) { b.innerHTML = '<p class="m">' + (r.msg ? esc(r.msg) + '<br>' : '') + '目前沒有待綁定的舊訂單。</p>'; return; }
   b.innerHTML = (r.msg ? '<p class="m">' + esc(r.msg) + '</p>' : '') + '<datalist id="hdl">' + Object.keys(nick).map(function (k) { return '<option value="' + esc(k) + '">'; }).join('') + '</datalist>' +
-    '<p><button class="btn a" data-a="hbind">綁定已填的</button> <span class="m">共 ' + r.groups.length + ' 位待綁定</span></p><div style="overflow:auto"><table><thead><tr><th>舊檔案裡的購買人<br><span class="m" style="font-weight:400">(Excel「購買人」欄的名字)</span></th><th>要綁定的 LINE 會員<br><span class="m" style="font-weight:400">(從系統已有的 LINE 會員中選)</span></th><th>可能是這幾位<br><span class="m" style="font-weight:400">(系統猜的,點一下自動填入)</span></th></tr></thead><tbody>' +
+    '<p><button class="btn a" data-a="hbind">綁定已填的</button> <input id="hsrch" type="search" placeholder="搜尋購買人 / LINE 暱稱" style="width:200px;margin-left:8px"> <span class="m" id="hcnt">共 ' + r.groups.length + ' 位待綁定</span></p><div style="overflow:auto"><table><thead><tr><th>舊檔案裡的購買人<br><span class="m" style="font-weight:400">(Excel「購買人」欄的名字)</span></th><th>要綁定的 LINE 會員<br><span class="m" style="font-weight:400">(從系統已有的 LINE 會員中選)</span></th><th>可能是這幾位<br><span class="m" style="font-weight:400">(系統猜的,點一下自動填入)</span></th></tr></thead><tbody>' +
     r.groups.map(function (g, i) {
       var low = g.name.trim().toLowerCase(), ex = r.members.filter(function (m) { return m.nick.trim().toLowerCase() === low; }), fz = low.length >= 2 ? r.members.filter(function (m) { var n = m.nick.toLowerCase(); return n !== low && (n.indexOf(low) >= 0 || low.indexOf(n) >= 0 && n.length >= 2); }).slice(0, 3) : [];
       var pre = ex.length === 1 ? lab(ex[0]) : '';
