@@ -679,18 +679,21 @@ function shrink(file) {
     rd.readAsDataURL(file);
   });
 }
+function upImages(files, count, add, doneMsg) {
+  var k = 0, n = 0;
+  (function next() {
+    if (k >= files.length) { tell('✓ 圖片上傳完成(共 ' + n + ' 張)。' + (doneMsg.indexOf('儲存') >= 0 ? '\n記得按「儲存商品」。' : '')); return; }
+    if (count() >= 8) { tell('最多 8 張' + (n ? ',已上傳 ' + n + ' 張' : '')); return; }
+    wait('圖片上傳中 ' + (k + 1) + ' / ' + files.length + ',請稍候…');
+    shrink(files[k]).then(function (b64) { return call('adminUploadImage', T, files[k].name, 'image/jpeg', b64); })
+      .then(function (u) { add(u); n++; k++; next(); })
+      .catch(function (er) { tell('圖片上傳失敗:' + er.message + (n ? '\n(前 ' + n + ' 張已上傳)' : '')); });
+  })();
+}
 document.addEventListener('change', function (e) {
   if (e.target.id !== 'imf' || !e.target.files.length) return;
-  var files = [].slice.call(e.target.files), st = $('#ims'), k = 0;
-  e.target.value = '';
-  (function next() {
-    if (k >= files.length) { st.textContent = '上傳完成,記得按儲存商品'; return; }
-    if (imgGet().length >= 8) { st.textContent = '最多 8 張'; return; }
-    st.textContent = '上傳中 ' + (k + 1) + '/' + files.length + '…';
-    shrink(files[k]).then(function (b64) { return call('adminUploadImage', T, files[k].name, 'image/jpeg', b64); })
-      .then(function (u) { imgSet(imgGet().concat([u])); k++; next(); })
-      .catch(function (er) { st.textContent = er.message; });
-  })();
+  var files = [].slice.call(e.target.files); e.target.value = '';
+  upImages(files, function () { return imgGet().length; }, function (u) { imgSet(imgGet().concat([u])); }, '上傳完成,記得按儲存商品');
 });
 document.addEventListener('keydown', function (e) {
   if (e.key !== 'Enter' || !e.target.name || e.target.name !== 'imgurl') return;
@@ -1408,16 +1411,8 @@ document.addEventListener('click', function (e) {
 });
 document.addEventListener('change', function (e) {
   if (e.target.id !== 'pvimf' || !e.target.files.length) return;
-  var files = [].slice.call(e.target.files), st = $('#pims'), k = 0;
-  e.target.value = '';
-  (function next() {
-    if (k >= files.length) { st.textContent = '上傳完成'; return; }
-    if (PIMG.length >= 8) { st.textContent = '最多 8 張'; return; }
-    st.textContent = '上傳中 ' + (k + 1) + '/' + files.length + '…';
-    shrink(files[k]).then(function (b64) { return call('adminUploadImage', T, files[k].name, 'image/jpeg', b64); })
-      .then(function (u) { PIMG.push(u); pimDraw(); k++; next(); })
-      .catch(function (er) { st.textContent = er.message; });
-  })();
+  var files = [].slice.call(e.target.files); e.target.value = '';
+  upImages(files, function () { return PIMG.length; }, function (u) { PIMG.push(u); pimDraw(); }, '上傳完成');
 });
 /* ---------- 訂購單 ---------- */
 function poLogo() { var m = document.querySelector('#side img'); return m ? m.src : ''; }
