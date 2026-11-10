@@ -2139,6 +2139,12 @@ function adminGrant(tk, lid, amt, days, note) {
     var a = Math.floor(Number(amt)), dd = Math.floor(Number(days));
     if (!(a >= 1 && a <= 100000)) throw new Error('金額需為 1-100000');
     if (!(dd >= 1 && dd <= 3650)) throw new Error('有效天數需為 1-3650');
+    // 防呆:10 秒內同一位會員、同金額、同備註、同操作人的手動發放,視為連點重複,不再發第二筆
+    var nowMs = Date.now(), dupG = rows_('購物金').filter(function (g) {
+      if (String(g['LINE ID']) !== String(lid) || String(g.來源) !== '手動發放' || Number(g.金額) !== a || String(g.備註 || '') !== t_(note, 100) || String(g.操作人) !== u.acc) return false;
+      var tm = new Date(String(g.發放時間).replace(' ', 'T') + '+08:00').getTime(); return nowMs - tm >= 0 && nowMs - tm < 10000;
+    });
+    if (dupG.length) throw new Error('剛剛已經發放過一筆相同的購物金(' + dupG[0].序號 + '),已略過重複發放');
     addGrant_(lid, a, dd, '手動發放', t_(note, 100), u.acc, '', '');
     log_(u.acc, '發放購物金', m.暱稱, a + ' 元,' + dd + ' 天;' + t_(note, 100));
   });

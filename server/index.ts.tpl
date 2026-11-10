@@ -15,6 +15,8 @@ const jsonR = (req: Request, o: unknown, status = 200) =>
   new Response(JSON.stringify(o), { status, headers: { ...SEC, ...corsFor(req), "Content-Type": "application/json; charset=utf-8" } });
 
 // 簡易限流(以來源 IP 計,每個執行個體各自計算,擋一般的灌單與暴力嘗試)
+const recent = new Map<string, { t: number; p: Promise<unknown> }>();
+const READ = /^(admin(Init|Orders|Products|PurchaseList|StockView|Report|Settings|Levels|Vendors|Brands|Cats|Carriers|Members|MemberGrants|Logs|Codes|Activities|LineHistory|LineInfo|ShipHistory|ShipQuote|ProxyQuote|HistBindList|Admins|Login)|member(Orders|ShipQuote|Login)|quote|getShop|shopData|trackLink|lineLiff|lineStart|lineCallback)$/;
 const hits = new Map<string, { n: number; t: number }>();
 const SENSITIVE = new Set(["adminLogin", "memberLogin", "placeOrder", "lineLiff", "lineStart", "lineCallback", "trackLink"]);
 function limited(ip: string, fn: string): boolean {
@@ -69,10 +71,21 @@ Deno.serve(async (req: Request) => {
   const fn = String(msg.fn || "");
   if (limited(ip, fn)) return jsonR(req, { ok: false, error: "操作太頻繁,請稍後再試" }, 429);
   try {
-    const { body, after } = await execute({ fn, args: msg.args || [], db, env });
-    // @ts-ignore EdgeRuntime 由 Supabase 提供
-    if (after.length) EdgeRuntime.waitUntil(runAfter(after, env));
-    return jsonR(req, body);
+    // 防連點:3 秒內完全相同的寫入請求(同函式、同參數)只執行一次,後來的沿用第一次的結果
+    const dkey = fn + "|" + text, isRead = READ.test(fn), now = Date.now();
+    if (!isRead) {
+      for (const [k, v] of recent) if (now - v.t > 5000) recent.delete(k);
+      const hit = recent.get(dkey);
+      if (hit && now - hit.t < 3000) return jsonR(req, await hit.p);
+    }
+    const run = (async () => {
+      const { body, after } = await execute({ fn, args: msg.args || [], db, env });
+      // @ts-ignore EdgeRuntime 由 Supabase 提供
+      if (after.length) EdgeRuntime.waitUntil(runAfter(after, env));
+      return body;
+    })();
+    if (!isRead) { recent.set(dkey, { t: now, p: run }); run.catch(() => recent.delete(dkey)); }
+    return jsonR(req, await run);
   } catch (e) {
     console.error("api error", e);
     return jsonR(req, { ok: false, error: "伺服器忙碌,請稍後再試" }, 500);
