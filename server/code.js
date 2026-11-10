@@ -1461,22 +1461,38 @@ function adminUpdateShip(tk, sid, d) {
   lk_(function () {
     var s = rows_('出貨單').filter(function (x) { return String(x.出貨單ID) === sid; })[0];
     if (!s) throw new Error('找不到出貨單');
-    var f = FLOW[s.付款方式] || [];
+    var payNew = String(s.付款方式), payChanged = false;
+    if (d.pay && String(d.pay) !== payNew) {
+      if (!PAY[d.pay] || d.pay === '刷卡') throw new Error('付款方式不正確');
+      var f0 = FLOW[payNew] || [];
+      if (f0.indexOf(String(s.狀態)) !== 0) throw new Error('出貨單已經開始處理(' + s.狀態 + '),不能改付款方式');
+      if (d.pay === '付現金' && String(s.配送方式) !== '自取') throw new Error('付現金只能用在自取');
+      if (d.pay === '賣貨便' && String(s.配送方式) !== '店到店') throw new Error('賣貨便只能用在店到店');
+      payNew = String(d.pay); payChanged = true; d.st = PAY[payNew];
+    }
+    var f = FLOW[payNew] || [];
     if (f.indexOf(d.st) < 0) throw new Error('此付款方式沒有「' + d.st + '」這個狀態');
     var fee = Number(d.fee);
     if (d.fee === '' || !(fee >= 0)) throw new Error('運費不正確');
     var ship = t_(d.ship, 200); if (!ship) throw new Error('請填寫收件資訊');
     var link = t_(d.link, 500); if (link && !/^https:\/\//.test(link)) throw new Error('付款連結需以 https:// 開頭');
     var n = cp_(s);
-    n.狀態 = d.st; n.物流 = t_(d.co, 30); n.物流單號 = t_(d.no, 40); n.付款連結 = link; n.匯款後五碼 = t_(d.last5, 5); if (d.rdate !== undefined) { var rd = String(d.rdate || ''); if (rd && !/^\d{4}-\d{2}-\d{2}$/.test(rd)) throw new Error('匯款日期格式不正確'); n.匯款日期 = rd; } n.收件資訊 = ship; n.備註 = t_(d.note, 200); n.電話 = t_(d.phone, 20) || s.電話;
+    n.付款方式 = payNew; n.狀態 = d.st; n.物流 = t_(d.co, 30); n.物流單號 = t_(d.no, 40); n.付款連結 = link; n.匯款後五碼 = t_(d.last5, 5); if (d.rdate !== undefined) { var rd = String(d.rdate || ''); if (rd && !/^\d{4}-\d{2}-\d{2}$/.test(rd)) throw new Error('匯款日期格式不正確'); n.匯款日期 = rd; } n.收件資訊 = ship; n.備註 = t_(d.note, 200); n.電話 = t_(d.phone, 20) || s.電話;
     n.運費 = fee; n.總額 = Math.max(0, Number(s.商品金額) - Number(s.優惠折抵 || 0) - Number(s.購物金折抵 || 0)) + fee;
-    var shippedNow = f.indexOf(d.st) >= si_(s.付款方式);
+    var shippedNow = f.indexOf(d.st) >= si_(payNew);
     if (!shippedNow) n.出貨時間 = ''; else if (!s.出貨時間) n.出貨時間 = now_();
     put_('出貨單', s._r, n);
     log_(u.acc, '修改出貨單', sid, diff_(s, n));
     String(s.訂單ID).split(',').forEach(function (oid) { syncOrderStatus_(oid, u.acc); });
     awardCredits_(sid, u.acc);
     notice = shipNotice_(s, n, f);
+    if (payChanged) {
+      log_(u.acc, '改付款方式', sid, String(s.付款方式) + '→' + payNew);
+      if (payNew === '匯款') {
+        var lid0 = String(s['LINE ID'] || ''), txt = String(s.姓名) + ' 您好,出貨單 ' + sid + ' 的付款方式已改為匯款\n應付金額:NT$ ' + n.總額 + '\n' + String(settings_().匯款資訊 || '') + '\n匯款後請到會員中心填寫帳號後五碼:' + appUrl_();
+        notice = (notice ? notice + ';' : '') + (lid0 ? (pushLine_(lid0, txt) ? '已用 LINE 通知客人匯款資訊' : 'LINE 通知發送失敗(客人可能未加好友)') : '客人沒有 LINE,請自行告知匯款資訊');
+      }
+    }
   });
   var res = adminOrders(tk);
   if (notice) res.shipNotify = notice;
