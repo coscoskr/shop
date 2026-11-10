@@ -117,7 +117,7 @@ fieldset{border:1px solid var(--line);border-radius:2px;margin:14px 0;padding:10
 
 <script src="api.js"></script>
 <script>
-var CR = [], BL = [], T = '', P = [], C = [], A = [], O = null, VL = [], FL = {}, tab = 'o', SEL = {};
+var CR = [], BL = [], T = '', P = [], C = [], A = [], O = null, VL = [], FL = {}, tab = (function () { try { var t = sessionStorage.getItem('tab'); return /^[oxysmpkrcdgalh]$/.test(t || '') ? t : 'o'; } catch (e) { return 'o'; } })(), SEL = {};
 var OF = { from: '', to: '', q: '', st: '', pay: '' }, SF = { from: '', to: '', q: '', st: '', pay: '', method: '' }, PF = { q: '', type: '', on: '', lock: '' };
 var ALLST = ['待刷卡', '已刷卡待出貨', '待匯款', '已匯款待查帳', '已查帳待出貨', '待出貨', '已出貨待送達', '已出貨待收貨', '已送達', '已收貨付款'];
 var $ = function (s) { return document.querySelector(s); };
@@ -173,7 +173,7 @@ $('#side').addEventListener('click', function (e) {
   tab = b.dataset.t; document.querySelectorAll('#side .tab').forEach(function (x) { x.classList.toggle('on', x === b); }); try { b.scrollIntoView({ inline: 'center', block: 'nearest' }); } catch (er) {} render();
 });
 
-function render() { ({ o: purchView, x: proxyView, y: shipForView, s: shipView, p: prodView, k: stockPage, r: reportPage, m: memberView, c: actView, d: codeView, g: setView, a: adminView, l: logView, h: histView })[tab](); }
+function render() { try { sessionStorage.setItem('tab', tab); } catch (e) {} document.querySelectorAll('#side .tab').forEach(function (x) { x.classList.toggle('on', x.dataset.t === tab); }); ({ o: purchView, x: proxyView, y: shipForView, s: shipView, p: prodView, k: stockPage, r: reportPage, m: memberView, c: actView, d: codeView, g: setView, a: adminView, l: logView, h: histView })[tab](); }
 /* 中文輸入法:組字(注音/拼音)過程中不重畫畫面,等選字完成才處理,避免變成ㄅㄆㄇ */
 document.addEventListener('input', function (e) { if (e.isComposing) e.stopImmediatePropagation(); }, true);
 document.addEventListener('compositionend', function (e) { var t = e.target; if (t && t.dispatchEvent && /^(INPUT|TEXTAREA)$/.test(t.tagName)) setTimeout(function () { t.dispatchEvent(new Event('input', { bubbles: true })); }, 0); }, true);
