@@ -1220,7 +1220,7 @@ function adminReport(tk, f) {
     if (f.pay && (!s || String(s.付款方式) !== f.pay)) return;
     if (q && (String(l.訂單ID) + o.姓名 + l.品名 + (l.規格 || '')).toLowerCase().indexOf(q) < 0) return;
     var m = lm(l), qty = Number(l.數量), rev = Number(l.小計) - (dsc[l._r] || 0), has = m.cost !== '';
-    sum.lines++; sum.qty += qty; sum.revenue += rev; os[String(l.訂單ID)] = 1; if (s) ss[String(s.出貨單ID)] = 1;
+    sum.lines++; sum.qty += qty; sum.revenue += rev; os[String(l.訂單ID)] = 1; if (s && (FLOW[s.付款方式] || []).indexOf(String(s.狀態)) >= si_(s.付款方式)) ss[String(s.出貨單ID)] = 1;
     if (has) { sum.cost += m.cost * qty; sum.profit += rev - m.cost * qty; } else sum.noCost++;
     var k = String(l.品名) + (l.規格 ? '(' + l.規格 + ')' : ''), pr = prod[k] = prod[k] || { name: k, qty: 0, revenue: 0, cost: 0, profit: 0 };
     pr.qty += qty; pr.revenue += rev; if (has) { pr.cost += m.cost * qty; pr.profit += rev - m.cost * qty; }

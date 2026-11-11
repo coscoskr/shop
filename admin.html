@@ -1503,7 +1503,7 @@ function loadReport() {
   call('adminReport', T, RF).then(function (r) {
     RD = r; var st = $('#rst'); if (st) st.innerHTML = '<option value="">全部</option>' + r.statuses.map(function (x) { return '<option' + (x === RF.status ? ' selected' : '') + '>' + esc(x) + '</option>'; }).join('');
     var m = r.sum;
-    $('#rpb').innerHTML = '<div class="rp"><div>總營收(訂單金額)<b>' + money(m.revenue) + '</b></div><div>利潤<b>' + money(m.profit) + '</b></div><div>銷售數量<b>' + nf(m.qty) + '</b></div><div>下單筆數<b>' + nf(m.orders) + '</b></div><div>出貨單數<b>' + nf(m.ships) + '</b></div><div>成本<b>' + money(m.cost) + '</b></div></div>' +
+    $('#rpb').innerHTML = '<div class="rp"><div>總營收(訂單金額)<b>' + money(m.revenue) + '</b></div><div>利潤<b>' + money(m.profit) + '</b></div><div>銷售數量<b>' + nf(m.qty) + '</b></div><div>下單筆數<b>' + nf(m.orders) + '</b></div><div>已出貨單數<b>' + nf(m.ships) + '</b></div><div>成本<b>' + money(m.cost) + '</b></div></div>' +
       '<p class="m">營收為訂單金額(商品小計扣掉折扣,未扣購物金、未含運費);利潤也是用扣掉折扣後的金額計算;' + (m.noCost ? nf(m.noCost) + ' 項未填成本,未計入成本與利潤。' : '') + '出貨日期篩選只會包含已建立出貨單的品項。</p>' +
       '<table><thead><tr><th>商品</th><th>數量</th><th>營收</th><th>成本</th><th>利潤</th></tr></thead><tbody>' + (r.prods.map(function (p) { return '<tr><td style="white-space:normal">' + esc(p.name) + '</td><td>' + nf(p.qty) + '</td><td>' + nf(p.revenue) + '</td><td>' + nf(p.cost) + '</td><td>' + nf(p.profit) + '</td></tr>'; }).join('') || '<tr><td colspan="5" class="m">沒有資料</td></tr>') + '</tbody></table>';
   }).catch(function (e) { $('#rpb').innerHTML = '<p class="er">' + esc(e.message) + '</p>'; });
