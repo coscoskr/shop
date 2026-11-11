@@ -2422,7 +2422,7 @@ function adminHistBindList(tk) {
   return { groups: gs, members: ms };
 }
 function adminHistBind(tk, pairs) {
-  var u = me_(tk), done = 0, skip = [];
+  var u = me_(tk), done = 0, skip = [], notify = {};
   lk_(function () {
     var mem = {}; rows_('會員').forEach(function (m) { mem[String(m['LINE ID'])] = m; });
     (pairs || []).slice(0, 300).forEach(function (p) {
@@ -2431,10 +2431,15 @@ function adminHistBind(tk, pairs) {
       var n = 0;
       rows_('訂單').forEach(function (o) { if (String(o.姓名) === name && String(o.備註).indexOf('[匯入]') === 0 && !String(o['LINE ID'] || '')) { var x = cp_(o); x['LINE ID'] = lid; put_('訂單', o._r, x); n++; } });
       rows_('出貨單').forEach(function (s) { if (String(s.姓名) === name && String(s.備註).indexOf('[匯入]') === 0 && !String(s['LINE ID'] || '')) { var x = cp_(s); x['LINE ID'] = lid; put_('出貨單', s._r, x); } });
-      if (n) { done++; log_(u.acc, '綁定舊訂單', name, '→ ' + String(mem[lid].暱稱) + ' ' + n + ' 張'); } else skip.push(name + ':沒有可綁定的訂單');
+      if (n) { done++; notify[lid] = 1; log_(u.acc, '綁定舊訂單', name, '→ ' + String(mem[lid].暱稱) + ' ' + n + ' 張'); } else skip.push(name + ':沒有可綁定的訂單');
     });
   });
-  var r = adminHistBindList(tk); r.msg = '已綁定 ' + done + ' 位' + (skip.length ? ',略過 ' + skip.length + ':' + skip.join('、') : ''); return r;
+  // 綁定成功後,用 LINE 通知客人(每位會員只發一則)
+  var okN = 0, failN = 0;
+  Object.keys(notify).forEach(function (lid) {
+    if (pushLine_(lid, 'coscos網站綁定成功!之後下單成功、到貨、出貨都會傳通知到這邊唷❤️謝謝您～')) okN++; else failN++;
+  });
+  var r = adminHistBindList(tk); r.msg = '已綁定 ' + done + ' 位,已用 LINE 通知 ' + okN + ' 位' + (failN ? '(' + failN + ' 位通知發送失敗,可能未加好友)' : '') + (skip.length ? ',略過 ' + skip.length + ':' + skip.join('、') : ''); return r;
 }
 
 

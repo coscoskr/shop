@@ -757,7 +757,7 @@ document.addEventListener('click', function (e) {
     var bad = 0; [].forEach.call(document.querySelectorAll('[data-hn]'), function (i) { if (i.value.trim() && !(HB && HB._nick[i.value.trim()])) bad++; });
     if (bad) { tell('有 ' + bad + ' 格填的暱稱找不到對應的 LINE 會員(紅框)。請改選清單裡的暱稱,或把那格清空,再按綁定。'); return; }
     if (!pairs.length) { tell('還沒有填任何暱稱(要從清單選到正確的暱稱)'); return; }
-    ask('確定綁定 ' + pairs.length + ' 位?', function () { wait('綁定中…請稍候'); call('adminHistBind', T, pairs).then(function (r) { var d = $('#dq'); d.oncancel = null; if (d.open) d.close(); histBindDraw(r); tell(r.msg); }).catch(function (e) { var d = $('#dq'); d.oncancel = null; if (d.open) d.close(); tell(e.message); }); }); return;
+    ask('確定綁定 ' + pairs.length + ' 位?\n綁定成功後會用 LINE 傳一則「綁定成功」通知給這些客人。', function () { wait('綁定中…請稍候'); call('adminHistBind', T, pairs).then(function (r) { var d = $('#dq'); d.oncancel = null; if (d.open) d.close(); histBindDraw(r); tell(r.msg); }).catch(function (e) { var d = $('#dq'); d.oncancel = null; if (d.open) d.close(); tell(e.message); }); }); return;
   }
   if (a === 'pon' || a === 'poff' || a === 'pdel') {
     var pids = selIds().filter(function (x) { return P.some(function (p) { return p.id === x; }); }); if (!pids.length) { tell('請先勾選商品'); return; }
