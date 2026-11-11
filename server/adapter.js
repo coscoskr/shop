@@ -11,7 +11,7 @@ export const TABLES = {
   '類別': T('categories', ['name'], { pk: 'name' }),
   '品牌': T('brands', ['name'], { pk: 'name' }),
   '廠商': T('vendors', ['name'], { pk: 'name' }),
-  '折扣碼': T('discount_codes', ['code','type','value','enabled','note','used','created_at','usage_limit','start_date','end_date'], { pk: 'code', num: ['value','used','usage_limit'] }),
+  '折扣碼': T('discount_codes', ['code','type','value','enabled','note','used','created_at','usage_limit','start_date','end_date','min_spend'], { pk: 'code', num: ['value','used','usage_limit','min_spend'] }),
   '等級': T('levels', ['name','rate','categories'], { pk: 'name', num: ['rate'] }),
   '會員': T('members', ['line_id','nickname','avatar','level','joined_at','last_login','friend','note','real_name','phone','email','address'], { pk: 'line_id' }),
   '訂單': T('orders', ['order_id','ordered_at','name','phone','pay_method','status','subtotal','shipping','total','receiver','note','line_id','pay_link','remit_last5','level','promo_name','promo_discount','credit_used','credit_detail','email','discount_code'], { pk: 'order_id', num: ['subtotal','shipping','total','promo_discount','credit_used'] }),

@@ -1396,18 +1396,19 @@ function drawCodes() {
     fld('折扣碼名稱(客人要輸入的文字)', 'code', cur.code) +
     '<label>折扣方式<select name="type" id="cdt"><option' + (cur.type === '百分比' ? ' selected' : '') + '>百分比</option><option' + (cur.type === '金額' ? ' selected' : '') + '>金額</option></select></label>' +
     '<label><span id="cdl">' + (cur.type === '金額' ? '折扣金額(元)' : '折扣 %(例:10 = 折抵 10%,打九折)') + '</span><input name="value" type="number" min="1" step="1" value="' + esc(cur.value) + '" inputmode="numeric"></label>' +
+    '<label>最低消費門檻(選填,商品金額滿多少才能用;例:5000)<input name="min" type="number" min="1" step="1" inputmode="numeric" value="' + (cur.min || '') + '"></label>' +
     '<label>使用數量上限(選填,空白=不限)<input name="limit" type="number" min="1" step="1" inputmode="numeric" value="' + (cur.limit || '') + '"></label>' +
     '<label>開始日(選填)<input name="start" type="date" value="' + esc(cur.start || '') + '"></label>' +
     '<label>截止日(選填,當天可用到 23:59)<input name="end" type="date" value="' + esc(cur.end || '') + '"></label>' +
     fld('備註(選填,只有你看得到)', 'note', cur.note) + '</div>' +
     '<label class="ck"><input type="checkbox" name="on"' + (cur.on ? ' checked' : '') + '> 啟用</label><p class="er" id="cde" role="alert"></p><button class="btn a">' + (CDE ? '儲存' : '新增') + '</button>' + (CDE ? ' <button type="button" class="btn l" data-cd="cancel">取消編輯</button>' : '') + '</form>' +
     '<table style="margin-top:16px"><thead><tr><th>折扣碼</th><th>內容</th><th>狀態</th><th>已使用</th><th>使用期限</th><th>備註</th><th></th></tr></thead><tbody>' +
-    (CD.map(function (x) { return '<tr><td><b>' + esc(x.code) + '</b></td><td>' + (x.type === '百分比' ? '折 ' + x.value + '%' : '折 ' + money(x.value)) + '</td><td>' + (x.state === '可用' ? '<span class="chip d">可使用</span>' : '<span class="chip">' + esc(x.state) + '</span>') + '</td><td>' + x.used + (x.limit ? ' / ' + x.limit : '') + ' 次</td><td>' + (x.start || x.end ? esc((x.start || '') + ' ~ ' + (x.end || '不限')) : '不限') + '</td><td style="white-space:normal">' + esc(x.note) + '</td><td style="white-space:nowrap"><button class="btn l s" data-cd="edit" data-c="' + esc(x.code) + '">編輯</button> <button class="btn l s" data-cd="tog" data-c="' + esc(x.code) + '">' + (x.on ? '停用' : '啟用') + '</button> <button class="btn l s" data-cd="del" data-c="' + esc(x.code) + '">刪除</button></td></tr>'; }).join('') || '<tr><td colspan="7" class="m">還沒有折扣碼</td></tr>') + '</tbody></table>';
+    (CD.map(function (x) { return '<tr><td><b>' + esc(x.code) + '</b></td><td>' + (x.min ? '滿 ' + money(x.min) + ' ' : '') + (x.type === '百分比' ? '折 ' + x.value + '%' : '折 ' + money(x.value)) + '</td><td>' + (x.state === '可用' ? '<span class="chip d">可使用</span>' : '<span class="chip">' + esc(x.state) + '</span>') + '</td><td>' + x.used + (x.limit ? ' / ' + x.limit : '') + ' 次</td><td>' + (x.start || x.end ? esc((x.start || '') + ' ~ ' + (x.end || '不限')) : '不限') + '</td><td style="white-space:normal">' + esc(x.note) + '</td><td style="white-space:nowrap"><button class="btn l s" data-cd="edit" data-c="' + esc(x.code) + '">編輯</button> <button class="btn l s" data-cd="tog" data-c="' + esc(x.code) + '">' + (x.on ? '停用' : '啟用') + '</button> <button class="btn l s" data-cd="del" data-c="' + esc(x.code) + '">刪除</button></td></tr>'; }).join('') || '<tr><td colspan="7" class="m">還沒有折扣碼</td></tr>') + '</tbody></table>';
 }
 document.addEventListener('change', function (e) { if (e.target.id === 'cdt') $('#cdl').textContent = e.target.value === '金額' ? '折扣金額(元)' : '折扣 %(例:10 = 折抵 10%,打九折)'; });
 document.addEventListener('submit', function (e) {
   var f = e.target; if (f.id !== 'cdf') return; e.preventDefault();
-  call('adminSaveCode', T, { old: CDE, code: f.code.value, type: f.type.value, value: f.value.value, note: f.note.value, limit: f.limit.value, start: f.start.value, end: f.end.value, on: f.on.checked }).then(function (r) { CD = r; CDE = ''; drawCodes(); }).catch(fail('#cde'));
+  call('adminSaveCode', T, { old: CDE, code: f.code.value, type: f.type.value, value: f.value.value, note: f.note.value, limit: f.limit.value, min: f.min.value, start: f.start.value, end: f.end.value, on: f.on.checked }).then(function (r) { CD = r; CDE = ''; drawCodes(); }).catch(fail('#cde'));
 });
 document.addEventListener('click', function (e) {
   var b = e.target.closest('[data-cd]'); if (!b) return;

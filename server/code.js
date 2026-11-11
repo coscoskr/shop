@@ -12,7 +12,7 @@ var H = {
   '商品_內部': ['商品ID', '廠商', '成本', '成本含稅', '貨源', '鎖定'],
   '類別': ['類別'],
   '品牌': ['品牌'],
-  '折扣碼': ['折扣碼', '類型', '數值', '啟用', '備註', '使用次數', '建立時間', '使用上限', '開始日', '截止日'],
+  '折扣碼': ['折扣碼', '類型', '數值', '啟用', '備註', '使用次數', '建立時間', '使用上限', '開始日', '截止日', '最低消費'],
   '廠商': ['廠商'],
   '訂單': ['訂單ID', '下單時間', '姓名', '電話', '付款方式', '狀態', '商品金額', '運費', '總額', '收件資訊', '備註', 'LINE ID', '付款連結', '匯款後五碼', '會員等級', '優惠名稱', '優惠折抵', '購物金折抵', '購物金明細', '電子郵件', '折扣碼'],
   '訂單明細': ['訂單ID', '商品ID', '品名', '數量', '單價', '小計', '到貨狀態', '可出貨', '申請出貨', '出貨單ID', '型態', '廠商', '成本', '成本含稅', '貨源', '廠商付款ID', '規格', '到貨操作人', '到貨時間', '叫貨狀態', '叫貨人', '叫貨時間'],
@@ -260,7 +260,7 @@ function placeCore_(want, ctx, o, name, phone, email, who, notePre) {
   var res;
   lk_(function () {
     var c = calc_(want, ctx, o.useCredit ? 1e9 : 0, o.code);
-    if (String(o.code || '').trim() && !c.codeOk) throw new Error('折扣碼不正確或已失效');
+    if (String(o.code || '').trim() && !c.codeOk) throw new Error(c.codeMin ? '此折扣碼需商品金額滿 NT$ ' + c.codeMin + ' 才能使用' : '折扣碼不正確或已失效');
     if (c.codeOk && c.discount > 0 && /^折扣碼 /.test(c.dname)) codeUsed_(c.codeName);
     var st = settings_();
     var d = Utilities.formatDate(new Date(), TZ, 'yyMMdd');
@@ -327,7 +327,7 @@ function adminProxyQuote(tk, o) {
     OVR_ = w.ovr;
     try {
       var c = calc_(w.want, c0.ctx, o.useCredit ? 1e9 : 0, o.code);
-      return { ok: true, sub: c.sub, discount: c.discount, dname: c.dname, credit: c.credit, total: c.total, codeOk: c.codeOk, level: c.level, balance: c.balance,
+      return { ok: true, sub: c.sub, discount: c.discount, dname: c.dname, credit: c.credit, total: c.total, codeOk: c.codeOk, codeMin: c.codeMin, level: c.level, balance: c.balance,
         lines: c.lines.map(function (l) { return { id: spec_(l[3]) ? String(l[0].商品ID) + '~' + l[3] : String(l[0].商品ID), name: String(l[0].名稱), spec: l[3] || '', qty: l[1], unit: l[2] }; }) };
     } finally { OVR_ = null; }
   } catch (e) { return { ok: false, msg: e.message }; }
@@ -786,7 +786,7 @@ function codeUsed_(name, delta) {
   if (r) { var n = cp_(r); n.使用次數 = Math.max(0, (Number(r.使用次數) || 0) + (delta === undefined ? 1 : delta)); put_('折扣碼', r._r, n); }
 }
 function codeList_() {
-  return codes_().map(function (r) { return { code: String(r.折扣碼), type: String(r.類型), value: Number(r.數值), on: String(r.啟用) === 'Y', note: String(r.備註 || ''), used: Number(r.使用次數) || 0, limit: Number(r.使用上限) || 0, start: dstr_(r.開始日), end: dstr_(r.截止日), state: codeState_(r), at: String(r.建立時間 || '').slice(0, 16) }; });
+  return codes_().map(function (r) { return { code: String(r.折扣碼), type: String(r.類型), value: Number(r.數值), on: String(r.啟用) === 'Y', note: String(r.備註 || ''), used: Number(r.使用次數) || 0, limit: Number(r.使用上限) || 0, start: dstr_(r.開始日), end: dstr_(r.截止日), min: Number(r.最低消費) || 0, state: codeState_(r), at: String(r.建立時間 || '').slice(0, 16) }; });
 }
 function adminCodes(tk) { me_(tk); return codeList_(); }
 function adminSaveCode(tk, d) {
@@ -799,6 +799,9 @@ function adminSaveCode(tk, d) {
   if (type === '金額' && !(v >= 1 && Math.floor(v) === v)) throw new Error('折扣金額請填 1 以上的整數');
   var lim = d.limit === '' || d.limit == null ? 0 : Number(d.limit);
   if (!(lim >= 0) || Math.floor(lim) !== lim) throw new Error('使用數量上限請填 1 以上的整數,空白代表不限');
+  var mn = d.min === '' || d.min == null ? 0 : Number(d.min);
+  if (!(mn >= 0) || Math.floor(mn) !== mn) throw new Error('最低消費請填整數金額,空白代表不限');
+  if (type === '金額' && mn > 0 && v >= mn) throw new Error('折扣金額不能大於或等於最低消費門檻');
   var st = String(d.start || '').trim(), en = String(d.end || '').trim();
   if ((st && !dstr_(st)) || (en && !dstr_(en))) throw new Error('日期格式不正確');
   st = dstr_(st); en = dstr_(en);
@@ -809,7 +812,7 @@ function adminSaveCode(tk, d) {
     if (dup) throw new Error('折扣碼「' + dup.折扣碼 + '」已經存在');
     var cur = old ? all.filter(function (r) { return String(r.折扣碼) === old; })[0] : null;
     if (old && !cur) throw new Error('找不到折扣碼「' + old + '」');
-    var row = { '折扣碼': code, '類型': type, '數值': v, '啟用': d.on === false ? 'N' : 'Y', '備註': t_(d.note, 100), '使用次數': cur ? cur.使用次數 : 0, '建立時間': cur ? cur.建立時間 : now_(), '使用上限': lim, '開始日': st, '截止日': en };
+    var row = { '折扣碼': code, '類型': type, '數值': v, '啟用': d.on === false ? 'N' : 'Y', '備註': t_(d.note, 100), '使用次數': cur ? cur.使用次數 : 0, '建立時間': cur ? cur.建立時間 : now_(), '使用上限': lim, '開始日': st, '截止日': en, '最低消費': mn };
     sh_('折扣碼'); put_('折扣碼', cur ? cur._r : 0, row);
     log_(u.acc, cur ? '修改折扣碼' : '新增折扣碼', code, type + ' ' + v + (lim ? ' 上限' + lim : '') + (st || en ? ' ' + st + '~' + en : '') + (row.啟用 === 'N' ? '(停用)' : ''));
   });
@@ -1289,6 +1292,7 @@ function adminOrderAdjust(tk, oid, d) {
     if (newCode !== oldCode) {
       if (newCode) {
         var cr = findCode_(newCode); if (!cr) throw new Error('折扣碼「' + newCode + '」不存在、已停用、已用完或不在使用期限內');
+        if ((Number(cr.最低消費) || 0) > sub) throw new Error('此折扣碼需商品金額滿 NT$ ' + Number(cr.最低消費) + ' 才能使用(目前 ' + sub + ')');
         var cv = Number(cr.數值), amt = String(cr.類型) === '百分比' ? Math.round(sub * cv / 100) : Math.min(cv, sub);
         n.折扣碼 = String(cr.折扣碼); n.優惠名稱 = '折扣碼 ' + cr.折扣碼; n.優惠折抵 = Math.min(amt, sub);
         codeUsed_(String(cr.折扣碼), 1); msg = '套用折扣碼 ' + cr.折扣碼 + ' 折抵 ' + n.優惠折抵;
@@ -2035,7 +2039,8 @@ function calc_(want, ctx, wantCredit, code) {
   var st = settings_(), lid = ctx && ctx.lid ? ctx.lid : '', lvl = lid ? levelOf_(lid) : '一般會員', t = today_();
   // 折扣碼(後台「折扣碼」頁設定;遊客也可使用):百分比或固定金額,與會員/活動優惠取最划算的一個
   var codeIn = String(code || '').trim(), codeOk = null, codeRow = null;
-  if (codeIn) { codeRow = findCode_(codeIn); codeOk = !!codeRow; }
+  var codeMin = 0;
+  if (codeIn) { codeRow = findCode_(codeIn); codeOk = !!codeRow; if (codeRow && (Number(codeRow.最低消費) || 0) > sub) { codeMin = Number(codeRow.最低消費); codeRow = null; codeOk = false; } }
   var best = { amt: 0, name: '' };
   function cand(amt, name) { if (amt > best.amt) best = { amt: amt, name: name }; }
   if (codeRow) {
@@ -2063,7 +2068,7 @@ function calc_(want, ctx, wantCredit, code) {
   var allowed = lid && after >= minSpend ? Math.max(0, Math.min(bal, cap, after)) : 0;
   var credit = Math.min(Math.floor(Number(wantCredit) || 0), allowed);
   return { lines: lines, sub: sub, discount: best.amt, dname: best.amt ? best.name : '', fee: fee, credit: credit, total: after - credit + fee,
-    level: lvl, balance: bal, codeName: codeRow ? String(codeRow.折扣碼) : '', allowed: allowed, minSpend: minSpend, codeOk: codeOk };
+    level: lvl, balance: bal, codeName: codeRow ? String(codeRow.折扣碼) : '', allowed: allowed, minSpend: minSpend, codeOk: codeOk, codeMin: codeMin };
 }
 function quote(tk, items, wantCredit, code) {
   var ctx = null; try { ctx = tk ? mem_(tk) : null; } catch (e) { ctx = null; }
@@ -2072,7 +2077,7 @@ function quote(tk, items, wantCredit, code) {
   (items || []).slice(0, 60).forEach(function (i) { var n = Math.floor(Number(i.qty)); if (n >= 1 && n <= 99) want[i.id] = (want[i.id] || 0) + n; });
   try {
     var c = calc_(want, ctx, wantCredit ? 1e9 : 0, code);
-    return { ok: true, sub: c.sub, discount: c.discount, dname: c.dname, fee: c.fee, credit: c.credit, total: c.total, codeOk: c.codeOk, level: c.level, balance: c.balance, allowed: c.allowed, minSpend: c.minSpend, login: !!ctx };
+    return { ok: true, sub: c.sub, discount: c.discount, dname: c.dname, fee: c.fee, credit: c.credit, total: c.total, codeOk: c.codeOk, codeMin: c.codeMin, level: c.level, balance: c.balance, allowed: c.allowed, minSpend: c.minSpend, login: !!ctx };
   } catch (e) { return { ok: false, msg: e.message }; }
 }
 

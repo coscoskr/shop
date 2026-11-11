@@ -393,7 +393,7 @@ function cartHtml(noRefresh) {
   });
   h += '<form id="cdf" class="cd"><label for="cdi" class="cdt">有折扣碼嗎?在這裡輸入</label><div class="cdr"><input id="cdi" value="' + esc(CODE) + '" maxlength="30" autocomplete="off" autocapitalize="characters" placeholder="輸入折扣碼"><button class="btn a">套用</button></div><div class="cdh">輸入後請按「套用」,折扣才會算進金額</div></form>';
   var q = QT && QT.ok ? QT : null;
-  if (CODE && q) h += q.codeOk ? '<p class="tg">折扣碼已套用</p>' : '<p class="tg">折扣碼不正確或已失效</p>';
+  if (CODE && q) h += q.codeOk ? '<p class="tg">折扣碼已套用</p>' : '<p class="tg">' + (q.codeMin ? '此折扣碼需商品金額滿 NT$ ' + Number(q.codeMin).toLocaleString('en-US') + ' 才能使用' : '折扣碼不正確或已失效') + '</p>';
   if (q) {
     h += '<p>商品 ' + money(q.sub) + (q.discount ? '<br>' + esc(q.dname) + ' <span class="tg">-' + money(q.discount) + '</span>' : '') +
       '<br><b>合計 ' + money(q.total) + '</b></p>';
