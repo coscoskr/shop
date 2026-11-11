@@ -420,13 +420,13 @@ function cartHtml(noRefresh) {
   } else {
     h += '<p>商品 ' + money(sub) + '<br><b>合計 ' + money(sub) + '</b></p>';
   }
-  h += '<p class="ds">折扣碼在下一步「結帳」時輸入。</p><p><button class="btn a" data-a="co">前往結帳</button> <button class="btn l" data-a="x">繼續逛逛</button></p></div>';
+  h += '<p class="ds">折扣碼在下一步「下單」時輸入。現在還不用結帳,等商品到貨、要出貨時再結帳。</p><p><button class="btn a" data-a="co">前往下單</button> <button class="btn l" data-a="x">繼續逛逛</button></p></div>';
   if (!noRefresh) refreshQuote();
   return h;
 }
 function checkoutHtml() {
-  var ids = Object.keys(cart), h = '<div id="cobox"><h2>結帳</h2>';
-  if (!ids.length) return '<h2>結帳</h2><p>購物車是空的。</p><button class="btn l" data-a="x">繼續逛逛</button>';
+  var ids = Object.keys(cart), h = '<div id="cobox"><h2>下單</h2>';
+  if (!ids.length) return '<h2>下單</h2><p>購物車是空的。</p><button class="btn l" data-a="x">繼續逛逛</button>';
   h += '<div class="cosum">';
   ids.forEach(function (id) { var p = byId(bp(id)); if (!p) return; h += '<div class="ln"><div class="nm">' + bn(p) + (sp(id) ? ' <small>(' + esc(sp(id)) + ')</small>' : '') + ' <small>× ' + cart[id] + '</small></div></div>'; });
   h += '</div>';
