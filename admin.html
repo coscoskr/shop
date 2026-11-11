@@ -118,7 +118,7 @@ fieldset{border:1px solid var(--line);border-radius:2px;margin:14px 0;padding:10
 <script src="api.js"></script>
 <script>
 var CR = [], BL = [], T = '', P = [], C = [], A = [], O = null, VL = [], FL = {}, tab = (function () { try { var t = sessionStorage.getItem('tab'); return /^[oxysmpkrcdgalh]$/.test(t || '') ? t : 'o'; } catch (e) { return 'o'; } })(), SEL = {};
-var OF = { from: '', to: '', q: '', st: '', pay: '' }, SF = { from: '', to: '', q: '', st: '', pay: '', method: '' }, PF = { q: '', type: '', on: '', lock: '' };
+var OF = { from: '', to: '', q: '', st: '', pay: '' }, SF = { from: '', to: '', q: '', st: '', pay: '', method: '', pr: '' }, PF = { q: '', type: '', on: '', lock: '' };
 var ALLST = ['待刷卡', '已刷卡待出貨', '待匯款', '已匯款待查帳', '已查帳待出貨', '待出貨', '已出貨待送達', '已出貨待收貨', '已送達', '已收貨付款'];
 var $ = function (s) { return document.querySelector(s); };
 function vopt(cur, blank) {
@@ -214,6 +214,7 @@ function filterBar(id, f, withPay, statuses) {
     '<label>狀態<select data-k="st">' + opts(statuses, f.st, '全部') + '</select></label>' +
     (withPay ? '<label>付款方式<select data-k="pay">' + opts(['刷卡', '匯款', '賣貨便', '付現金'], f.pay, '全部') + '</select></label>' : '') +
     (f.method !== undefined ? '<label>運送方式<select data-k="method">' + opts(['店到店', '宅配', '自取'], f.method, '全部') + '</select></label>' : '') +
+    (f.pr !== undefined ? '<label>列印狀態<select data-k="pr">' + opts(['未列印', '已列印'], f.pr, '全部') + '</select></label>' : '') +
     '<button class="btn l" data-a="reset">清除篩選</button><span class="sum" id="sum"></span></div>';
 }
 function bindFilter(id, f, redraw) {
@@ -267,7 +268,7 @@ var SSEL = {};
 function dt2(t) { t = String(t || ''); return t.length >= 16 ? esc(t.slice(5, 10)) + '<br><small class="m">' + esc(t.slice(11, 16)) + '</small>' : '<span class="m">—</span>'; }
 function shipRows() {
   var k = SF.q.toLowerCase();
-  var rows = shipList().filter(function (x) { var s = x.s; return inRange(s.cr, SF) && (!SF.st || s.st === SF.st) && (!SF.pay || s.pay === SF.pay) && (!SF.method || s.method === SF.method) && (!k || (s.id + s.oids.join(',') + s.name + s.phone + s.no + s.last5).toLowerCase().indexOf(k) >= 0); });
+  var rows = shipList().filter(function (x) { var s = x.s; return inRange(s.cr, SF) && (!SF.st || s.st === SF.st) && (!SF.pay || s.pay === SF.pay) && (!SF.method || s.method === SF.method) && (!SF.pr || (SF.pr === '未列印' ? !s.pr : !!s.pr)) && (!k || (s.id + s.oids.join(',') + s.name + s.phone + s.no + s.last5).toLowerCase().indexOf(k) >= 0); });
   var sum = rows.reduce(function (t, x) { return t + x.s.total; }, 0);
   var pend = 0; O.forEach(function (o) { o.items.forEach(function (i) { if (i.arr === '已到貨' && !i.sid) pend++; }); });
   $('#sum').textContent = '共 ' + rows.length + ' 張,合計 ' + money(sum) + ';待處理(已到貨、客人尚未出貨)' + pend + ' 項';
