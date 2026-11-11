@@ -285,6 +285,7 @@ function shipRows() {
   var sum = rows.reduce(function (t, x) { return t + x.s.total; }, 0);
   var pend = 0; O.forEach(function (o) { o.items.forEach(function (i) { if (i.arr === '已到貨' && !i.sid) pend++; }); });
   $('#sum').textContent = '共 ' + rows.length + ' 張,合計 ' + money(sum) + ';待處理(已到貨、客人尚未出貨)' + pend + ' 項';
+  var vis = {}; rows.forEach(function (x) { vis[x.s.id] = 1; }); Object.keys(SSEL).forEach(function (k) { if (!vis[k]) delete SSEL[k]; });
   var allOn = rows.length > 0 && rows.every(function (x) { return SSEL[x.s.id]; });
   $('#tb').innerHTML = '<div class="bt"><span class="m">已勾選 <b id="ssn">' + selShips().length + '</b> 張:</span><button class="btn l" data-a="sbq">改為「已查帳待出貨」</button> <label style="display:inline-block;margin:0">改為 <select id="sbst">' + ALLST.map(function (x) { return '<option>' + esc(x) + '</option>'; }).join('') + '</select></label><button class="btn l" data-a="sbgo">套用狀態</button><button class="btn a" data-a="sbp">批次列印訂購單</button><button class="btn l" data-a="sbd">批次刪除</button></div>' +
     '<table class="sht"><thead><tr><th class="c"><input type="checkbox" id="sall" aria-label="全選目前清單"' + (allOn ? ' checked' : '') + '></th><th class="c">是否列印</th><th>出貨單</th><th>姓名 / 電話</th><th>品項</th><th class="c">運送</th><th class="c">付款</th><th class="c">後五碼</th><th class="c">匯款日期</th><th class="n">應付</th><th class="c">狀態</th><th>物流 / 單號</th><th class="c">建立</th><th class="c">出貨</th></tr></thead><tbody>' +
@@ -789,7 +790,7 @@ document.addEventListener('click', function (e) {
   if (a === 'poprint') {
     var ps = window.POS || [], now = new Date().toISOString().slice(0, 19).replace('T', ' ');
     window.print();
-    if (ps.length) call('adminShipPrinted', T, ps).then(function () { (O || []).forEach(function (o) { o.ships.forEach(function (s) { if (ps.indexOf(s.id) >= 0) s.pr = now; }); }); if (tab === 's') shipRows(); }).catch(function () {});
+    if (ps.length) call('adminShipPrinted', T, ps).then(function () { (O || []).forEach(function (o) { o.ships.forEach(function (s) { if (ps.indexOf(s.id) >= 0) s.pr = now; }); }); ps.forEach(function (id) { delete SSEL[id]; }); if (tab === 's') shipRows(); }).catch(function () {});
     return;
   }
   if (a === 'spadd') { SPL.push({ n: '', q: '' }); drawSpecs(); var ins = document.querySelectorAll('.spi'); if (ins.length) ins[ins.length - 1].focus(); return; }
