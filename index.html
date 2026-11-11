@@ -24,7 +24,7 @@ h1{font-size:18px;margin:0;white-space:nowrap;letter-spacing:.5px}
 .sw{position:relative;flex:1;max-width:460px;margin-left:auto}
 .lgb,.btn.lgb,#lga{background:#06C755;border:1px solid #06C755;color:#fff;border-radius:6px;font-weight:600}.lgb:hover,#lga:hover{background:#05b34c;color:#fff}
 .ot{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);font-size:14px}.ot>div{display:flex;justify-content:space-between;padding:2px 0}.ot .dc{color:var(--acc)}.ot .tt{font-weight:700;font-size:15px;padding-top:4px}
-#cdw{position:fixed;inset:0;z-index:99999;background:rgba(75,59,55,.45);display:flex;align-items:center;justify-content:center;padding:24px}#cdw .cdb{background:#fff;border-radius:18px;padding:22px 20px;max-width:320px;width:100%;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.25)}#cdw .cdb p{margin:0 0 10px}#cdw .cdb b{font-size:17px;color:var(--acc)}
+#tst{position:fixed;left:50%;bottom:24px;transform:translate(-50%,30px);opacity:0;pointer-events:none;z-index:99998;background:#4b3b37;color:#fff;padding:12px 16px;border-radius:999px;font-size:14px;display:flex;gap:12px;align-items:center;transition:.25s;max-width:92vw}#tst.on{opacity:1;transform:translate(-50%,0);pointer-events:auto}#tst button{background:#fff;color:#4b3b37;border:0;border-radius:999px;padding:5px 12px;font-weight:700;cursor:pointer}.cosum{margin:6px 0;padding:8px 10px;background:#faf3f0;border-radius:10px;font-size:14px}#cdw{position:fixed;inset:0;z-index:99999;background:rgba(75,59,55,.45);display:flex;align-items:center;justify-content:center;padding:24px}#cdw .cdb{background:#fff;border-radius:18px;padding:22px 20px;max-width:320px;width:100%;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.25)}#cdw .cdb p{margin:0 0 10px}#cdw .cdb b{font-size:17px;color:var(--acc)}
 .cd{margin:12px 0;padding:12px 14px;background:var(--soft);border:2px dashed var(--pink);border-radius:16px}.cd .cdt{font-size:15px;font-weight:700;color:var(--acc);margin-bottom:8px}.cd .cdr{display:flex;gap:8px}.cd input{flex:1;min-width:0;height:44px;padding:0 14px;border:1.5px solid var(--pink);border-radius:999px;background:#fff;font-size:16px;letter-spacing:.5px}.cd input:focus{outline:none;border-color:var(--acc)}.cd .btn{flex:none;height:44px;min-height:0;padding:0 20px;font-size:15px;line-height:1;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center}.cd .cdh{margin-top:6px;font-size:12px;color:var(--mute)}
 .sw{min-width:0}.sw input{width:100%;padding:9px 14px;border:1px solid var(--line);border-radius:999px;background:#fff}
 #sg{position:absolute;left:0;right:0;top:100%;background:#fff;border:1px solid var(--line);display:none;z-index:6}
@@ -192,7 +192,7 @@ function maxQ(p) { return p.stock === null ? 99 : Math.min(99, p.stock); }
 function tag(p) { return p.type === '預購' ? '預購' + (p.arrival === '排隊中' ? ',暫不確定,排隊中' : p.arrival ? ',預計' + md(p.arrival) + '左右' : '') : '現貨'; }
 
 google.script.run.withSuccessHandler(function (d) {
-  D = d; drawFt(); $('#store').textContent = d.store || 'coscos韓國選物店'; document.title = d.store || 'coscos韓國選物店';
+  D = d; restoreCart(); drawFt(); $('#store').textContent = d.store || 'coscos韓國選物店'; document.title = d.store || 'coscos韓國選物店';
   if (d.notice) { $('#notice').hidden = false; $('#notice').textContent = d.notice; }
   if (BOOT.err) { $('#notice').hidden = false; $('#notice').textContent = BOOT.err; }
   if (LT && !BOOT.token) {
@@ -355,7 +355,27 @@ document.addEventListener('keydown', function (e) { if (e.key === 'Escape') clos
 document.addEventListener('change', function (e) {
   var t = e.target; if (t.id === 'so') { SORT = t.value; PAGE = 1; grid(); } else if (t.id === 'pp') { PER = +t.value || 24; PAGE = 1; grid(); }
 });
-function count() { var n = 0; for (var k in cart) n += cart[k]; $('#cn').hidden = !n; $('#cn').textContent = n; }
+function count() { var n = 0; for (var k in cart) n += cart[k]; $('#cn').hidden = !n; $('#cn').textContent = n; try { localStorage.setItem('cart1', JSON.stringify(cart)); } catch (x) {} }
+function restoreCart() {
+  var raw = null; try { raw = JSON.parse(localStorage.getItem('cart1') || 'null'); } catch (x) {}
+  if (!raw || typeof raw !== 'object') return;
+  var left = {}, dropped = 0;
+  Object.keys(raw).forEach(function (k) {
+    var p = byId(bp(k)), n = Math.floor(Number(raw[k])), spv = k.indexOf('~') > 0 ? k.slice(k.indexOf('~') + 1) : '';
+    if (!p || !(n >= 1) || p.stock === 0 || (p.specs && p.specs.length && spv && p.specs.indexOf(spv) < 0)) { dropped++; return; }
+    var cap = Math.min(p.stock === null ? 99 : p.stock, spv && p.specQty && p.specQty[spv] != null ? p.specQty[spv] : 99, 99);
+    if (cap < 1) { dropped++; return; }
+    left[k] = Math.min(n, cap); if (left[k] < n) dropped++;
+  });
+  cart = left; count();
+  if (dropped) toast('購物車裡有 ' + dropped + ' 項商品已售完或數量有調整');
+}
+var TT = 0;
+function toast(msg, withCart) {
+  var t = $('#tst'); if (!t) { t = document.createElement('div'); t.id = 'tst'; t.setAttribute('role', 'status'); document.body.appendChild(t); }
+  t.innerHTML = '<span>' + esc(msg) + '</span>' + (withCart ? ' <button type="button" data-a="cart">查看購物車</button>' : ''); t.className = 'on';
+  clearTimeout(TT); TT = setTimeout(function () { t.className = ''; }, withCart ? 4000 : 3500);
+}
 function show(h) { setLg(); var d = $('#dlg'); d.innerHTML = h; if (!d.open) d.showModal(); d.setAttribute('tabindex', '-1'); try { d.focus({ preventScroll: true }); } catch (x) {} d.style.pointerEvents = 'none'; setTimeout(function () { d.style.pointerEvents = ''; }, 350); if (d.querySelector('#lga')) prepLogin(); }
 function prepLogin() {
   if (D && D.line && D.line.liff) { var a0 = $('#lga'); if (a0) { a0.href = 'https://liff.line.me/' + D.line.liff; a0.removeAttribute('aria-disabled'); a0.textContent = '使用 LINE 登入'; } return; }
@@ -391,9 +411,7 @@ function cartHtml(noRefresh) {
     var p = byId(bp(id)), n = cart[id]; if (!p) return; var u = unit(p, n); sub += u * n;
     h += '<div class="ln"><div><div class="nm">' + bn(p) + (sp(id) ? ' <small>(' + esc(sp(id)) + ')</small>' : '') + '</div><small>' + money(u) + ' × ' + n + '</small></div><div class="r"><button class="btn l" data-a="dec" data-id="' + esc(id) + '">−</button><button class="btn l" data-a="inc" data-id="' + esc(id) + '">+</button><b>' + money(u * n) + '</b><button class="btn l" data-a="del" data-id="' + esc(id) + '">移除</button></div></div>';
   });
-  h += '<form id="cdf" class="cd"><label for="cdi" class="cdt">有折扣碼嗎?在這裡輸入</label><div class="cdr"><input id="cdi" value="' + esc(CODE) + '" maxlength="30" autocomplete="off" autocapitalize="characters" placeholder="輸入折扣碼"><button class="btn a">套用</button></div><div class="cdh">輸入後請按「套用」,折扣才會算進金額</div></form>';
   var q = QT && QT.ok ? QT : null;
-  if (CODE && q) h += q.codeOk ? '<p class="tg">折扣碼已套用</p>' : '<p class="tg">' + (q.codeMin ? '此折扣碼需商品金額滿 NT$ ' + Number(q.codeMin).toLocaleString('en-US') + ' 才能使用' : '折扣碼不正確或已失效') + '</p>';
   if (q) {
     h += '<p>商品 ' + money(q.sub) + (q.discount ? '<br>' + esc(q.dname) + ' <span class="tg">-' + money(q.discount) + '</span>' : '') +
       '<br><b>合計 ' + money(q.total) + '</b></p>';
@@ -402,14 +420,33 @@ function cartHtml(noRefresh) {
   } else {
     h += '<p>商品 ' + money(sub) + '<br><b>合計 ' + money(sub) + '</b></p>';
   }
-  h += '<p><button class="btn a" data-a="co">確認下訂</button> <button class="btn l" data-a="x">繼續逛逛</button></p></div>';
+  h += '<p class="ds">折扣碼在下一步「結帳」時輸入。</p><p><button class="btn a" data-a="co">前往結帳</button> <button class="btn l" data-a="x">繼續逛逛</button></p></div>';
   if (!noRefresh) refreshQuote();
   return h;
+}
+function checkoutHtml() {
+  var ids = Object.keys(cart), h = '<div id="cobox"><h2>結帳</h2>';
+  if (!ids.length) return '<h2>結帳</h2><p>購物車是空的。</p><button class="btn l" data-a="x">繼續逛逛</button>';
+  h += '<div class="cosum">';
+  ids.forEach(function (id) { var p = byId(bp(id)); if (!p) return; h += '<div class="ln"><div class="nm">' + bn(p) + (sp(id) ? ' <small>(' + esc(sp(id)) + ')</small>' : '') + ' <small>× ' + cart[id] + '</small></div></div>'; });
+  h += '</div>';
+  h += '<form id="cdf" class="cd"><label for="cdi" class="cdt">有折扣碼嗎?在這裡輸入</label><div class="cdr"><input id="cdi" value="' + esc(CODE) + '" maxlength="30" autocomplete="off" autocapitalize="characters" placeholder="輸入折扣碼"><button class="btn a">套用</button></div><div class="cdh">輸入後請按「套用」,折扣才會算進金額</div></form>';
+  var q = QT && QT.ok ? QT : null;
+  if (CODE && q) h += q.codeOk ? '<p class="tg">折扣碼已套用</p>' : '<p class="tg">' + (q.codeMin ? '此折扣碼需商品金額滿 NT$ ' + Number(q.codeMin).toLocaleString('en-US') + ' 才能使用' : '折扣碼不正確或已失效') + '</p>';
+  if (q) h += '<p>商品 ' + money(q.sub) + (q.discount ? '<br>' + esc(q.dname) + ' <span class="tg">-' + money(q.discount) + '</span>' : '') + '<br><b>合計 ' + money(q.total) + '</b></p>';
+  if (LT) h += '<p id="er" class="tg" role="alert"></p><p><button class="btn a" data-a="pn" id="pnb">確認下訂</button> <button type="button" class="btn l" data-a="cart">返回購物車</button></p>';
+  else h += '<p class="ds">請留下姓名、電話與電子郵件。到貨、出貨通知會寄到你的電子郵件。付款方式與收件資料,等商品到貨要結帳時再填。</p><form id="f"><label>姓名<input name="name" required maxlength="40"></label><label>聯絡電話<input name="phone" required inputmode="tel"></label><label>電子郵件(必填,用來通知與聯絡)<input name="email" type="email" required maxlength="80" autocomplete="email"></label><p id="er" class="tg" role="alert"></p><button class="btn a" id="sb">確認下訂</button> <button type="button" class="btn l" data-a="cart">返回購物車</button></form>';
+  h += '</div>'; if (!q) refreshQuote();
+  return h;
+}
+function showCheckout() {
+  var keep = {}; [].forEach.call(document.querySelectorAll('#f input'), function (i) { keep[i.name] = i.value; });
+  show(checkoutHtml()); var f = $('#f'); if (f) Object.keys(keep).forEach(function (k) { if (f[k]) f[k].value = keep[k]; });
 }
 function refreshQuote() {
   var items = Object.keys(cart).map(function (id) { return { id: id, qty: cart[id] }; });
   if (!items.length) return;
-  google.script.run.withSuccessHandler(function (r) { QT = r; if ($('#dlg').open && $('#cartbox')) { var ae = document.activeElement; if (ae && ae.id === 'cdi') return; show(cartHtml(true)); } }).quote(LT, items, false, CODE);
+  google.script.run.withSuccessHandler(function (r) { QT = r; if ($('#dlg').open && $('#cartbox')) { show(cartHtml(true)); } else if ($('#dlg').open && $('#cobox')) { var ae = document.activeElement; if (ae && ae.id === 'cdi') return; showCheckout(); } }).quote(LT, items, false, CODE);
 }
 function formHtml() {
   return '<h2>遊客下單</h2><p class="ds">請留下姓名、電話與電子郵件。到貨、出貨通知會寄到你的電子郵件。付款方式與收件資料,等商品到貨要結帳時再填。</p><form id="f"><label>姓名<input name="name" required maxlength="40"></label><label>聯絡電話<input name="phone" required inputmode="tel"></label><label>電子郵件(必填,用來通知與聯絡)<input name="email" type="email" required maxlength="80" autocomplete="email"></label>' +
@@ -423,7 +460,7 @@ function placeNow(o, sb) {
     MTAB = 'o'; MSEL = {}; memLoad(function () { show('<h2>訂單已成立</h2><p>訂單編號 <b>' + esc(oid) + '</b></p><p class="ds">現貨或已到貨的商品,即可勾選結帳並出貨;預購商品到貨後會通知你。</p><button class="btn a" data-a="mt" data-t="o">我知道了,查看訂單明細</button>'); });
     D.products.forEach(function (p) { if (p.stock !== null) { var n = 0; o.items.forEach(function (i) { if (bp(i.id) === p.id) n += i.qty; }); if (n) p.stock = Math.max(0, p.stock - n); } });
     grid();
-  }).withFailureHandler(function (er) { if (sb) { sb.disabled = false; $('#er').textContent = er.message; } else show('<h2>無法下單</h2><p>' + esc(er.message) + '</p><button class="btn a" data-a="cart">返回購物車</button>'); }).placeOrder(o);
+  }).withFailureHandler(function (er) { var pb = $('#pnb'); if (pb) pb.disabled = false; if (sb || pb) { if (sb) sb.disabled = false; $('#er').textContent = er.message; } else show('<h2>無法下單</h2><p>' + esc(er.message) + '</p><button class="btn a" data-a="cart">返回購物車</button>'); }).placeOrder(o);
 }
 
 document.addEventListener('click', function (e) {
@@ -458,16 +495,16 @@ document.addEventListener('click', function (e) {
     var key = spv ? cur.id + '~' + spv : cur.id, rm = Math.min(room(cur), spv ? specRoom(cur, spv) : 99);
     if (rm < 1) { $('#dte').textContent = '已達可購買數量上限'; return; }
     if (dq > rm) { dq = rm; $('#dte').textContent = '庫存只剩 ' + rm + ' 件,已幫你調整數量'; $('#qn').textContent = dq; return; }
-    cart[key] = (cart[key] || 0) + dq; count(); show(cartHtml());
+    cart[key] = (cart[key] || 0) + dq; count(); $('#dlg').close(); toast('已加入購物車 ✓ 可以繼續逛', true);
   }
   else if (a === 'cart') show(cartHtml());
   else if (a === 'inc') { var p = byId(bp(id)), isp = id.indexOf('~') > 0 ? id.slice(id.indexOf('~') + 1) : ''; if (room(p) > 0 && (!isp || specRoom(p, isp) > 0)) cart[id]++; count(); show(cartHtml()); }
   else if (a === 'dec') { if (--cart[id] < 1) delete cart[id]; count(); show(cartHtml()); }
   else if (a === 'del') { delete cart[id]; count(); show(cartHtml()); }
-  else if (a === 'co' && $('#cdi') && $('#cdi').value.trim() && $('#cdi').value.trim() !== CODE) { cdWarn(); }
+  else if (a === 'pn') { if ($('#cdi') && $('#cdi').value.trim() !== CODE) { cdWarn(); return; } b.disabled = true; placeNow({}, null); }
   else if (a === 'cdok') { var w = $('#cdw'); if (w) w.remove(); var i = $('#cdi'); if (i) { i.focus(); } }
-  else if (a === 'co') { if (LT) placeNow({}); else if (!GUEST && D.line && D.line.on) show(loginHtml('請先用 LINE 登入,或以遊客身分繼續下單。', true)); else show(formHtml()); }
-  else if (a === 'guest') { GUEST = true; show(formHtml()); }
+  else if (a === 'co') { if (LT) { QT = null; showCheckout(); } else if (!GUEST && D.line && D.line.on) show(loginHtml('請先用 LINE 登入,或以遊客身分繼續下單。', true)); else { QT = null; showCheckout(); } }
+  else if (a === 'guest') { GUEST = true; QT = null; showCheckout(); }
   else if (a === 'x') $('#dlg').close();
   else if (a === 'sg') { cat = b.dataset.c || ''; q = ''; $('#q').value = ''; $('#sg').style.display = 'none'; PAGE = 1; nav(); grid(); }
   else if (a === 'sp') { $('#sg').style.display = 'none'; cur = byId(id); dq = 1; show(detail(cur)); }
@@ -478,6 +515,7 @@ document.addEventListener('submit', function (e) {
 document.addEventListener('submit', function (e) {
   if (e.target.id !== 'f') return;
   e.preventDefault();
+  if ($('#cdi') && $('#cdi').value.trim() !== CODE) { cdWarn(); return; }
   var f = e.target, sb = $('#sb'); sb.disabled = true; $('#er').textContent = '';
   placeNow({ name: f.name.value, phone: f.phone.value, email: f.email.value }, sb);
 });
