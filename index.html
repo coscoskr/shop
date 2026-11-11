@@ -355,6 +355,20 @@ document.addEventListener('keydown', function (e) { if (e.key === 'Escape') clos
 document.addEventListener('change', function (e) {
   var t = e.target; if (t.id === 'so') { SORT = t.value; PAGE = 1; grid(); } else if (t.id === 'pp') { PER = +t.value || 24; PAGE = 1; grid(); }
 });
+// 點視窗外面(灰色背景)就關閉視窗;手指在視窗內按下、拖到外面放開不算
+(function () {
+  var down = false;
+  function openDlg() { var d = document.querySelector('dialog[open]'); return d && d.id !== 'cdw' ? d : null; }
+  function out(d, x, y) { var r = d.getBoundingClientRect(); return x < r.left || x > r.right || y < r.top || y > r.bottom; }
+  document.addEventListener('pointerdown', function (e) { var d = openDlg(); down = !!d && !d.contains(e.target) || (!!d && e.target === d && out(d, e.clientX, e.clientY)); }, true);
+  document.addEventListener('click', function (e) {
+    var d = openDlg(); if (!d || !down) return; down = false;
+    if ($('#cdw')) return;
+    if (e.target === d && !out(d, e.clientX, e.clientY)) return;
+    if (d.contains(e.target) && e.target !== d) return;
+    var ev = new Event('cancel', { cancelable: true }); d.dispatchEvent(ev); if (!ev.defaultPrevented) d.close();
+  });
+})();
 function count() { var n = 0; for (var k in cart) n += cart[k]; $('#cn').hidden = !n; $('#cn').textContent = n; try { localStorage.setItem('cart1', JSON.stringify(cart)); } catch (x) {} }
 function restoreCart() {
   var raw = null; try { raw = JSON.parse(localStorage.getItem('cart1') || 'null'); } catch (x) {}
