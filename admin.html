@@ -591,14 +591,15 @@ function histBindDraw(r) {
   var nick = {}, dup = {}; r.members.forEach(function (m) { var k = m.nick.trim().toLowerCase(); dup[k] = (dup[k] || 0) + 1; });
   var lab = function (m) { return m.nick + (dup[m.nick.trim().toLowerCase()] > 1 ? ' ·' + m.id.slice(-4) : ''); };
   r.members.forEach(function (m) { nick[lab(m)] = m.id; }); r._nick = nick;
-  if (!r.groups.length) { b.innerHTML = '<p class="m">' + (r.msg ? esc(r.msg) + '<br>' : '') + '目前沒有待綁定的舊訂單。</p>'; return; }
+  var rn = '<div style="margin-top:16px;padding:10px;border:1px dashed var(--line);border-radius:10px"><b>補發綁定通知</b><span class="m"> 客人沒收到「綁定成功」訊息時,選她的 LINE 暱稱重發</span><br><input list="hdl2" id="rnn" placeholder="輸入 LINE 暱稱搜尋並選擇" style="min-width:220px;margin-top:6px"> <button type="button" class="btn a" data-a="hrn">補發</button><datalist id="hdl2">' + Object.keys(nick).map(function (k) { return '<option value="' + esc(k) + '">'; }).join('') + '</datalist></div>';
+  if (!r.groups.length) { b.innerHTML = '<p class="m">' + (r.msg ? esc(r.msg) + '<br>' : '') + '目前沒有待綁定的舊訂單。</p>' + rn; return; }
   b.innerHTML = (r.msg ? '<p class="m">' + esc(r.msg) + '</p>' : '') + '<datalist id="hdl">' + Object.keys(nick).map(function (k) { return '<option value="' + esc(k) + '">'; }).join('') + '</datalist>' +
     '<p><button class="btn a" data-a="hbind">綁定已填的</button> <input id="hsrch" type="search" placeholder="搜尋購買人 / LINE 暱稱" style="width:200px;margin-left:8px"> <span class="m" id="hcnt">共 ' + r.groups.length + ' 位待綁定</span></p><div style="overflow:auto"><table><thead><tr><th>舊檔案裡的購買人<br><span class="m" style="font-weight:400">(Excel「購買人」欄的名字)</span></th><th>要綁定的 LINE 會員<br><span class="m" style="font-weight:400">(從系統已有的 LINE 會員中選)</span></th></tr></thead><tbody>' +
     r.groups.map(function (g, i) {
       var low = g.name.trim().toLowerCase(), ex = r.members.filter(function (m) { return m.nick.trim().toLowerCase() === low; }), fz = low.length >= 2 ? r.members.filter(function (m) { var n = m.nick.toLowerCase(); return n !== low && (n.indexOf(low) >= 0 || low.indexOf(n) >= 0 && n.length >= 2); }).slice(0, 3) : [];
       var pre = ex.length === 1 ? lab(ex[0]) : '';
       return '<tr><td>' + esc(g.name) + '</td><td><input list="hdl" data-hn="' + i + '" value="' + esc(pre) + '" style="min-width:180px" placeholder="輸入 LINE 暱稱搜尋並選擇"><div class="hbs m" data-hs="' + i + '" style="font-size:12px;margin-top:3px"></div></td></tr>';
-    }).join('') + '</tbody></table></div>';
+    }).join('') + '</tbody></table></div>' + rn;
   [].forEach.call(document.querySelectorAll('[data-hn]'), hbCheck);
 }
 function setView() {
@@ -788,6 +789,11 @@ document.addEventListener('click', function (e) {
     if (bad) { tell('有 ' + bad + ' 格填的暱稱找不到對應的 LINE 會員(紅框)。請改選清單裡的暱稱,或把那格清空,再按綁定。'); return; }
     if (!pairs.length) { tell('還沒有填任何暱稱(要從清單選到正確的暱稱)'); return; }
     ask('確定綁定 ' + pairs.length + ' 位?\n綁定成功後會用 LINE 傳一則「綁定成功」通知給這些客人。', function () { wait('綁定中…請稍候'); call('adminHistBind', T, pairs).then(function (r) { var d = $('#dq'); d.oncancel = null; if (d.open) d.close(); histBindDraw(r); tell(r.msg); }).catch(function (e) { var d = $('#dq'); d.oncancel = null; if (d.open) d.close(); tell(e.message); }); }); return;
+  }
+  if (a === 'hrn') {
+    var rv = ($('#rnn').value || '').trim(), rid = HB && HB._nick[rv];
+    if (!rid) { tell('請從清單選一位 LINE 會員的暱稱'); return; }
+    ask('要補發「綁定成功」通知給「' + rv + '」嗎?', function () { wait('發送中…請稍候'); call('adminHistRenotify', T, rid).then(function (r) { var d = $('#dq'); d.oncancel = null; if (d.open) d.close(); histBindDraw(r); tell(r.msg); }).catch(function (e) { var d = $('#dq'); d.oncancel = null; if (d.open) d.close(); tell(e.message); }); }); return;
   }
   if (a === 'pon' || a === 'poff' || a === 'pdel') {
     var pids = selIds().filter(function (x) { return P.some(function (p) { return p.id === x; }); }); if (!pids.length) { tell('請先勾選商品'); return; }

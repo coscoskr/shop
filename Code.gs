@@ -1940,13 +1940,15 @@ function memberRow_(lid) { return rows_('會員').filter(function (r) { return S
 function levels_() { return rows_('等級'); }
 function levelOf_(lid) { var m = memberRow_(lid); return m && String(m.等級) ? String(m.等級) : '一般會員'; }
 function pushLine_(lid, text, imgs) {
-  var tk = prop_('LINE_MSG_TOKEN'); if (!tk) return false;
+  var tk = prop_('LINE_MSG_TOKEN'); if (!tk) { LINE_ERR_ = '尚未設定 LINE_MSG_TOKEN'; return false; }
   try {
     var r = UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push', { method: 'post', contentType: 'application/json', headers: { Authorization: 'Bearer ' + tk }, muteHttpExceptions: true,
       payload: JSON.stringify({ to: lid, messages: [{ type: 'text', text: text }].concat((imgs || []).filter(function (u) { return /^https:\/\//.test(u); }).slice(0, 4).map(function (u) { return { type: 'image', originalContentUrl: u, previewImageUrl: u }; })) }) });
+    LINE_ERR_ = r.getResponseCode() === 200 ? '' : 'HTTP ' + r.getResponseCode() + ' ' + String(r.getContentText() || '').slice(0, 160);
     return r.getResponseCode() === 200;
-  } catch (e) { return false; }
+  } catch (e) { LINE_ERR_ = String(e && e.message || e).slice(0, 160); return false; }
 }
+var LINE_ERR_ = '';
 /** 出貨單改成「已出貨」時,用 LINE 通知客人(內容在設定頁);回傳結果文字 */
 function notifyShipped_(s, key, subj, quiet) {
   key = key || '出貨通知內容'; subj = subj || '出貨通知';
@@ -2442,6 +2444,15 @@ function adminHistBindList(tk) {
   var ms = rows_('會員').map(function (m) { return { id: String(m['LINE ID']), nick: String(m.暱稱 || ''), real: String(m.姓名 || '') }; });
   return { groups: gs, members: ms };
 }
+var BIND_MSG_ = 'coscos網站綁定成功!之後下單成功、到貨、出貨都會傳通知到這邊唷❤️謝謝您～';
+/** 補發「綁定成功」通知給單一會員(回傳成功/失敗原因) */
+function adminHistRenotify(tk, lid) {
+  var u = me_(tk), m = rows_('會員').filter(function (x) { return String(x['LINE ID']) === String(lid); })[0];
+  if (!m) throw new Error('找不到這位會員');
+  var ok = pushLine_(String(lid), BIND_MSG_);
+  log_(u.acc, ok ? '補發綁定通知' : '補發綁定通知失敗', String(m.暱稱), ok ? '' : LINE_ERR_);
+  var r = adminHistBindList(tk); r.msg = ok ? '已補發綁定成功通知給「' + m.暱稱 + '」' : '「' + m.暱稱 + '」發送失敗:' + LINE_ERR_; return r;
+}
 function adminHistBind(tk, pairs) {
   var u = me_(tk), done = 0, skip = [], notify = {};
   lk_(function () {
@@ -2456,9 +2467,10 @@ function adminHistBind(tk, pairs) {
     });
   });
   // 綁定成功後,用 LINE 通知客人(每位會員只發一則)
-  var okN = 0, failN = 0;
+  var okN = 0, failN = 0, failL = [];
   Object.keys(notify).forEach(function (lid) {
-    if (pushLine_(lid, 'coscos網站綁定成功!之後下單成功、到貨、出貨都會傳通知到這邊唷❤️謝謝您～')) okN++; else failN++;
+    if (pushLine_(lid, BIND_MSG_)) okN++; else { failN++; var mm = rows_('會員').filter(function (m) { return String(m['LINE ID']) === lid; })[0]; failL.push((mm ? String(mm.暱稱) : lid) + '(' + LINE_ERR_ + ')'); }
   });
-  var r = adminHistBindList(tk); r.msg = '已綁定 ' + done + ' 位,已用 LINE 通知 ' + okN + ' 位' + (failN ? '(' + failN + ' 位通知發送失敗,可能未加好友)' : '') + (skip.length ? ',略過 ' + skip.length + ':' + skip.join('、') : ''); return r;
+  failL.forEach(function (x) { log_(u.acc, '綁定通知失敗', x.split('(')[0], x); });
+  var r = adminHistBindList(tk); r.msg = '已綁定 ' + done + ' 位,已用 LINE 通知 ' + okN + ' 位' + (failN ? '(' + failN + ' 位通知發送失敗:' + failL.join('、') + ')。可到下方「補發綁定通知」重發' : '') + (skip.length ? ',略過 ' + skip.length + ':' + skip.join('、') : ''); return r;
 }
