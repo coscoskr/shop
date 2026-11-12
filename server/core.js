@@ -182,6 +182,7 @@ export async function handleWebhook({ rawBody, signature, db, env }) {
   if (!ok) return { ok: false, later: Promise.resolve() };
   const later = (async () => {
     await runAfter(after, env);
+    console.log('webhook jobs', JSON.stringify(jobs.map((j) => j.kind + ':' + (j.imageId ? 'img' : 'txt'))));
     for (const job of jobs) {
       try { if (job.kind === 'reply') await lineReply(job, job.text, env); else await runArrivalJob(job, { db, env }); } catch (e) { console.error('arrival job error', e); await lineReply(job, '處理失敗,請稍後再試或到後台手動處理。', env).catch(() => {}); }
     }
@@ -191,13 +192,15 @@ export async function handleWebhook({ rawBody, signature, db, env }) {
 
 async function lineReply(job, text, env, props) {
   const tok = (props && props.LINE_MSG_TOKEN) || (env.props || {}).LINE_MSG_TOKEN || '';
-  if (!tok) return false;
+  if (!tok) { console.error('lineReply: no token'); return false; }
   const msg = [{ type: 'text', text: String(text).slice(0, 4900) }];
   if (job.token) {
     const r = await fetch('https://api.line.me/v2/bot/message/reply', { method: 'POST', headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' }, body: JSON.stringify({ replyToken: job.token, messages: msg }) });
     if (r.ok) return true;
+    console.error('lineReply failed', r.status, (await r.text()).slice(0, 150));
   }
   const r2 = await fetch('https://api.line.me/v2/bot/message/push', { method: 'POST', headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' }, body: JSON.stringify({ to: job.uid, messages: msg }) });
+  if (!r2.ok) console.error('linePush failed', r2.status, (await r2.text()).slice(0, 150));
   return r2.ok;
 }
 
