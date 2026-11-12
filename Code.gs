@@ -282,7 +282,8 @@ function placeCore_(want, ctx, o, name, phone, email, who, notePre) {
       var tpl = String(st.下單成功通知內容 === undefined ? defSet_('下單成功通知內容') : st.下單成功通知內容 || '');
       if (tpl) {
         var vals = { '姓名': String(name), '訂單編號': oid, '品項': c.lines.map(function (l) { return l[0].名稱 + (l[3] ? '(' + l[3] + ')' : '') + '×' + l[1]; }).join('、'), '金額': String(c.total), '連結': appUrl_() };
-        pushLine_(ctx.lid, Object.keys(vals).reduce(function (t, k) { return t.split('{' + k + '}').join(vals[k]); }, tpl));
+        var otx = Object.keys(vals).reduce(function (t, k) { return t.split('{' + k + '}').join(vals[k]); }, tpl);
+        pushLine_(ctx.lid, otx, null, orderFlex_(oid, name, c, otx));
       }
     }
     res = { orderId: oid, total: c.total, fee: c.fee, pay: pay, bank: '', discount: c.discount, dname: c.dname, credit: c.credit, mt: ctx ? '' : mk_(nz_(phone)) };
@@ -1962,6 +1963,38 @@ function pushLine_(lid, text, imgs, flex) {
     return r.getResponseCode() === 200;
   } catch (e) { LINE_ERR_ = String(e && e.message || e).slice(0, 160); return false; }
 }
+/* LINE 卡片共用:品牌色(與網站相同的玫瑰棕色系) */
+var BR_ = { acc: '#A95B4D', ink: '#4B3B37', mute: '#8C7771', line: '#F0DFD9', soft: '#FAEEEA', paper: '#FFFBFA' };
+function flexT_(t, o) { var x = { type: 'text', text: String(t) || ' ' }; for (var k in o) x[k] = o[k]; return x; }
+function flexBtn_(lab, act, pri) { return { type: 'button', style: pri ? 'primary' : 'secondary', color: pri ? BR_.acc : BR_.line, height: 'sm', action: act, flex: 1 }; }
+function flexHead_(title, right) { return { type: 'box', layout: 'horizontal', backgroundColor: BR_.acc, paddingAll: '14px', contents: [flexT_(title, { color: '#FFFFFF', weight: 'bold' }), flexT_(right, { color: '#F6DCD5', size: 'sm', align: 'end', gravity: 'center' })] }; }
+function flexHero_(label, big) { return { type: 'box', layout: 'vertical', backgroundColor: BR_.soft, paddingAll: '18px', contents: [flexT_(label, { color: BR_.mute, size: 'sm' }), flexT_(big, { color: BR_.ink, size: 'xxl', weight: 'bold', adjustMode: 'shrink-to-fit', margin: 'sm' })] }; }
+function flexRow_(l, r, o) { o = o || {}; return { type: 'box', layout: 'horizontal', margin: o.margin || 'sm', contents: [flexT_(l, { size: 'sm', color: o.lc || BR_.mute }), flexT_(r, { size: o.size || 'sm', weight: o.bold ? 'bold' : 'regular', color: o.rc || BR_.ink, align: 'end' })] }; }
+function money_(n) { return '$' + Number(n || 0).toLocaleString('en-US'); }
+/** 訂單成立卡片(LINE Flex) */
+function orderFlex_(oid, name, c, alt) {
+  try {
+    var T = flexT_, L = c.lines || [], qty = L.reduce(function (a, l) { return a + Number(l[1] || 0); }, 0), at = now_();
+    var body = [T(String(name || '') + ' 您好,已收到您的訂單 ❤️', { wrap: true, size: 'sm', color: BR_.ink }), { type: 'separator', margin: 'md', color: BR_.line },
+      flexRow_('共 ' + L.length + ' 項・' + qty + ' 件', '', { margin: 'md' })];
+    L.slice(0, 6).forEach(function (l) {
+      body.push({ type: 'box', layout: 'horizontal', margin: 'md', contents: [T(String(l[0].名稱) + (l[3] ? '(' + l[3] + ')' : ''), { wrap: true, size: 'sm', color: BR_.ink, flex: 5 }), T('×' + l[1], { size: 'sm', weight: 'bold', align: 'end', color: BR_.ink, flex: 1 })] });
+    });
+    if (L.length > 6) body.push(T('…其他 ' + (L.length - 6) + ' 項', { size: 'xs', color: BR_.mute, margin: 'md' }));
+    body.push({ type: 'separator', margin: 'lg', color: BR_.line });
+    body.push(flexRow_('商品金額', money_(c.sub), { margin: 'md' }));
+    if (Number(c.discount) > 0) body.push(flexRow_('優惠折抵' + (c.dname ? '(' + c.dname + ')' : ''), '− ' + money_(c.discount), { rc: BR_.acc }));
+    if (Number(c.credit) > 0) body.push(flexRow_('購物金折抵', '− ' + money_(c.credit), { rc: BR_.acc }));
+    if (Number(c.fee) > 0) body.push(flexRow_('運費', money_(c.fee)));
+    body.push(flexRow_('訂單金額', money_(c.total), { margin: 'md', bold: true, size: 'md', lc: BR_.ink }));
+    body.push(T('預購商品到貨後會再通知您;到貨的商品可到會員專區勾選出貨。', { wrap: true, size: 'xs', color: BR_.mute, margin: 'lg' }));
+    var b = { type: 'bubble', size: 'mega', header: flexHead_('🛍️ 訂單成立', at.slice(5, 7) + '/' + at.slice(8, 10) + ' 訂購'), hero: flexHero_('訂單編號', oid),
+      body: { type: 'box', layout: 'vertical', backgroundColor: BR_.paper, contents: body } };
+    var base = appUrl_();
+    if (/^https:\/\//.test(base)) b.footer = { type: 'box', layout: 'vertical', contents: [flexBtn_('', { type: 'uri', label: '查看我的訂單', uri: base + (base.indexOf('?') >= 0 ? '&' : '?') + 'm=1' }, true)] };
+    return { type: 'flex', altText: String(alt || ('訂單 ' + oid + ' 已成立')).slice(0, 390), contents: b };
+  } catch (e) { return null; }
+}
 /** 出貨通知卡片(LINE Flex):單號大字、複製單號、物流查件、查看出貨單 */
 function shipFlex_(s, alt, shipImg) {
   try {
@@ -1970,24 +2003,24 @@ function shipFlex_(s, alt, shipImg) {
     var qty = ls.reduce(function (a, l) { return a + Number(l.數量 || 0); }, 0);
     var at = String(s.出貨時間 || '') || now_(), md = at.slice(5, 7) + '/' + at.slice(8, 10);
     var T = function (t, o) { var x = { type: 'text', text: String(t) || ' ' }; for (var k in o) x[k] = o[k]; return x; };
-    var G = '#2E7D4F', body = [T(String(s.姓名 || '') + ' 您好,您的商品已出貨:', { wrap: true, size: 'sm', color: '#333333' }), { type: 'separator', margin: 'md' },
+    var G = BR_.acc, body = [T(String(s.姓名 || '') + ' 您好,您的商品已出貨:', { wrap: true, size: 'sm', color: BR_.ink }), { type: 'separator', margin: 'md' },
       T('出貨單 ' + sid, { weight: 'bold', color: G, size: 'sm', margin: 'md' }),
-      { type: 'box', layout: 'horizontal', margin: 'sm', contents: [T('共 ' + ls.length + ' 項・' + qty + ' 件', { size: 'sm', color: '#666666' }), T('$' + Number(s.總額 || 0).toLocaleString('en-US'), { size: 'sm', weight: 'bold', align: 'end' })] }];
+      { type: 'box', layout: 'horizontal', margin: 'sm', contents: [T('共 ' + ls.length + ' 項・' + qty + ' 件', { size: 'sm', color: BR_.mute }), T('$' + Number(s.總額 || 0).toLocaleString('en-US'), { size: 'sm', weight: 'bold', align: 'end', color: BR_.ink })] }];
     ls.slice(0, 5).forEach(function (l) {
-      body.push({ type: 'box', layout: 'horizontal', margin: 'md', contents: [T(String(l.品名) + (l.規格 ? '(' + l.規格 + ')' : ''), { wrap: true, size: 'sm', color: '#444444', flex: 5 }), T('×' + l.數量, { size: 'sm', weight: 'bold', align: 'end', flex: 1 })] });
+      body.push({ type: 'box', layout: 'horizontal', margin: 'md', contents: [T(String(l.品名) + (l.規格 ? '(' + l.規格 + ')' : ''), { wrap: true, size: 'sm', color: BR_.ink, flex: 5 }), T('×' + l.數量, { size: 'sm', weight: 'bold', align: 'end', color: BR_.ink, flex: 1 })] });
     });
-    if (ls.length > 5) body.push(T('…其他 ' + (ls.length - 5) + ' 項', { size: 'xs', color: '#999999', margin: 'md' }));
+    if (ls.length > 5) body.push(T('…其他 ' + (ls.length - 5) + ' 項', { size: 'xs', color: BR_.mute, margin: 'md' }));
     if (shipImg) body.push(T('出貨單如下圖 👇', { size: 'sm', color: G, margin: 'lg' }));
-    var btn = function (lab, act, pri) { return { type: 'button', style: pri ? 'primary' : 'secondary', color: pri ? G : '#E3E6EA', height: 'sm', action: act, flex: 1 }; };
+    var btn = flexBtn_;
     var row = [];
     if (no) row.push(btn('', { type: 'clipboard', label: '① 複製單號', clipboardText: no }));
     if (turl) row.push(btn('', { type: 'uri', label: (no ? '② ' : '') + '物流查件', uri: turl }, true));
     var foot = []; if (row.length) foot.push({ type: 'box', layout: 'horizontal', spacing: 'sm', contents: row });
     var base = appUrl_(); if (/^https:\/\//.test(base)) foot.push(btn('', { type: 'uri', label: '查看出貨單 ' + (sid.length > 8 ? sid.slice(8) : sid), uri: base + (base.indexOf('?') >= 0 ? '&' : '?') + 's=' + encodeURIComponent(sid) }));
     var b = { type: 'bubble', size: 'mega',
-      header: { type: 'box', layout: 'horizontal', backgroundColor: '#1F5C3A', paddingAll: '14px', contents: [T('🚚 出貨通知', { color: '#FFFFFF', weight: 'bold' }), T(md + ' 已出貨', { color: '#D6EADC', size: 'sm', align: 'end', gravity: 'center' })] },
-      body: { type: 'box', layout: 'vertical', contents: body } };
-    if (no) b.hero = { type: 'box', layout: 'vertical', backgroundColor: G, paddingAll: '18px', contents: [T(co + '單號', { color: '#E8F3EC', size: 'sm' }), T(no.replace(/(.{4})(?=.)/g, '$1 '), { color: '#FFFFFF', size: 'xxl', weight: 'bold', adjustMode: 'shrink-to-fit', margin: 'sm' })] };
+      header: flexHead_('🚚 出貨通知', md + ' 已出貨'),
+      body: { type: 'box', layout: 'vertical', backgroundColor: BR_.paper, contents: body } };
+    if (no) b.hero = flexHero_(co + '單號', no.replace(/(.{4})(?=.)/g, '$1 '));
     if (foot.length) b.footer = { type: 'box', layout: 'vertical', spacing: 'sm', contents: foot };
     return { type: 'flex', altText: String(alt || '出貨通知').slice(0, 390), contents: b };
   } catch (e) { return null; }

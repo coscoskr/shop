@@ -228,7 +228,7 @@ google.script.run.withSuccessHandler(function (d) {
   try { var c1 = new URLSearchParams(location.search).get('c'); if (c1 && D.cats.some(function (x) { return x === c1 || x.indexOf(c1 + '/') === 0; })) cat = c1; } catch (e1) {}
   nav(); grid();
   if (BOOT.token) memLoad(function () { show(memList()); });
-  else if (PEND_S) { if (LT) { mt = LT; memLoad(function () { show(memList()); }); } else show(memLogin()); }
+  else if (PEND_S || /[?&]m=1/.test(location.search)) { if (LT) { mt = LT; memLoad(function () { show(memList()); }); } else show(memLogin()); }
   try { var pid0 = new URLSearchParams(location.search).get('p'); if (pid0 && !BOOT.token) { var pp0 = byId(pid0); if (pp0) { cur = pp0; dq = 1; show(detail(cur)); } } } catch (e0) {}
   liffBoot();
 }).withFailureHandler(function (e) { $('#grid').innerHTML = '<p>載入失敗:' + esc(e.message) + '</p>'; }).getShop();
