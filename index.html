@@ -232,6 +232,7 @@ google.script.run.withSuccessHandler(function (d) {
   liffBoot();
 }).withFailureHandler(function (e) { $('#grid').innerHTML = '<p>載入失敗:' + esc(e.message) + '</p>'; }).getShop();
 
+function credNote() { var t = String((D && D.creditNote) || '').trim(); return t ? '<p class="ds" style="white-space:pre-line;font-size:.85em">' + esc(t) + '</p>' : ''; }
 function catHit(pc, v, p) { if (v === '@現貨' || v === '@預購') return !!p && p.type === v.slice(1); if (v === '@品牌') return !!p && !!p.brand; if (v.indexOf('@品牌/') === 0) return !!p && p.brand === v.slice(4); return !v || pc.some(function (c) { return c === v || c.indexOf(v + '/') === 0; }); }
 function drawFt() {
   var b = (D && D.biz) || {}, l = (D && D.line) || {}, ft = $('#ft'), fab = $('#fab'), mk = document.querySelector('.hero .mkw'), i = [], k = [];
@@ -610,6 +611,7 @@ function memHead() {
   var m = MD.me; if (!m) return '';
   return '<div class="oc" style="cursor:default"><div class="ln" style="border:0;padding:0"><b>' + esc(m.name) + '</b><span class="chip">' + esc(m.level) + '</span></div>' +
     '<div>購物金 <b>' + money(m.balance) + '</b></div>' + (m.grants.length ? '<small>' + m.grants.map(function (g) { return money(g.amt) + ' 到期 ' + esc(g.exp); }).join('<br>') + '</small>' : '') + '</div>' +
+    credNote() +
     (m.friend ? '' : '<p class="ds">你還沒加我們的官方帳號好友,加入後才收得到到貨通知。' + (D.line && D.line.friend ? ' <a href="' + esc(D.line.friend) + '" target="_blank" rel="noopener">立即加入</a>' : '') + '</p>');
 }
 var MTAB = 'o', MSEL = {};
@@ -710,7 +712,7 @@ function shipForm() {
     '<label>聯絡電話<input name="phone" required inputmode="tel" value="' + esc((MD.me && MD.me.phone) || o0.ph || '') + '"></label>' +
     '<div id="mcvs"><label>超商<select name="cvs"><option>7-11</option><option>全家</option></select></label><label>取貨門市(店名或店號)<input name="store" maxlength="60"></label></div>' +
     '<div id="mhome" hidden><label>收件地址<input name="addr" maxlength="150" value="' + esc((MD.me && MD.me.addr) || '') + '"></label></div>' +
-    (bal > 0 ? '<label>使用購物金(餘額 ' + money(bal) + ')<input name="credit" type="number" min="0" step="1" value="0" inputmode="numeric"></label><small class="ds" id="crh"></small>' : '') +
+    (bal > 0 ? '<label>使用購物金(餘額 ' + money(bal) + ')<input name="credit" type="number" min="0" step="1" value="0" inputmode="numeric"></label><small class="ds" id="crh"></small>' + credNote() : '') +
     '<fieldset><legend>付款方式</legend><label><input type="radio" name="pay" value="匯款" checked> 匯款(先轉帳,確認收款後出貨)</label><label><input type="radio" name="pay" value="賣貨便"> 賣貨便(貨到付款,僅店到店)</label><label><input type="radio" name="pay" value="付現金"> 付現金(僅自取)</label><label style="color:var(--mute)"><input type="radio" name="pay" value="刷卡" disabled> 信用卡(籌備中)</label></fieldset>' +
     '<label>備註<textarea name="note" rows="2" maxlength="200"></textarea></label>' +
     '<p id="sfe" class="tg" role="alert"></p><button class="btn a">確認出貨</button> <button type="button" class="btn l" data-a="mb">返回</button></form>';

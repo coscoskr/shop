@@ -227,7 +227,7 @@ function getShop() {
 function shopData_() {
   var st = settings_();
   return {
-    store: st.店名 || '', notice: st.公告 || '', free: Number(st.免運門檻) || 0, fee: Number(st.宅配運費) || 0, feeCvs: Number(st.店到店運費) || 0,
+    store: st.店名 || '', notice: st.公告 || '', creditNote: st.購物金注意事項 === undefined ? defSet_('購物金注意事項') : String(st.購物金注意事項 || ''), free: Number(st.免運門檻) || 0, fee: Number(st.宅配運費) || 0, feeCvs: Number(st.店到店運費) || 0,
     line: { on: lineOn_(), liff: prop_('LIFF_ID'), friend: String(st.加好友連結 || ''), community: String(st.LINE社群連結 || '') },
     biz: { name: String(st.公司名稱 || ''), addr: String(st.公司地址 || ''), tax: /^\d+$/.test(String(st.統一編號 || '')) ? ('00000000' + st.統一編號).slice(-8) : String(st.統一編號 || ''), ig: String(st.IG連結 || '') },
     cats: cats_(), products: rows_('商品').filter(function (p) { return p.上架 === 'Y'; }).map(pub_)
@@ -432,7 +432,7 @@ function brandSheet_() {
   if (!sh) { sh = ss.insertSheet('品牌'); sh.getRange(1, 1, 1, 1).setValues([['品牌']]).setFontWeight('bold'); sh.setFrozenRows(1); delete SHC_['品牌']; delete RC_['品牌']; }
   return sh;
 }
-function brands_() { brandSheet_(); return rows_('品牌').map(function (r) { return String(r.品牌); }); }
+function brands_() { brandSheet_(); return rows_('品牌').map(function (r) { return String(r.品牌); }).sort(function (a, b) { var x = a.toLowerCase(), y = b.toLowerCase(); return x < y ? -1 : x > y ? 1 : 0; }); }
 function brandKey_(v) { return String(v || '').replace(/\s+/g, '').toLowerCase(); }
 /** 回傳清單中對應的標準寫法(忽略大小寫與空白);空白回傳空字串;不在清單就丟錯 */
 function brandPick_(v) {
@@ -1876,6 +1876,7 @@ function adminCreateShipFor(tk, items, d) {
 var LINE_ID_DEFAULT = '2012348090';
 var DEFAULT_SETTINGS = [
   ['店名', 'coscos韓國選物店'], ['免運門檻', 1500], ['店到店運費', 60], ['宅配運費', 80], ['匯款資訊', '請填寫銀行代碼、帳號、戶名'], ['公告', ''],
+  ['購物金注意事項', '⚠️ 購物金使用注意事項\n▪️ 下次消費滿 $500，可折 $50\n▪️ 下次消費滿 $1,000，可折 $150\n▪️ 每筆消費限使用一種折抵方式\n▪️ 精品、特價商品及指定商品不適用'],
   ['購物金使用門檻', 1000], ['購物金折抵上限', 100], ['購物金預設有效天數', 90],
   ['到貨通知內容', '{姓名} 您好,您訂購的 {品名} 已到貨!請到會員中心勾選要出貨的商品:{連結}'],
   ['下單成功通知內容', '訂單{訂單編號}確認！\n\n商品:{品項}\n訂單金額:NT$ {金額}\n\n預購商品到貨後會再訊息通知您❤️\n到貨商品可以在會員的訂單明細勾選出貨～\n\n有任何問題隨時聯繫我們🫶'],
@@ -2393,7 +2394,7 @@ function adminDeleteActivity(tk, id) {
   });
   return adminActivities(tk);
 }
-var SET_KEYS = ['店名', '店到店運費', '宅配運費', '免運門檻', '匯款資訊', '公告', '購物金使用門檻', '購物金折抵上限', '購物金預設有效天數', '到貨通知內容', '下單成功通知內容', '出貨通知內容', '退回通知內容', '送達通知內容', '未收到匯款通知內容', '物流追蹤連結', '加好友連結', '公司名稱', '公司地址', '統一編號', 'IG連結', 'LINE社群連結'];
+var SET_KEYS = ['店名', '店到店運費', '宅配運費', '免運門檻', '匯款資訊', '公告', '購物金使用門檻', '購物金折抵上限', '購物金預設有效天數', '購物金注意事項', '到貨通知內容', '下單成功通知內容', '出貨通知內容', '退回通知內容', '送達通知內容', '未收到匯款通知內容', '物流追蹤連結', '加好友連結', '公司名稱', '公司地址', '統一編號', 'IG連結', 'LINE社群連結'];
 function defSet_(k) { var r = DEFAULT_SETTINGS.filter(function (x) { return x[0] === k; })[0]; return r ? r[1] : ''; }
 function adminSettings(tk) {
   me_(tk); var s = settings_(), o = {};

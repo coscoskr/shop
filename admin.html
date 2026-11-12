@@ -178,7 +178,7 @@ function wait(msg) {
 function fail(id) { return function (e) { var el = $(id); if (el) el.textContent = e.message; else tell(e.message); }; }
 function start(tk, name) {
   T = tk; O = null; PV = null; try { sessionStorage.setItem('t', tk); sessionStorage.setItem('n', name); } catch (e) {}
-  call('adminInit', T).then(function (d) { P = d.products; C = d.cats; A = d.admins; VL = d.vendors || []; BL = d.brands || []; CR = d.carriers || []; $('#who').textContent = name; $('#lg').hidden = true; $('#app').hidden = false; render(); }).catch(function () {});
+  call('adminInit', T).then(function (d) { P = d.products; C = d.cats; A = d.admins; VL = d.vendors || []; BL = (d.brands || []).slice().sort(function(a, b) { var x = String(a.name || a).toLowerCase(), y = String(b.name || b).toLowerCase(); return x < y ? -1 : x > y ? 1 : 0; }); CR = d.carriers || []; $('#who').textContent = name; $('#lg').hidden = true; $('#app').hidden = false; render(); }).catch(function () {});
 }
 try { var st0 = sessionStorage.getItem('t') || localStorage.getItem('rt'), sn0 = sessionStorage.getItem('n') || localStorage.getItem('rn'); if (st0) { $('#lg').hidden = true; call('adminInit', st0).then(function (d) { T = st0; O = null; PV = null; P = d.products; C = d.cats; A = d.admins; VL = d.vendors || []; BL = d.brands || []; CR = d.carriers || []; $('#who').textContent = sn0 || ''; $('#app').hidden = false; render(); }).catch(function () { $('#lg').hidden = false; try { localStorage.removeItem('rt'); localStorage.removeItem('rn'); sessionStorage.removeItem('t'); sessionStorage.removeItem('n'); } catch (e) {} }); } } catch (e) {}
 
@@ -343,7 +343,7 @@ function brandAdd() {
   var k = v.replace(/\s+/g, '').toLowerCase(), hit = BL.filter(function (x) { return x.replace(/\s+/g, '').toLowerCase() === k; })[0];
   function ok(name, text) { $('#brsel').innerHTML = brOpts(name); inp.value = ''; msg.className = 'tg'; msg.textContent = text; }
   if (hit) { ok(hit, '清單已有「' + hit + '」,已幫你選好'); return; }
-  call('adminAddBrand', T, v).then(function (r) { BR = r; BL = r.map(function (x) { return x.name; }); var nm = BL.filter(function (x) { return x.replace(/\s+/g, '').toLowerCase() === k; })[0] || v; ok(nm, '新增成功,已選取「' + nm + '」'); }).catch(function (er) { msg.className = 'er'; msg.textContent = er.message; });
+  call('adminAddBrand', T, v).then(function (r) { BR = r.sort(function(a, b) { var x = String(a.name || a).toLowerCase(), y = String(b.name || b).toLowerCase(); return x < y ? -1 : x > y ? 1 : 0; }); BL = r.map(function (x) { return x.name; }); var nm = BL.filter(function (x) { return x.replace(/\s+/g, '').toLowerCase() === k; })[0] || v; ok(nm, '新增成功,已選取「' + nm + '」'); }).catch(function (er) { msg.className = 'er'; msg.textContent = er.message; });
 }
 document.addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target.id === 'brnew') { e.preventDefault(); brandAdd(); } });
 function catBig(cs) { var o = []; cs.forEach(function (c) { var k = c.split('/')[0]; if (o.indexOf(k) < 0) o.push(k); }); return o.join('、'); }
@@ -604,7 +604,7 @@ function histBindDraw(r) {
 }
 function setView() {
   $('#v').innerHTML = '<p class="m">載入中…</p>';
-  Promise.all([call('adminSettings', T), call('adminLevels', T), call('adminVendors', T), call('adminCats', T), call('adminBrands', T), call('adminCarriers', T)]).then(function (r) { CR = r[5]; SG = r[0]; LV = r[1]; VL = r[2]; CL = r[3]; BR = r[4]; BL = BR.map(function (x) { return x.name; }); C = CL.map(function (x) { return x.name; }); drawSettings(); }).catch(function (e) { $('#v').innerHTML = '<p class="er">' + esc(e.message) + '</p>'; });
+  Promise.all([call('adminSettings', T), call('adminLevels', T), call('adminVendors', T), call('adminCats', T), call('adminBrands', T), call('adminCarriers', T)]).then(function (r) { CR = r[5]; SG = r[0]; LV = r[1]; VL = r[2]; CL = r[3]; BR = r[4].sort(function(a, b) { var x = String(a.name || a).toLowerCase(), y = String(b.name || b).toLowerCase(); return x < y ? -1 : x > y ? 1 : 0; }); BL = BR.map(function (x) { return x.name; }); C = CL.map(function (x) { return x.name; }); drawSettings(); }).catch(function (e) { $('#v').innerHTML = '<p class="er">' + esc(e.message) + '</p>'; });
 }
 var CL = [], BR = [];
 function arrSec() {
@@ -624,7 +624,7 @@ function drawSettings() {
     '<div class="warn">LINE 登入:' + (l.login ? '已設定' : '尚未設定(缺 LINE_LOGIN_SECRET)') + ';LINE 推播:' + (l.msg ? '已設定' : '尚未設定(缺 LINE_MSG_TOKEN)') + '\n網站網址(LINE Callback URL 要填這個):' + esc(l.url) + '</div>' +
     '<form id="stf" style="max-width:760px"><div class="g">' + fld('店名', '店名', v.店名) + fld('店到店運費', '店到店運費', v.店到店運費, 'number') + fld('宅配運費', '宅配運費', v.宅配運費, 'number') + fld('免運門檻(訂單金額扣掉優惠後滿多少免運)', '免運門檻', v.免運門檻, 'number') +
     fld('購物金使用門檻(訂單滿多少才能用)', '購物金使用門檻', v.購物金使用門檻, 'number') + fld('購物金折抵上限(每筆最多折幾元,空白=不限)', '購物金折抵上限', v.購物金折抵上限, 'number') + fld('購物金預設有效天數', '購物金預設有效天數', v.購物金預設有效天數, 'number') +
-    '<div class="f">' + fld('加好友連結', '加好友連結', v.加好友連結) + '</div>' + ta('匯款資訊', 3) + ta('公告', 2) + ta('到貨通知內容', 3) + ta('下單成功通知內容', 5) + ta('出貨通知內容', 7) + ta('未收到匯款通知內容', 4) + ta('退回通知內容', 5) + ta('送達通知內容', 4) + '</div><h3 style="margin-top:20px">公司資訊(顯示在前台最下方)</h3><div class="g">' + fld('公司名稱', '公司名稱', v.公司名稱) + fld('統一編號', '統一編號', v.統一編號) + '<div class="f">' + fld('公司地址', '公司地址', v.公司地址) + '</div>' + fld('Instagram 連結(https)', 'IG連結', v.IG連結) + fld('LINE 社群連結(https)', 'LINE社群連結', v.LINE社群連結) + '</div>' +
+    '<div class="f">' + fld('加好友連結', '加好友連結', v.加好友連結) + '</div>' + ta('匯款資訊', 3) + ta('公告', 2) + ta('購物金注意事項', 5) + ta('到貨通知內容', 3) + ta('下單成功通知內容', 5) + ta('出貨通知內容', 7) + ta('未收到匯款通知內容', 4) + ta('退回通知內容', 5) + ta('送達通知內容', 4) + '</div><h3 style="margin-top:20px">公司資訊(顯示在前台最下方)</h3><div class="g">' + fld('公司名稱', '公司名稱', v.公司名稱) + fld('統一編號', '統一編號', v.統一編號) + '<div class="f">' + fld('公司地址', '公司地址', v.公司地址) + '</div>' + fld('Instagram 連結(https)', 'IG連結', v.IG連結) + fld('LINE 社群連結(https)', 'LINE社群連結', v.LINE社群連結) + '</div>' +
     '<p class="m">出貨通知另可用:{附圖}(該行只有上傳了出貨單圖片才會出現,例如「出貨單如圖{附圖}」)<br>到貨通知可用:{姓名} {品名} {訂單} {連結}<br>下單成功通知(客人下單後自動用官方 LINE 傳給他,只有 LINE 登入的會員收得到;內容留空就不發送)可用:{姓名} {訂單編號} {品項} {金額} {連結}<br>出貨通知(出貨單改成「已出貨」時自動用 LINE 發送)可用:{出貨單號} {物流} {物流單號} {追蹤連結} {姓名} {連結};某個變數沒有值時,那一整行會自動省略。<br>送達通知(出貨單改成「已送達」或「已收貨付款」時自動發送,LINE 或 Email)可用:{出貨單號} {物流} {物流單號} {姓名} {連結}。<br>物流清單請在下方「物流管理」新增與修改。例:黑貓=https://網址?no={單號}。物流欄位包含該名稱就會套用。</p><p class="er" id="ste" role="alert"></p><button class="btn a">儲存設定</button></form>' +
     arrSec() + carrierSec() + '<h3 style="margin-top:28px">廠商管理</h3><p class="m">商品與訂單明細的「廠商」都從這裡的清單選。刪除廠商不會改動已經存在的商品和訂單。</p><table style="max-width:420px;min-width:0"><tbody>' +
     (VL.map(function (x) { return '<tr><td>' + esc(x) + '</td><td><button class="btn l s" data-vd="del" data-name="' + esc(x) + '">刪除</button></td></tr>'; }).join('') || '<tr><td class="m">還沒有廠商</td></tr>') + '</tbody></table>' +
@@ -770,7 +770,7 @@ document.addEventListener('submit', function (e) {
       vendor: g('vendor').value, source: g('source').value, cost: g('cost').value, taxIncl: g('tax').value === 'Y'};
     $('#pe').textContent = ''; wait('商品儲存中…請稍候');
     call('adminSaveProduct', T, o2).then(function (r) {
-      P = r; if (o2.newBrand.trim()) call('adminBrands', T).then(function (b) { BR = b; BL = b.map(function (x) { return x.name; }); });
+      P = r; if (o2.newBrand.trim()) call('adminBrands', T).then(function (b) { BR = b.sort(function(a, b) { var x = String(a.name || a).toLowerCase(), y = String(b.name || b).toLowerCase(); return x < y ? -1 : x > y ? 1 : 0; }); BL = b.map(function (x) { return x.name; }); });
       var d = $('#dq'); d.innerHTML = '<p style="margin:6px 0;text-align:center;font-weight:700">✓ 商品已儲存</p>';
       setTimeout(function () { d.oncancel = null; if (d.open) d.close(); if ($('#dlg').open) $('#dlg').close(); prodView(); }, 900);
     }).catch(function (e) { var d = $('#dq'); d.oncancel = null; if (d.open) d.close(); var el = $('#pe'); if (el) el.textContent = e.message; else tell(e.message); });
@@ -1396,7 +1396,7 @@ document.addEventListener('click', function (e) {
     ask('刪除整個大分類「' + n + '」,包含底下所有小分類?共 ' + b.dataset.n + ' 項商品使用,會從這些商品上移除(商品不會被刪)。', function () { call('adminDeleteBig', T, n).then(function (r) { catSet(r); catRefresh(); }).catch(fail2); });
   }
 });
-function brSet(r) { BR = r; BL = r.map(function (x) { return x.name; }); drawSettings(); catRefresh(); }
+function brSet(r) { BR = r.sort(function(a, b) { var x = String(a.name || a).toLowerCase(), y = String(b.name || b).toLowerCase(); return x < y ? -1 : x > y ? 1 : 0; }); BL = r.map(function (x) { return x.name; }); drawSettings(); catRefresh(); }
 document.addEventListener('click', function (e) {
   var b = e.target.closest('[data-bt]'); if (!b) return;
   var n = b.dataset.name, t = b.dataset.bt, fail2 = function (er) { tell(er.message); };
