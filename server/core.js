@@ -131,6 +131,7 @@ export async function runAfter(after, env) {
  */
 export async function handleWebhook({ rawBody, signature, db, env }) {
   let events = [];
+  const jobs = [], after = [];
   const ok = await db.withTx(async (tx) => {
     const { tableData, kv, props: dbProps } = await tx.loadAll();
     const props = Object.assign({}, env.props || {}, dbProps);
@@ -159,8 +160,94 @@ export async function handleWebhook({ rawBody, signature, db, env }) {
       }
       withRt(rt, () => code.INTERNAL.contactSeen_(uid, name, pic, follow));
     }
+    // 到貨通知助理:只處理一對一訊息;綁定、確認、取消當場處理,文字/圖片留待解析
+    for (const ev of events) {
+      const uid = ev && ev.source && ev.source.userId;
+      if (!uid || ev.type !== 'message' || !ev.message || (ev.source.type && ev.source.type !== 'user')) continue;
+      try {
+        if (ev.message.type === 'text') {
+          const r = withRt(rt, () => code.INTERNAL.arrText_(uid, ev.message.text));
+          if (r && r.reply) jobs.push({ kind: 'reply', uid, token: ev.replyToken, text: r.reply });
+          else if (r && r.ai) jobs.push({ kind: 'ai', uid, token: ev.replyToken, text: String(ev.message.text || '').slice(0, 6000) });
+        } else if (ev.message.type === 'image') {
+          if (withRt(rt, () => code.INTERNAL.arrIsAdmin_(uid))) jobs.push({ kind: 'ai', uid, token: ev.replyToken, imageId: ev.message.id });
+        }
+      } catch (e) { console.error('arrival text error', e); }
+    }
     await tx.commit(rt.collectOps(), rt.kvOps);
+    rt.fetchQueue.forEach((f) => after.push({ type: 'fetch', f }));
+    rt.mailQueue.forEach((m) => after.push({ type: 'mail', m }));
     return true;
   });
-  return ok;
+  if (!ok) return { ok: false, later: Promise.resolve() };
+  const later = (async () => {
+    await runAfter(after, env);
+    for (const job of jobs) {
+      try { if (job.kind === 'reply') await lineReply(job, job.text, env); else await runArrivalJob(job, { db, env }); } catch (e) { console.error('arrival job error', e); await lineReply(job, '處理失敗,請稍後再試或到後台手動處理。', env).catch(() => {}); }
+    }
+  })();
+  return { ok: true, later };
 }
+
+async function lineReply(job, text, env, props) {
+  const tok = (props && props.LINE_MSG_TOKEN) || (env.props || {}).LINE_MSG_TOKEN || '';
+  if (!tok) return false;
+  const msg = [{ type: 'text', text: String(text).slice(0, 4900) }];
+  if (job.token) {
+    const r = await fetch('https://api.line.me/v2/bot/message/reply', { method: 'POST', headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' }, body: JSON.stringify({ replyToken: job.token, messages: msg }) });
+    if (r.ok) return true;
+  }
+  const r2 = await fetch('https://api.line.me/v2/bot/message/push', { method: 'POST', headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' }, body: JSON.stringify({ to: job.uid, messages: msg }) });
+  return r2.ok;
+}
+
+const ARR_SYSTEM = '你是韓國代購店「coscos」的到貨通知解析員。使用者會轉傳廠商的到貨通知(文字或截圖),請找出「這次實際到貨」的每個品項。\n' +
+  '我會提供店內商品清單(格式:商品ID|名稱|規格(待到貨件數))。請把通知裡每個品項對應到清單中的商品與規格;對不上就把 pid 設為 null。\n' +
+  '只輸出 JSON,不要任何其他文字,格式:{"items":[{"text":"通知上的原文品名","pid":"商品ID或null","spec":"規格(沒有規格就空字串,必須與清單中的規格文字完全一致,不含括號內的待到貨數)","qty":到貨數量(整數),"price":單價數字或null}]}\n' +
+  '規則:數量以「到貨/出貨給我們」的件數為準;缺貨、未到、取消的品項不要列入或 qty 設 0;同一商品不同規格請分開列;看不出任何到貨品項就回 {"items":[]}。';
+
+async function runArrivalJob(job, { db, env }) {
+  // 1) 讀出商品清單(短交易,不寫入)
+  const { cands, key, tok } = await db.withTx(async (tx) => {
+    const { tableData, kv, props: dbProps } = await tx.loadAll();
+    const props = Object.assign({}, env.props || {}, dbProps);
+    const rt = createRuntime({ H: code.H, tableData, kv, props, fetchMap: {} });
+    return { cands: withRt(rt, () => code.INTERNAL.arrCands_()), key: props.ANTHROPIC_API_KEY || '', tok: props.LINE_MSG_TOKEN || '' };
+  });
+  if (!key) { await lineReply(job, '尚未設定 Anthropic 金鑰,無法解析到貨通知。', env); return; }
+  // 2) 取圖片(如有)並請 Claude 解析
+  const content = [];
+  if (job.imageId) {
+    const r = await fetch('https://api-data.line.me/v2/bot/message/' + encodeURIComponent(job.imageId) + '/content', { headers: { Authorization: 'Bearer ' + tok } });
+    if (!r.ok) throw new Error('取不到圖片 ' + r.status);
+    const buf = new Uint8Array(await r.arrayBuffer());
+    if (buf.length > 4_500_000) { await lineReply(job, '圖片太大,請裁切或縮小後再傳。', env); return; }
+    let mt = (r.headers.get('content-type') || 'image/jpeg').split(';')[0];
+    if (!/^image\/(jpeg|png|gif|webp)$/.test(mt)) mt = 'image/jpeg';
+    let s = ''; for (let i = 0; i < buf.length; i += 0x8000) s += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
+    content.push({ type: 'image', source: { type: 'base64', media_type: mt, data: btoa(s) } });
+  }
+  content.push({ type: 'text', text: '店內商品清單:\n' + cands + '\n\n' + (job.text ? '廠商到貨通知(文字):\n' + job.text : '請解析上面的到貨通知圖片。') });
+  const ar = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST', headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+    body: JSON.stringify({ model: 'claude-sonnet-5-5', max_tokens: 2000, system: ARR_SYSTEM, messages: [{ role: 'user', content }] }),
+  });
+  if (!ar.ok) { console.error('anthropic', ar.status, (await ar.text()).slice(0, 200)); await lineReply(job, '解析服務暫時無法使用(' + ar.status + '),請稍後再試。', env); return; }
+  const aj = await ar.json();
+  const txt = ((aj.content || []).find((b) => b.type === 'text') || {}).text || '';
+  let items = [];
+  try { const m = txt.match(/\{[\s\S]*\}/); items = (JSON.parse(m ? m[0] : '{}').items || []).filter((x) => x && Number(x.qty) > 0).slice(0, 60); } catch (e) { items = []; }
+  if (!items.length) { await lineReply(job, '我看不出這則訊息裡有到貨品項。若要處理到貨,請轉傳廠商的到貨通知(文字或截圖)。', env); return; }
+  // 3) 分配 + 存成待確認
+  const { reply, after } = await db.withTx(async (tx) => {
+    const { tableData, kv, props: dbProps } = await tx.loadAll();
+    const props = Object.assign({}, env.props || {}, dbProps);
+    const rt = createRuntime({ H: code.H, tableData, kv, props, fetchMap: {} });
+    const reply = withRt(rt, () => code.INTERNAL.arrPlan_(items));
+    await tx.commit(rt.collectOps(), rt.kvOps);
+    return { reply, after: [] };
+  });
+  await lineReply(job, reply, env);
+}
+
+// 管理員在 LINE 回「確認」時入帳(上面 arrText_ 已在交易內完成),這裡不用再做事

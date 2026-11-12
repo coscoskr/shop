@@ -42,6 +42,7 @@ const env = {
     LINE_LOGIN_SECRET: Deno.env.get("LINE_LOGIN_SECRET"),
     LINE_MSG_TOKEN: Deno.env.get("LINE_MSG_TOKEN"),
     APP_URL: Deno.env.get("APP_URL"),
+    ANTHROPIC_API_KEY: Deno.env.get("ANTHROPIC_API_KEY"),
   } as Record<string, string | undefined>,
 };
 for (const k of Object.keys(env.props)) if (env.props[k] === undefined) delete env.props[k];
@@ -53,8 +54,10 @@ Deno.serve(async (req: Request) => {
   if (sig) {
     // LINE 官方帳號的 Webhook(由簽章驗證身分)
     try {
-      const ok = await handleWebhook({ rawBody: await req.text(), signature: sig, db, env });
-      return ok ? jsonR(req, { ok: true }) : jsonR(req, { ok: false }, 401);
+      const r = await handleWebhook({ rawBody: await req.text(), signature: sig, db, env });
+      // @ts-ignore EdgeRuntime 由 Supabase 提供
+      if (r.ok && r.later) EdgeRuntime.waitUntil(r.later);
+      return r.ok ? jsonR(req, { ok: true }) : jsonR(req, { ok: false }, 401);
     } catch (e) {
       console.error("webhook error", e);
       return jsonR(req, { ok: false }, 500);
