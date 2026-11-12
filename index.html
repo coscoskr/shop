@@ -228,6 +228,7 @@ google.script.run.withSuccessHandler(function (d) {
   try { var c1 = new URLSearchParams(location.search).get('c'); if (c1 && D.cats.some(function (x) { return x === c1 || x.indexOf(c1 + '/') === 0; })) cat = c1; } catch (e1) {}
   nav(); grid();
   if (BOOT.token) memLoad(function () { show(memList()); });
+  else if (PEND_S) { if (LT) { mt = LT; memLoad(function () { show(memList()); }); } else show(memLogin()); }
   try { var pid0 = new URLSearchParams(location.search).get('p'); if (pid0 && !BOOT.token) { var pp0 = byId(pid0); if (pp0) { cur = pp0; dq = 1; show(detail(cur)); } } } catch (e0) {}
   liffBoot();
 }).withFailureHandler(function (e) { $('#grid').innerHTML = '<p>載入失敗:' + esc(e.message) + '</p>'; }).getShop();
@@ -740,8 +741,9 @@ function sfQuote(ch) {
 }
 document.addEventListener('input', function (e) { if (e.target.form && e.target.form.id === 'sf' && (e.target.name === 'credit')) sfQuote(); });
 document.addEventListener('change', function (e) { if (e.target.form && e.target.form.id === 'sf' && (e.target.name === 'method' || e.target.name === 'pay')) sfQuote(e.target.name); });
+var PEND_S = (function () { try { return new URLSearchParams(location.search).get('s') || ''; } catch (e) { return ''; } })();
 function memLoad(cb) {
-  google.script.run.withSuccessHandler(function (d) { MD = d; cb(); })
+  google.script.run.withSuccessHandler(function (d) { MD = d; if (PEND_S) { var z = (d.ships || []).filter(function (x) { return x.id === PEND_S; })[0]; PEND_S = ''; if (z) { MTAB = 's'; show(shipDetail(z)); return; } } cb(); })
     .withFailureHandler(function (e) { if (mt === LT) { LT = ''; try { localStorage.removeItem('lt'); } catch (x) {} } mt = ''; show(memLogin()); if ($('#me')) $('#me').textContent = e.message; }).memberOrders(mt);
 }
 document.addEventListener('click', function (e) {

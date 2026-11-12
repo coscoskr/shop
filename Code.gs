@@ -1952,14 +1952,45 @@ function upsertMember_(lid, name, pic, friend) {
 function memberRow_(lid) { return rows_('會員').filter(function (r) { return String(r['LINE ID']) === lid; })[0]; }
 function levels_() { return rows_('等級'); }
 function levelOf_(lid) { var m = memberRow_(lid); return m && String(m.等級) ? String(m.等級) : '一般會員'; }
-function pushLine_(lid, text, imgs) {
+function pushLine_(lid, text, imgs, flex) {
   var tk = prop_('LINE_MSG_TOKEN'); if (!tk) { LINE_ERR_ = '尚未設定 LINE_MSG_TOKEN'; return false; }
   try {
     var r = UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push', { method: 'post', contentType: 'application/json', headers: { Authorization: 'Bearer ' + tk }, muteHttpExceptions: true,
-      payload: JSON.stringify({ to: lid, messages: [{ type: 'text', text: text }].concat((imgs || []).filter(function (u) { return /^https:\/\//.test(u); }).slice(0, 4).map(function (u) { return { type: 'image', originalContentUrl: u, previewImageUrl: u }; })) }) });
+      payload: JSON.stringify({ to: lid, messages: [flex || { type: 'text', text: text }].concat((imgs || []).filter(function (u) { return /^https:\/\//.test(u); }).slice(0, 4).map(function (u) { return { type: 'image', originalContentUrl: u, previewImageUrl: u }; })) }) });
+    if (flex && r.getResponseCode() === 400) return pushLine_(lid, text, imgs); // 卡片格式被拒時改送文字
     LINE_ERR_ = r.getResponseCode() === 200 ? '' : 'HTTP ' + r.getResponseCode() + ' ' + String(r.getContentText() || '').slice(0, 160);
     return r.getResponseCode() === 200;
   } catch (e) { LINE_ERR_ = String(e && e.message || e).slice(0, 160); return false; }
+}
+/** 出貨通知卡片(LINE Flex):單號大字、複製單號、物流查件、查看出貨單 */
+function shipFlex_(s, alt, shipImg) {
+  try {
+    var sid = String(s.出貨單ID), co = String(s.物流 || ''), no = String(s.物流單號 || ''), turl = trackUrl_(co, no) || shortTrack_(s);
+    var ls = rows_('訂單明細').filter(function (l) { return String(l.出貨單ID) === sid; });
+    var qty = ls.reduce(function (a, l) { return a + Number(l.數量 || 0); }, 0);
+    var at = String(s.出貨時間 || '') || now_(), md = at.slice(5, 7) + '/' + at.slice(8, 10);
+    var T = function (t, o) { var x = { type: 'text', text: String(t) || ' ' }; for (var k in o) x[k] = o[k]; return x; };
+    var G = '#2E7D4F', body = [T(String(s.姓名 || '') + ' 您好,您的商品已出貨:', { wrap: true, size: 'sm', color: '#333333' }), { type: 'separator', margin: 'md' },
+      T('出貨單 ' + sid, { weight: 'bold', color: G, size: 'sm', margin: 'md' }),
+      { type: 'box', layout: 'horizontal', margin: 'sm', contents: [T('共 ' + ls.length + ' 項・' + qty + ' 件', { size: 'sm', color: '#666666' }), T('$' + Number(s.總額 || 0).toLocaleString('en-US'), { size: 'sm', weight: 'bold', align: 'end' })] }];
+    ls.slice(0, 5).forEach(function (l) {
+      body.push({ type: 'box', layout: 'horizontal', margin: 'md', contents: [T(String(l.品名) + (l.規格 ? '(' + l.規格 + ')' : ''), { wrap: true, size: 'sm', color: '#444444', flex: 5 }), T('×' + l.數量, { size: 'sm', weight: 'bold', align: 'end', flex: 1 })] });
+    });
+    if (ls.length > 5) body.push(T('…其他 ' + (ls.length - 5) + ' 項', { size: 'xs', color: '#999999', margin: 'md' }));
+    if (shipImg) body.push(T('出貨單如下圖 👇', { size: 'sm', color: G, margin: 'lg' }));
+    var btn = function (lab, act, pri) { return { type: 'button', style: pri ? 'primary' : 'secondary', color: pri ? G : '#E3E6EA', height: 'sm', action: act, flex: 1 }; };
+    var row = [];
+    if (no) row.push(btn('', { type: 'clipboard', label: '① 複製單號', clipboardText: no }));
+    if (turl) row.push(btn('', { type: 'uri', label: (no ? '② ' : '') + '物流查件', uri: turl }, true));
+    var foot = []; if (row.length) foot.push({ type: 'box', layout: 'horizontal', spacing: 'sm', contents: row });
+    var base = appUrl_(); if (/^https:\/\//.test(base)) foot.push(btn('', { type: 'uri', label: '查看出貨單 ' + (sid.length > 8 ? sid.slice(8) : sid), uri: base + (base.indexOf('?') >= 0 ? '&' : '?') + 's=' + encodeURIComponent(sid) }));
+    var b = { type: 'bubble', size: 'mega',
+      header: { type: 'box', layout: 'horizontal', backgroundColor: '#1F5C3A', paddingAll: '14px', contents: [T('🚚 出貨通知', { color: '#FFFFFF', weight: 'bold' }), T(md + ' 已出貨', { color: '#D6EADC', size: 'sm', align: 'end', gravity: 'center' })] },
+      body: { type: 'box', layout: 'vertical', contents: body } };
+    if (no) b.hero = { type: 'box', layout: 'vertical', backgroundColor: G, paddingAll: '18px', contents: [T(co + '單號', { color: '#E8F3EC', size: 'sm' }), T(no.replace(/(.{4})(?=.)/g, '$1 '), { color: '#FFFFFF', size: 'xxl', weight: 'bold', adjustMode: 'shrink-to-fit', margin: 'sm' })] };
+    if (foot.length) b.footer = { type: 'box', layout: 'vertical', spacing: 'sm', contents: foot };
+    return { type: 'flex', altText: String(alt || '出貨通知').slice(0, 390), contents: b };
+  } catch (e) { return null; }
 }
 var LINE_ERR_ = '';
 /** 出貨單改成「已出貨」時,用 LINE 通知客人(內容在設定頁);回傳結果文字 */
@@ -1981,7 +2012,8 @@ function notifyShipped_(s, key, subj, quiet) {
   }).map(function (ln) { return Object.keys(vals).reduce(function (t, k) { return t.split('{' + k + '}').join(vals[k]); }, ln); });
   var msg = lines.join('\n');
   if (em) return mailTo_(em, '【' + (st.店名 || 'coscos') + '】' + subj + ' ' + vals['出貨單號'], msg + (shipImg ? '\n出貨單圖片:' + shipImg : '')) ? '已用 Email 通知客人' : 'Email 發送失敗';
-  return pushLine_(lid, msg, shipImg ? [shipImg] : null) ? '已用 LINE 通知客人' + (shipImg ? '(含出貨單圖片)' : '') : 'LINE 通知發送失敗(客人可能未加好友)';
+  var fx = key === '出貨通知內容' ? shipFlex_(s, msg, shipImg) : null;
+  return pushLine_(lid, msg, shipImg ? [shipImg] : null, fx) ? '已用 LINE 通知客人' + (shipImg ? '(含出貨單圖片)' : '') : 'LINE 通知發送失敗(客人可能未加好友)';
 }
 /** 沒有 LINE 的客人(遊客)改用 Email 通知;回傳是否成功 */
 function mailTo_(to, subject, body) {

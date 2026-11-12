@@ -114,7 +114,18 @@ export async function runAfter(after, env) {
         const init = { method: (o.method || 'get').toUpperCase(), headers: Object.assign({}, o.headers || {}) };
         if (o.contentType) init.headers['Content-Type'] = o.contentType;
         if (o.payload !== undefined) init.body = typeof o.payload === 'string' ? o.payload : new URLSearchParams(o.payload).toString();
-        await fetch(a.f.url, init);
+        const r = await fetch(a.f.url, init);
+        // LINE 卡片訊息被拒(400)時,改送同內容的純文字,確保客人一定收得到
+        if (!r.ok && r.status === 400 && /api\.line\.me\/v2\/bot\/message\/push/.test(a.f.url) && init.body) {
+          try {
+            const j = JSON.parse(init.body);
+            if (j.messages && j.messages[0] && j.messages[0].type === 'flex') {
+              console.error('flex rejected', (await r.text()).slice(0, 200));
+              j.messages[0] = { type: 'text', text: j.messages[0].altText || '通知' };
+              await fetch(a.f.url, Object.assign({}, init, { body: JSON.stringify(j) }));
+            }
+          } catch (e2) { /* ignore */ }
+        }
       } else if (a.type === 'mail' && env.RESEND_API_KEY) {
         await fetch('https://api.resend.com/emails', {
           method: 'POST', headers: { Authorization: 'Bearer ' + env.RESEND_API_KEY, 'Content-Type': 'application/json' },
