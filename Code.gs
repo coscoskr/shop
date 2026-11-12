@@ -1006,15 +1006,24 @@ function allPurch_() {
   var a = rows_('訂單明細').map(function (r) { r._sh = '訂單明細'; return r; });
   return a.concat(rows_('庫存進貨').map(function (r) { r._sh = '庫存進貨'; return r; }));
 }
+/** 訂購人顯示:已綁定 LINE 會員 → LINE 名稱;會員自己改過姓名且不同 → LINE名稱(會員名稱) */
+function buyerName_(o, mem) {
+  var m = mem[String(o['LINE ID'] || '')];
+  if (!m) return String(o.姓名 || '');
+  var nick = String(m.暱稱 || '').trim(), rn = String(m.姓名 || '').trim();
+  if (!nick) return rn || String(o.姓名 || '');
+  return rn && rn.toLowerCase() !== nick.toLowerCase() ? nick + '(' + rn + ')' : nick;
+}
 function purchaseList_() {
-  var lm = lineMeta_(true), ords = {}, shs = {};
+  var lm = lineMeta_(true), ords = {}, shs = {}, mem = {};
+  rows_('會員').forEach(function (m) { mem[String(m['LINE ID'])] = m; });
   rows_('訂單').forEach(function (o) { ords[String(o.訂單ID)] = o; });
   rows_('出貨單').forEach(function (x) { shs[String(x.出貨單ID)] = String(x.狀態 || ''); });
   var lines = allPurch_().map(function (r) {
     var m = lm(r), st = r._sh === '庫存進貨', o = ords[String(r.訂單ID)] || {};
     return { key: String(r.訂單ID) + '|' + String(r.商品ID), oid: String(r.訂單ID), pid: String(r.商品ID), stock: st, at: st ? String(r.日期 || '') : String(o.下單時間 || '').slice(0, 10), name: String(r.品名), qty: Number(r.數量), unit: st ? 0 : Number(r.單價),
       code: st ? '' : String(o.折扣碼 || ''), dname: st ? '' : String(o.優惠名稱 || ''), disc: st ? 0 : Number(o.優惠折抵 || 0),
-      buyer: st ? '【庫存】' : String(o.姓名 || ''), spec: String(r.規格 || ''), sid: String(r.出貨單ID || ''), sst: shs[String(r.出貨單ID || '')] || '', arrBy: String(r.到貨操作人 || ''), arrAt: String(r.到貨時間 || ''), ord: st ? '' : String(r.叫貨狀態 || ''), ordBy: st ? '' : String(r.叫貨人 || ''), ordAt: st ? '' : String(r.叫貨時間 || ''), brand: m.brand || '', typ: st ? '庫存' : m.typ, arr: String(r.到貨狀態), vendor: m.vendor, cost: m.cost, tax: m.tax, src: m.src, pay: m.pay };
+      buyer: st ? '【庫存】' : buyerName_(o, mem), buyer0: st ? '' : String(o.姓名 || ''), spec: String(r.規格 || ''), sid: String(r.出貨單ID || ''), sst: shs[String(r.出貨單ID || '')] || '', arrBy: String(r.到貨操作人 || ''), arrAt: String(r.到貨時間 || ''), ord: st ? '' : String(r.叫貨狀態 || ''), ordBy: st ? '' : String(r.叫貨人 || ''), ordAt: st ? '' : String(r.叫貨時間 || ''), brand: m.brand || '', typ: st ? '庫存' : m.typ, arr: String(r.到貨狀態), vendor: m.vendor, cost: m.cost, tax: m.tax, src: m.src, pay: m.pay };
   }).sort(function (a, b) { return a.at < b.at ? 1 : a.at > b.at ? -1 : (a.oid < b.oid ? 1 : -1); });
   var vs = {}; lines.forEach(function (l) { if (l.vendor) vs[l.vendor] = 1; });
   rows_('商品_內部').forEach(function (i) { if (i.廠商) vs[String(i.廠商)] = 1; });

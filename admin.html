@@ -864,7 +864,7 @@ function pvLines() {
     if (f.arr && pvSt(l) !== f.arr) return false;
     if (f.ord === 'no' && (l.stock || l.ord)) return false; if (f.ord === 'yes' && !l.ord) return false;
     if (f.from && l.at < f.from) return false; if (f.to && l.at > f.to) return false;
-    if (q) { var hay = (l.oid + ' ' + l.buyer + ' ' + (l.brand || '') + ' ' + l.name + ' ' + l.spec + ' ' + l.vendor + ' ' + l.src + ' ' + l.code + ' ' + l.dname).toLowerCase(); if (q.split(/[\s,，、]+/).filter(Boolean).some(function (w) { return hay.indexOf(w) < 0; })) return false; }
+    if (q) { var hay = (l.oid + ' ' + l.buyer + ' ' + (l.buyer0 || '') + ' ' + (l.brand || '') + ' ' + l.name + ' ' + l.spec + ' ' + l.vendor + ' ' + l.src + ' ' + l.code + ' ' + l.dname).toLowerCase(); if (q.split(/[\s,，、]+/).filter(Boolean).some(function (w) { return hay.indexOf(w) < 0; })) return false; }
     return true;
   });
 }
