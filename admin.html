@@ -849,7 +849,7 @@ document.addEventListener('submit', function (e) {
 });
 
 /* ===== 進貨付款 ===== */
-var PVT = 0, PVDIRTY = false, PV = null, VF = { vendor: '', pay: '', arr: '', ord: '', q: '', from: '', to: '' }, PSEL = {}, PVIEW = 'lines';
+var PVT = 0, PVDIRTY = false, PV = null, VF = { vendor: '', pay: '', arr: '', ord: '', qb: '', qn: '', qs: '', from: '', to: '' }, PSEL = {}, PVIEW = 'lines';
 function purchView() {
   if (PV && Date.now() - PVT < 60000 && !PVDIRTY) { PSEL = {}; pvDraw(); return; }
   $('#v').innerHTML = '<p class="m">載入中…</p>';
@@ -857,14 +857,14 @@ function purchView() {
 }
 function pvSt(l) { return l.sid && !l.stock ? (/已出貨|已送達|已收貨付款|已自取付款/.test(l.sst || '') ? '已出貨' : '待出貨') : l.arr === '已到貨' ? '已到貨' : '未到貨'; }
 function pvLines() {
-  var f = VF, q = f.q.toLowerCase();
+  var f = VF, hit = function (txt, q) { q = String(q || '').toLowerCase().trim(); if (!q) return true; var hay = String(txt || '').toLowerCase(); return q.split(/[\s,，、]+/).filter(Boolean).every(function (w) { return hay.indexOf(w) >= 0; }); };
   return PV.lines.filter(function (l) {
     if (f.vendor === '__none') { if (l.vendor) return false; } else if (f.vendor && l.vendor !== f.vendor) return false;
     if (f.pay === 'paid' && !l.pay) return false; if (f.pay === 'unpaid' && l.pay) return false;
     if (f.arr && pvSt(l) !== f.arr) return false;
     if (f.ord === 'no' && (l.stock || l.ord)) return false; if (f.ord === 'yes' && !l.ord) return false;
     if (f.from && l.at < f.from) return false; if (f.to && l.at > f.to) return false;
-    if (q) { var hay = (l.oid + ' ' + l.buyer + ' ' + (l.buyer0 || '') + ' ' + (l.brand || '') + ' ' + l.name + ' ' + l.spec + ' ' + l.vendor + ' ' + l.src + ' ' + l.code + ' ' + l.dname).toLowerCase(); if (q.split(/[\s,，、]+/).filter(Boolean).some(function (w) { return hay.indexOf(w) < 0; })) return false; }
+    if (!hit(l.buyer + ' ' + (l.buyer0 || ''), f.qb) || !hit((l.brand || '') + ' ' + l.name, f.qn) || !hit(l.spec, f.qs)) return false;
     return true;
   });
 }
@@ -881,7 +881,7 @@ function pvDraw() {
     '<label>狀態<select data-k="arr">' + opts(['未到貨', '已到貨', '待出貨', '已出貨'], VF.arr, '全部') + '</select></label>' +
     '<label>叫貨<select data-k="ord"><option value="">全部</option><option value="no"' + (VF.ord === 'no' ? ' selected' : '') + '>未叫貨</option><option value="yes"' + (VF.ord === 'yes' ? ' selected' : '') + '>已叫貨</option></select></label>' +
     '<label>下單從<input type="date" data-k="from" value="' + esc(VF.from) + '"></label><label>到<input type="date" data-k="to" value="' + esc(VF.to) + '"></label>' +
-    '<label>關鍵字<input data-k="q" placeholder="訂單、訂購人、品名、規格、廠商…(可用空格分隔多個,例如:毛帽 黑色)" value="' + esc(VF.q) + '"></label><button class="btn l" data-pv="rs">清除篩選</button></div>' +
+    '<label>訂購人<input data-k="qb" placeholder="LINE 名稱或購買人" value="' + esc(VF.qb) + '" style="width:150px"></label><label>品名<input data-k="qn" placeholder="可用空格分隔多個字" value="' + esc(VF.qn) + '" style="width:170px"></label><label>規格<input data-k="qs" placeholder="例如:黑色" value="' + esc(VF.qs) + '" style="width:130px"></label><button class="btn l" data-pv="rs">清除篩選</button></div>' +
     '<p style="margin:8px 0"><span class="zm" role="group" aria-label="表格縮放"><button class="btn l s" data-pv="zo" aria-label="縮小">－</button><b id="pvzv" style="min-width:48px;display:inline-block;text-align:center">' + PZ + '%</b><button class="btn l s" data-pv="zi" aria-label="放大">＋</button><button class="btn l s" data-pv="zr">還原</button><button class="btn l s" data-pv="zf">符合寬度</button></span> <button class="btn a" data-pv="bo">批次訂貨</button> <button class="btn l" data-pv="bos">全選未叫貨</button> <button class="btn l" data-pv="boc">取消叫貨</button> <button class="btn a" data-pv="info">批次修改(到貨/成本/廠商/貨源)</button> <button class="btn a" data-pv="pay">廠商付款紀錄</button> <button class="btn l" data-pv="bdel">批次刪除</button></p>' +
     '<div style="display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 10px"><div id="pvflt" style="flex:1;min-width:300px;border:1px solid var(--line);border-radius:6px;padding:8px 12px"></div><div id="pvsum" style="flex:1;min-width:300px;border:1px solid var(--line);border-radius:6px;padding:8px 12px;background:#fafafa"></div></div>' +
     '<div id="pvt"></div>';
@@ -942,7 +942,7 @@ function pvFilterText() {
   if (VF.arr) t.push('狀態:' + VF.arr);
   if (VF.ord) t.push(VF.ord === 'yes' ? '已叫貨' : '未叫貨');
   if (VF.from || VF.to) t.push('下單 ' + (VF.from || '') + ' ~ ' + (VF.to || ''));
-  if (VF.q) t.push('關鍵字:' + VF.q);
+  if (VF.qb) t.push('訂購人:' + VF.qb); if (VF.qn) t.push('品名:' + VF.qn); if (VF.qs) t.push('規格:' + VF.qs);
   return t.length ? t.join(';') : '無(顯示全部)';
 }
 function pvAgg(L) {
@@ -998,7 +998,7 @@ function pvSum() {
 document.addEventListener('input', function (e) { var c = e.target.classList; if (!c) return; if (c.contains('spi')) { SPL[Number(e.target.dataset.i)].n = e.target.value; syncStock(); } else if (c.contains('spq')) { SPL[Number(e.target.dataset.i)].q = e.target.value; syncStock(); } });
 document.addEventListener('input', function (e) {
   var k = e.target.dataset && e.target.dataset.k, f = e.target.closest && e.target.closest('#pvf'); if (!f || !k) return;
-  VF[k] = e.target.value; if (e.target.type === 'date' || e.target.tagName === 'SELECT' || k === 'q') pvRows();
+  VF[k] = e.target.value; if (e.target.type === 'date' || e.target.tagName === 'SELECT' || k === 'qb' || k === 'qn' || k === 'qs') pvRows();
 });
 document.addEventListener('change', function (e) {
   if (e.target.id === 'sall') { var on = e.target.checked; (window.SROWS || []).forEach(function (x) { SSEL[x] = on; }); document.querySelectorAll('.ssel').forEach(function (c) { c.checked = on; }); $('#ssn').textContent = selShips().length; }
@@ -1039,7 +1039,7 @@ document.addEventListener('click', function (e) {
       call('adminBatchOrder', T, kb, on).then(function (r) { pvSet(r); }).catch(function (er) { tell(er.message); });
     });
   }
-  else if (a === 'rs') { VF = { vendor: '', pay: '', arr: '', ord: '', q: '', from: '', to: '' }; pvDraw(); }
+  else if (a === 'rs') { VF = { vendor: '', pay: '', arr: '', ord: '', qb: '', qn: '', qs: '', from: '', to: '' }; pvDraw(); }
   else if (a === 'pay') {
     var ks = pvSel(); if (!ks.length) { tell('請先勾選要付款的品項'); return; }
     var sel = PV.lines.filter(function (l) { return PSEL[l.key]; }), vs = {}, exp = 0, miss = 0, paid = 0;
