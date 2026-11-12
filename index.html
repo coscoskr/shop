@@ -227,8 +227,8 @@ google.script.run.withSuccessHandler(function (d) {
   }
   try { var c1 = new URLSearchParams(location.search).get('c'); if (c1 && D.cats.some(function (x) { return x === c1 || x.indexOf(c1 + '/') === 0; })) cat = c1; } catch (e1) {}
   nav(); grid();
-  if (BOOT.token) memLoad(function () { show(memList()); });
-  else if (PEND_S || /[?&]m=1/.test(location.search)) { if (LT) { mt = LT; memLoad(function () { show(memList()); }); } else show(memLogin()); }
+  if (BOOT.token) memLoad(function () { show(memList()); hlOrder(); });
+  else if (PEND_S || HL_O || /[?&]m=1/.test(location.search)) { if (LT) { mt = LT; memLoad(function () { show(memList()); hlOrder(); }); } else show(memLogin()); }
   try { var pid0 = new URLSearchParams(location.search).get('p'); if (pid0 && !BOOT.token) { var pp0 = byId(pid0); if (pp0) { cur = pp0; dq = 1; show(detail(cur)); } } } catch (e0) {}
   liffBoot();
 }).withFailureHandler(function (e) { $('#grid').innerHTML = '<p>載入失敗:' + esc(e.message) + '</p>'; }).getShop();
@@ -625,7 +625,7 @@ function memList() {
     else {
       h += '<p class="ds">已到貨的商品可以勾選(灰色的是還沒到貨),按「確定出貨」後會建立出貨單,再進行付款與出貨。</p>';
       os.forEach(function (o) {
-        h += '<div class="oc" style="cursor:default"><div class="ln" style="border:0;padding:0"><b>' + esc(o.at.slice(0, 10)) + ' 訂購</b><span class="chip">' + esc(o.st) + '</span></div>' +
+        h += '<div class="oc" data-oid="' + esc(o.id) + '" style="cursor:default' + (o.id === HL_O ? ';outline:2px solid var(--acc);outline-offset:2px' : '') + '"><div class="ln" style="border:0;padding:0"><b>' + esc(o.at.slice(0, 10)) + ' 訂購 <span class="ds">' + esc(o.id) + '</span></b><span class="chip">' + esc(o.st) + '</span></div>' +
           o.items.map(function (i) {
             var can = i.arr === '已到貨' && !i.sid, k = o.id + '|' + i.pid, spc = sp(i.pid);
             return '<div class="li' + (can ? ' pk' : '') + '"><div>' + (i.sid ? '' : '<input type="checkbox" class="sk" data-k="' + esc(k) + '"' + (can ? '' : ' disabled') + (MSEL[k] ? ' checked' : '') + ' aria-label="勾選 ' + esc(i.name) + '">') + '</div>' +
@@ -741,6 +741,8 @@ function sfQuote(ch) {
 }
 document.addEventListener('input', function (e) { if (e.target.form && e.target.form.id === 'sf' && (e.target.name === 'credit')) sfQuote(); });
 document.addEventListener('change', function (e) { if (e.target.form && e.target.form.id === 'sf' && (e.target.name === 'method' || e.target.name === 'pay')) sfQuote(e.target.name); });
+var HL_O = (function () { try { return new URLSearchParams(location.search).get('o') || ''; } catch (e) { return ''; } })();
+function hlOrder() { if (!HL_O) return; setTimeout(function () { var e = document.querySelector('[data-oid="' + HL_O.replace(/"/g, '') + '"]'); if (e) e.scrollIntoView({ block: 'center', behavior: 'smooth' }); }, 300); }
 var PEND_S = (function () { try { return new URLSearchParams(location.search).get('s') || ''; } catch (e) { return ''; } })();
 function memLoad(cb) {
   google.script.run.withSuccessHandler(function (d) { MD = d; if (PEND_S) { var z = (d.ships || []).filter(function (x) { return x.id === PEND_S; })[0]; PEND_S = ''; if (z) { MTAB = 's'; show(shipDetail(z)); return; } } cb(); })

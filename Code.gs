@@ -1988,12 +1988,31 @@ function orderFlex_(oid, name, c, alt) {
     body.push(T('感謝您的訂購 · coscos 韓國選物店', { size: 'xxs', color: '#999999', align: 'center', margin: 'lg' }));
     var b = { type: 'bubble', size: 'giga', header: poHead_('訂單確認', 'ORDER CONFIRMED', oid), body: { type: 'box', layout: 'vertical', paddingTop: '4px', contents: body } };
     var base = appUrl_();
-    if (/^https:\/\//.test(base)) b.footer = { type: 'box', layout: 'vertical', contents: [{ type: 'button', style: 'primary', color: PO_.ink, height: 'sm', action: { type: 'uri', label: '查看我的訂單', uri: base + (base.indexOf('?') >= 0 ? '&' : '?') + 'm=1' } }] };
+    if (/^https:\/\//.test(base)) b.footer = { type: 'box', layout: 'vertical', contents: [poBtn_({ type: 'uri', label: '查看訂單明細', uri: siteUrl_('o=' + encodeURIComponent(oid)) }, true)] };
     return { type: 'flex', altText: String(alt || ('訂單 ' + oid + ' 已成立')).slice(0, 390), contents: b };
   } catch (e) { return null; }
 }
+/** 到貨通知卡片(LINE Flex) */
+function arrFlex_(o, names, alt) {
+  try {
+    var T = flexT_, oid = String(o.訂單ID);
+    var body = [T(String(o.姓名 || '') + ' 您好,您訂購的商品到貨囉 🎉', { wrap: true, size: 'sm', color: PO_.ink, margin: 'md' })];
+    var rows = [{ type: 'box', layout: 'horizontal', backgroundColor: PO_.ink, paddingAll: '6px', contents: [T('#', { size: 'xxs', color: '#FFFFFF', weight: 'bold', flex: 1 }), T('已到貨商品', { size: 'xxs', color: '#FFFFFF', weight: 'bold', flex: 12 })] }];
+    names.slice(0, 20).forEach(function (nm, n) { rows.push({ type: 'box', layout: 'horizontal', paddingAll: '6px', backgroundColor: n % 2 ? PO_.zebra : '#FFFFFF', contents: [T(String(n + 1), { size: 'xxs', color: PO_.mute, flex: 1 }), T(nm, { size: 'xs', color: PO_.ink, wrap: true, flex: 12 })] }); });
+    body.push({ type: 'box', layout: 'vertical', margin: 'md', contents: rows });
+    if (names.length > 20) body.push(T('…其他 ' + (names.length - 20) + ' 項', { size: 'xxs', color: PO_.mute, margin: 'sm' }));
+    body.push(T('請到會員專區的「訂單明細」勾選要出貨的商品,按「確定出貨」就會幫您安排出貨 ❤️', { wrap: true, size: 'xs', color: '#444444', margin: 'md' }));
+    body.push(T('感謝您的訂購 · coscos 韓國選物店', { size: 'xxs', color: '#999999', align: 'center', margin: 'lg' }));
+    var b = { type: 'bubble', size: 'giga', header: poHead_('到貨通知', 'ARRIVAL NOTICE', oid), body: { type: 'box', layout: 'vertical', paddingTop: '4px', contents: body } };
+    var u = siteUrl_('o=' + encodeURIComponent(oid));
+    if (u) b.footer = { type: 'box', layout: 'vertical', contents: [poBtn_({ type: 'uri', label: '確認到貨商品', uri: u }, true)] };
+    return { type: 'flex', altText: String(alt || '商品到貨通知').slice(0, 390), contents: b };
+  } catch (e) { return null; }
+}
 /** 出貨通知卡片(LINE Flex):版面同後台列印的「訂購單」,再加上物流單號與按鈕 */
-var PO_ = { ink: '#222222', mute: '#888888', line: '#DDDDDD', zebra: '#F7F7F7' };
+var PO_ = { ink: '#222222', mute: '#888888', line: '#DDDDDD', zebra: '#F7F7F7', pink: '#E8AEA0', pinkSoft: '#FAEEEA' };
+function poBtn_(act, pri) { return { type: 'button', style: pri ? 'primary' : 'secondary', color: pri ? PO_.pink : PO_.pinkSoft, height: 'sm', action: act, flex: 1 }; }
+function siteUrl_(q) { var base = appUrl_(); return /^https:\/\//.test(base) ? base + (base.indexOf('?') >= 0 ? '&' : '?') + q : ''; }
 function poHead_(title, en, id) {
   var T = flexT_, base = appUrl_(), logo = /^https:\/\//.test(base) ? base.replace(/[^\/]*$/, '') + 'logo.png' : '';
   var left = [];
@@ -2049,7 +2068,7 @@ function shipFlex_(s, alt, shipImg) {
     if (s.備註) body.push(T('備註:' + String(s.備註), { size: 'xxs', color: '#444444', wrap: true, margin: 'md' }));
     if (shipImg) body.push(T('超商出貨單如下圖 👇', { size: 'xs', color: PO_.ink, weight: 'bold', margin: 'md' }));
     body.push(T('感謝您的訂購 · coscos 韓國選物店', { size: 'xxs', color: '#999999', align: 'center', margin: 'lg' }));
-    var btn = function (act, pri) { return { type: 'button', style: pri ? 'primary' : 'secondary', color: pri ? PO_.ink : '#EEEEEE', height: 'sm', action: act, flex: 1 }; };
+    var btn = poBtn_;
     var row = [];
     if (no) row.push(btn({ type: 'clipboard', label: '① 複製單號', clipboardText: no }));
     if (turl) row.push(btn({ type: 'uri', label: (no ? '② ' : '') + '物流查件', uri: turl }, true));
@@ -2097,7 +2116,7 @@ function notifyArrival_(arr) {
     var lid = String(o['LINE ID'] || ''), em = String(o.電子郵件 || '');
     var names = arr[oid].filter(function (x, i, a) { return a.indexOf(x) === i; }).join('、');
     var text = tpl.split('{姓名}').join(o.姓名).split('{品名}').join(names).split('{訂單}').join(oid).split('{連結}').join(appUrl_());
-    if (lid) { if (pushLine_(lid, text)) r.sent++; else r.failed++; }
+    if (lid) { if (pushLine_(lid, text, null, arrFlex_(o, arr[oid].filter(function (x, i, a) { return a.indexOf(x) === i; }), text))) r.sent++; else r.failed++; }
     else if (em) { if (mailTo_(em, '【' + (settings_().店名 || 'coscos') + '】商品到貨通知', text)) r.sent++; else r.failed++; }
     else r.noLine++;
   });
