@@ -859,7 +859,7 @@ document.addEventListener('submit', function (e) {
 });
 
 /* ===== 進貨付款 ===== */
-var PVT = 0, PVDIRTY = false, PV = null, VF = { vendor: '', pay: '', arr: '', ord: '', qo: '', qb: '', qn: '', qs: '', from: '', to: '' }, PSEL = {}, PVIEW = 'lines';
+var PVT = 0, PVDIRTY = false, PV = null, VF = { vendor: '', pay: '', cost: '', arr: '', ord: '', qo: '', qb: '', qn: '', qs: '', from: '', to: '' }, PSEL = {}, PVIEW = 'lines';
 function purchView() {
   if (PV && Date.now() - PVT < 60000 && !PVDIRTY) { PSEL = {}; pvDraw(); return; }
   $('#v').innerHTML = '<p class="m">載入中…</p>';
@@ -870,7 +870,7 @@ function pvLines() {
   var f = VF, hit = function (txt, q) { q = String(q || '').toLowerCase().trim(); if (!q) return true; var hay = String(txt || '').toLowerCase(); return q.split(/[\s,，、]+/).filter(Boolean).every(function (w) { return hay.indexOf(w) >= 0; }); };
   return PV.lines.filter(function (l) {
     if (f.vendor === '__none') { if (l.vendor) return false; } else if (f.vendor && l.vendor !== f.vendor) return false;
-    if (f.pay === 'paid' && !l.pay) return false; if (f.pay === 'unpaid' && l.pay) return false;
+    if (f.pay === 'paid' && !l.pay) return false; if (f.pay === 'unpaid' && l.pay) return false; if (f.cost === 'has' && (l.cost === '' || l.cost == null)) return false; if (f.cost === 'none' && !(l.cost === '' || l.cost == null)) return false;
     if (f.arr && pvSt(l) !== f.arr) return false;
     if (f.ord === 'no' && (l.stock || l.ord)) return false; if (f.ord === 'yes' && !l.ord) return false;
     if (f.from && l.at < f.from) return false; if (f.to && l.at > f.to) return false;
@@ -888,6 +888,7 @@ function pvDraw() {
   var arrs = {}; PV.lines.forEach(function (l) { if (l.arr) arrs[l.arr] = 1; });
   h += '<div class="fb" id="pvf"><label>廠商<select data-k="vendor">' + opts(PV.vendors, VF.vendor, '全部') + '</select></label>' +
     '<label>付款<select data-k="pay"><option value="">全部</option><option value="unpaid"' + (VF.pay === 'unpaid' ? ' selected' : '') + '>未付款</option><option value="paid"' + (VF.pay === 'paid' ? ' selected' : '') + '>已付款</option></select></label>' +
+    '<label>成本<select data-k="cost"><option value="">全部</option><option value="has"' + (VF.cost === 'has' ? ' selected' : '') + '>有填成本</option><option value="none"' + (VF.cost === 'none' ? ' selected' : '') + '>沒填成本</option></select></label>' +
     '<label>狀態<select data-k="arr">' + opts(['未到貨', '已到貨', '待出貨', '已出貨'], VF.arr, '全部') + '</select></label>' +
     '<label>叫貨<select data-k="ord"><option value="">全部</option><option value="no"' + (VF.ord === 'no' ? ' selected' : '') + '>未叫貨</option><option value="yes"' + (VF.ord === 'yes' ? ' selected' : '') + '>已叫貨</option></select></label>' +
     '<label>下單從<input type="date" data-k="from" value="' + esc(VF.from) + '"></label><label>到<input type="date" data-k="to" value="' + esc(VF.to) + '"></label>' +
@@ -952,7 +953,7 @@ function pvFilterText() {
   if (VF.arr) t.push('狀態:' + VF.arr);
   if (VF.ord) t.push(VF.ord === 'yes' ? '已叫貨' : '未叫貨');
   if (VF.from || VF.to) t.push('下單 ' + (VF.from || '') + ' ~ ' + (VF.to || ''));
-  if (VF.qo) t.push('訂單編號:' + VF.qo); if (VF.qb) t.push('訂購人:' + VF.qb); if (VF.qn) t.push('品名:' + VF.qn); if (VF.qs) t.push('規格:' + VF.qs);
+  if (VF.cost) t.push(VF.cost === 'has' ? '有填成本' : '沒填成本'); if (VF.qo) t.push('訂單編號:' + VF.qo); if (VF.qb) t.push('訂購人:' + VF.qb); if (VF.qn) t.push('品名:' + VF.qn); if (VF.qs) t.push('規格:' + VF.qs);
   return t.length ? t.join(';') : '無(顯示全部)';
 }
 function pvAgg(L) {
@@ -1049,7 +1050,7 @@ document.addEventListener('click', function (e) {
       call('adminBatchOrder', T, kb, on).then(function (r) { pvSet(r); }).catch(function (er) { tell(er.message); });
     });
   }
-  else if (a === 'rs') { VF = { vendor: '', pay: '', arr: '', ord: '', qo: '', qb: '', qn: '', qs: '', from: '', to: '' }; pvDraw(); }
+  else if (a === 'rs') { VF = { vendor: '', pay: '', cost: '', arr: '', ord: '', qo: '', qb: '', qn: '', qs: '', from: '', to: '' }; pvDraw(); }
   else if (a === 'pay') {
     var ks = pvSel(); if (!ks.length) { tell('請先勾選要付款的品項'); return; }
     var sel = PV.lines.filter(function (l) { return PSEL[l.key]; }), vs = {}, exp = 0, miss = 0, paid = 0;
