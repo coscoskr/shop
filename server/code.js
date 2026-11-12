@@ -1972,56 +1972,91 @@ function flexHead_(title, right) { return { type: 'box', layout: 'horizontal', b
 function flexHero_(label, big) { return { type: 'box', layout: 'vertical', backgroundColor: BR_.soft, paddingAll: '18px', contents: [flexT_(label, { color: BR_.mute, size: 'sm' }), flexT_(big, { color: BR_.ink, size: 'xxl', weight: 'bold', adjustMode: 'shrink-to-fit', margin: 'sm' })] }; }
 function flexRow_(l, r, o) { o = o || {}; return { type: 'box', layout: 'horizontal', margin: o.margin || 'sm', contents: [flexT_(l, { size: 'sm', color: o.lc || BR_.mute }), flexT_(r, { size: o.size || 'sm', weight: o.bold ? 'bold' : 'regular', color: o.rc || BR_.ink, align: 'end' })] }; }
 function money_(n) { return '$' + Number(n || 0).toLocaleString('en-US'); }
-/** 訂單成立卡片(LINE Flex) */
+/** 訂單成立卡片(LINE Flex):版面同「訂購單」 */
 function orderFlex_(oid, name, c, alt) {
   try {
     var T = flexT_, L = c.lines || [], qty = L.reduce(function (a, l) { return a + Number(l[1] || 0); }, 0), at = now_();
-    var body = [T(String(name || '') + ' 您好,已收到您的訂單 ❤️', { wrap: true, size: 'sm', color: BR_.ink }), { type: 'separator', margin: 'md', color: BR_.line },
-      flexRow_('共 ' + L.length + ' 項・' + qty + ' 件', '', { margin: 'md' })];
-    L.slice(0, 6).forEach(function (l) {
-      body.push({ type: 'box', layout: 'horizontal', margin: 'md', contents: [T(String(l[0].名稱) + (l[3] ? '(' + l[3] + ')' : ''), { wrap: true, size: 'sm', color: BR_.ink, flex: 5 }), T('×' + l[1], { size: 'sm', weight: 'bold', align: 'end', color: BR_.ink, flex: 1 })] });
-    });
-    if (L.length > 6) body.push(T('…其他 ' + (L.length - 6) + ' 項', { size: 'xs', color: BR_.mute, margin: 'md' }));
-    body.push({ type: 'separator', margin: 'lg', color: BR_.line });
-    body.push(flexRow_('商品金額', money_(c.sub), { margin: 'md' }));
-    if (Number(c.discount) > 0) body.push(flexRow_('優惠折抵' + (c.dname ? '(' + c.dname + ')' : ''), '− ' + money_(c.discount), { rc: BR_.acc }));
-    if (Number(c.credit) > 0) body.push(flexRow_('購物金折抵', '− ' + money_(c.credit), { rc: BR_.acc }));
-    if (Number(c.fee) > 0) body.push(flexRow_('運費', money_(c.fee)));
-    body.push(flexRow_('訂單金額', money_(c.total), { margin: 'md', bold: true, size: 'md', lc: BR_.ink }));
-    body.push(T('預購商品到貨後會再通知您;到貨的商品可到會員專區勾選出貨。', { wrap: true, size: 'xs', color: BR_.mute, margin: 'lg' }));
-    var b = { type: 'bubble', size: 'mega', header: flexHead_('🛍️ 訂單成立', at.slice(5, 7) + '/' + at.slice(8, 10) + ' 訂購'), hero: flexHero_('訂單編號', oid),
-      body: { type: 'box', layout: 'vertical', backgroundColor: BR_.paper, contents: body } };
+    var body = [T(String(name || '') + ' 您好,已收到您的訂單 ❤️', { wrap: true, size: 'sm', color: PO_.ink, margin: 'md' })];
+    body.push(poGrid_([['訂單編號', oid], ['訂購時間', at.slice(0, 16)]]));
+    body.push(poTable_(L.slice(0, 20).map(function (l) { return { name: String(l[0].名稱), spec: String(l[3] || ''), qty: l[1], sub: Number(l[1]) * Number(l[2]) }; })));
+    if (L.length > 20) body.push(T('…其他 ' + (L.length - 20) + ' 項', { size: 'xxs', color: PO_.mute, margin: 'sm' }));
+    var sum = [['共 ' + L.length + ' 項 / ' + qty + ' 件', ''], ['商品合計', money_(c.sub)]];
+    if (Number(c.discount) > 0) sum.push(['優惠' + (c.dname ? '(' + c.dname + ')' : ''), '-' + money_(c.discount)]);
+    if (Number(c.credit) > 0) sum.push(['購物金', '-' + money_(c.credit)]);
+    if (Number(c.fee) > 0) sum.push(['運費', money_(c.fee)]);
+    body.push(poSum_(sum, c.total, '訂單金額'));
+    body.push(T('預購商品到貨後會再通知您;到貨的商品可到會員專區勾選出貨。', { wrap: true, size: 'xxs', color: '#444444', margin: 'md' }));
+    body.push(T('感謝您的訂購 · coscos 韓國選物店', { size: 'xxs', color: '#999999', align: 'center', margin: 'lg' }));
+    var b = { type: 'bubble', size: 'giga', header: poHead_('訂單確認', 'ORDER CONFIRMED', oid), body: { type: 'box', layout: 'vertical', paddingTop: '4px', contents: body } };
     var base = appUrl_();
-    if (/^https:\/\//.test(base)) b.footer = { type: 'box', layout: 'vertical', contents: [flexBtn_('', { type: 'uri', label: '查看我的訂單', uri: base + (base.indexOf('?') >= 0 ? '&' : '?') + 'm=1' }, true)] };
+    if (/^https:\/\//.test(base)) b.footer = { type: 'box', layout: 'vertical', contents: [{ type: 'button', style: 'primary', color: PO_.ink, height: 'sm', action: { type: 'uri', label: '查看我的訂單', uri: base + (base.indexOf('?') >= 0 ? '&' : '?') + 'm=1' } }] };
     return { type: 'flex', altText: String(alt || ('訂單 ' + oid + ' 已成立')).slice(0, 390), contents: b };
   } catch (e) { return null; }
 }
-/** 出貨通知卡片(LINE Flex):單號大字、複製單號、物流查件、查看出貨單 */
+/** 出貨通知卡片(LINE Flex):版面同後台列印的「訂購單」,再加上物流單號與按鈕 */
+var PO_ = { ink: '#222222', mute: '#888888', line: '#DDDDDD', zebra: '#F7F7F7' };
+function poHead_(title, en, id) {
+  var T = flexT_, base = appUrl_(), logo = /^https:\/\//.test(base) ? base.replace(/[^\/]*$/, '') + 'logo.png' : '';
+  var left = [];
+  if (logo) left.push({ type: 'image', url: logo, size: '40px', aspectMode: 'fit', aspectRatio: '19:20', flex: 0 });
+  left.push({ type: 'box', layout: 'vertical', justifyContent: 'center', paddingStart: logo ? '8px' : '0px', contents: [T('coscos 韓國選物店', { size: 'sm', weight: 'bold', color: PO_.ink }), T('KOREA SELECT SHOP', { size: 'xxs', color: PO_.mute })] });
+  return { type: 'box', layout: 'vertical', paddingAll: '16px', paddingBottom: '0px', backgroundColor: '#FFFFFF', contents: [
+    { type: 'box', layout: 'horizontal', contents: [{ type: 'box', layout: 'horizontal', flex: 3, contents: left },
+      { type: 'box', layout: 'vertical', flex: 2, contents: [T(title, { size: 'lg', weight: 'bold', align: 'end', color: PO_.ink }), T(en, { size: 'xxs', align: 'end', color: PO_.mute }), T(id, { size: 'xxs', align: 'end', color: PO_.ink, weight: 'bold' })] }] },
+    { type: 'box', layout: 'vertical', height: '3px', backgroundColor: PO_.ink, margin: 'md', contents: [] }] };
+}
+function poCell_(k, v) { return { type: 'box', layout: 'vertical', flex: 1, paddingAll: '6px', contents: [flexT_(k, { size: 'xxs', color: PO_.mute }), flexT_(v || '—', { size: 'xs', color: PO_.ink, weight: 'bold', wrap: true })] }; }
+function poGrid_(pairs) {
+  var rows = [], k;
+  for (k = 0; k < pairs.length; k += 2) rows.push({ type: 'box', layout: 'horizontal', contents: [poCell_(pairs[k][0], pairs[k][1]), pairs[k + 1] ? poCell_(pairs[k + 1][0], pairs[k + 1][1]) : { type: 'filler' }] });
+  return { type: 'box', layout: 'vertical', borderWidth: '1px', borderColor: '#CCCCCC', margin: 'md', contents: rows };
+}
+function poTable_(items) {
+  var T = flexT_, th = function (t, o) { var x = { size: 'xxs', color: '#FFFFFF', weight: 'bold' }; for (var k in o) x[k] = o[k]; return T(t, x); };
+  var rows = [{ type: 'box', layout: 'horizontal', backgroundColor: PO_.ink, paddingAll: '6px', contents: [th('#', { flex: 1 }), th('品名 / 規格', { flex: 9 }), th('數量', { flex: 3, align: 'end' }), th('小計', { flex: 4, align: 'end' })] }];
+  items.forEach(function (i, n) {
+    rows.push({ type: 'box', layout: 'horizontal', paddingAll: '6px', backgroundColor: n % 2 ? PO_.zebra : '#FFFFFF', contents: [
+      T(String(n + 1), { size: 'xxs', color: PO_.mute, flex: 1 }),
+      { type: 'box', layout: 'vertical', flex: 9, contents: [T(i.name, { size: 'xs', color: PO_.ink, wrap: true })].concat(i.spec ? [T(i.spec, { size: 'xxs', color: PO_.mute, wrap: true })] : []) },
+      T(String(i.qty), { size: 'xs', weight: 'bold', align: 'end', color: PO_.ink, flex: 3 }), T(money_(i.sub), { size: 'xs', align: 'end', color: PO_.ink, flex: 4 })] });
+  });
+  return { type: 'box', layout: 'vertical', margin: 'md', contents: rows };
+}
+function poSum_(rows, total, totLabel) {
+  var c = rows.map(function (r) { return flexRow_(r[0], r[1], { lc: PO_.mute, rc: r[2] || PO_.ink, margin: 'xs' }); });
+  c.push({ type: 'separator', margin: 'sm', color: PO_.ink });
+  c.push(flexRow_(totLabel || '應付', money_(total), { lc: PO_.ink, rc: PO_.ink, bold: true, size: 'lg', margin: 'sm' }));
+  return { type: 'box', layout: 'vertical', margin: 'md', contents: c };
+}
 function shipFlex_(s, alt, shipImg) {
   try {
-    var sid = String(s.出貨單ID), co = String(s.物流 || ''), no = String(s.物流單號 || ''), turl = trackUrl_(co, no) || shortTrack_(s);
+    var T = flexT_, sid = String(s.出貨單ID), co = String(s.物流 || ''), no = String(s.物流單號 || ''), turl = trackUrl_(co, no) || shortTrack_(s);
     var ls = rows_('訂單明細').filter(function (l) { return String(l.出貨單ID) === sid; });
     var qty = ls.reduce(function (a, l) { return a + Number(l.數量 || 0); }, 0);
     var at = String(s.出貨時間 || '') || now_(), md = at.slice(5, 7) + '/' + at.slice(8, 10);
-    var T = function (t, o) { var x = { type: 'text', text: String(t) || ' ' }; for (var k in o) x[k] = o[k]; return x; };
-    var G = BR_.acc, body = [T(String(s.姓名 || '') + ' 您好,您的商品已出貨:', { wrap: true, size: 'sm', color: BR_.ink }), { type: 'separator', margin: 'md' },
-      T('出貨單 ' + sid, { weight: 'bold', color: G, size: 'sm', margin: 'md' }),
-      { type: 'box', layout: 'horizontal', margin: 'sm', contents: [T('共 ' + ls.length + ' 項・' + qty + ' 件', { size: 'sm', color: BR_.mute }), T('$' + Number(s.總額 || 0).toLocaleString('en-US'), { size: 'sm', weight: 'bold', align: 'end', color: BR_.ink })] }];
-    ls.slice(0, 5).forEach(function (l) {
-      body.push({ type: 'box', layout: 'horizontal', margin: 'md', contents: [T(String(l.品名) + (l.規格 ? '(' + l.規格 + ')' : ''), { wrap: true, size: 'sm', color: BR_.ink, flex: 5 }), T('×' + l.數量, { size: 'sm', weight: 'bold', align: 'end', color: BR_.ink, flex: 1 })] });
-    });
-    if (ls.length > 5) body.push(T('…其他 ' + (ls.length - 5) + ' 項', { size: 'xs', color: BR_.mute, margin: 'md' }));
-    if (shipImg) body.push(T('出貨單如下圖 👇', { size: 'sm', color: G, margin: 'lg' }));
-    var btn = flexBtn_;
+    var body = [];
+    body.push({ type: 'box', layout: 'vertical', backgroundColor: PO_.zebra, paddingAll: '12px', margin: 'md', cornerRadius: '6px', contents: [
+      flexRow_('🚚 ' + md + ' 已出貨', co, { lc: PO_.ink, rc: PO_.mute, margin: 'none' }),
+      T(no ? no.replace(/(.{4})(?=.)/g, '$1 ') : '(尚未提供物流單號)', { size: no ? 'xxl' : 'sm', weight: 'bold', color: PO_.ink, adjustMode: 'shrink-to-fit', margin: 'sm' })] });
+    body.push(poGrid_([['收件人', String(s.姓名 || '')], ['電話', String(s.電話 || '')], ['付款方式', String(s.付款方式 || '')], ['運送方式', String(s.配送方式 || '')],
+      ['訂單編號', String(s.訂單ID || '').split(',').join('、')], ['建立時間', String(s.建立時間 || '').slice(0, 16)], ['配送 / 收件資訊', String(s.收件資訊 || '')]]));
+    body.push(poTable_(ls.slice(0, 20).map(function (l) { return { name: String(l.品名), spec: String(l.規格 || ''), qty: l.數量, sub: Number(l.小計 || 0) }; })));
+    if (ls.length > 20) body.push(T('…其他 ' + (ls.length - 20) + ' 項', { size: 'xxs', color: PO_.mute, margin: 'sm' }));
+    var sum = [['共 ' + ls.length + ' 項 / ' + qty + ' 件', ''], ['商品合計', money_(s.商品金額)]];
+    if (Number(s.優惠折抵) > 0) sum.push(['優惠', '-' + money_(s.優惠折抵)]);
+    if (Number(s.購物金折抵) > 0) sum.push(['購物金', '-' + money_(s.購物金折抵)]);
+    sum.push(['運費', money_(s.運費)]);
+    body.push(poSum_(sum, s.總額));
+    if (s.備註) body.push(T('備註:' + String(s.備註), { size: 'xxs', color: '#444444', wrap: true, margin: 'md' }));
+    if (shipImg) body.push(T('超商出貨單如下圖 👇', { size: 'xs', color: PO_.ink, weight: 'bold', margin: 'md' }));
+    body.push(T('感謝您的訂購 · coscos 韓國選物店', { size: 'xxs', color: '#999999', align: 'center', margin: 'lg' }));
+    var btn = function (act, pri) { return { type: 'button', style: pri ? 'primary' : 'secondary', color: pri ? PO_.ink : '#EEEEEE', height: 'sm', action: act, flex: 1 }; };
     var row = [];
-    if (no) row.push(btn('', { type: 'clipboard', label: '① 複製單號', clipboardText: no }));
-    if (turl) row.push(btn('', { type: 'uri', label: (no ? '② ' : '') + '物流查件', uri: turl }, true));
+    if (no) row.push(btn({ type: 'clipboard', label: '① 複製單號', clipboardText: no }));
+    if (turl) row.push(btn({ type: 'uri', label: (no ? '② ' : '') + '物流查件', uri: turl }, true));
     var foot = []; if (row.length) foot.push({ type: 'box', layout: 'horizontal', spacing: 'sm', contents: row });
-    var base = appUrl_(); if (/^https:\/\//.test(base)) foot.push(btn('', { type: 'uri', label: '查看出貨單 ' + (sid.length > 8 ? sid.slice(8) : sid), uri: base + (base.indexOf('?') >= 0 ? '&' : '?') + 's=' + encodeURIComponent(sid) }));
-    var b = { type: 'bubble', size: 'mega',
-      header: flexHead_('🚚 出貨通知', md + ' 已出貨'),
-      body: { type: 'box', layout: 'vertical', backgroundColor: BR_.paper, contents: body } };
-    if (no) b.hero = flexHero_(co + '單號', no.replace(/(.{4})(?=.)/g, '$1 '));
+    var base = appUrl_(); if (/^https:\/\//.test(base)) foot.push(btn({ type: 'uri', label: '在網站查看訂購單', uri: base + (base.indexOf('?') >= 0 ? '&' : '?') + 's=' + encodeURIComponent(sid) }));
+    var b = { type: 'bubble', size: 'giga', header: poHead_('訂購單', 'PURCHASE ORDER', sid), body: { type: 'box', layout: 'vertical', paddingTop: '4px', contents: body } };
     if (foot.length) b.footer = { type: 'box', layout: 'vertical', spacing: 'sm', contents: foot };
     return { type: 'flex', altText: String(alt || '出貨通知').slice(0, 390), contents: b };
   } catch (e) { return null; }
@@ -2694,6 +2729,6 @@ function adminHistBind(tk, pairs) {
 
 /* ===== 以下由 build.py 加入 ===== */
 export const API = {resetAdmin, getShop, placeOrder, adminProxyQuote, adminPlaceOrder, adminLogin, adminVendors, adminBrands, adminAddBrand, adminRenameBrand, adminDeleteBrand, adminCats, adminAddCat, adminRenameCat, adminRenameBig, adminDeleteBig, adminDeleteCat, adminAddVendor, adminDeleteVendor, adminCarriers, adminSaveCarrier, adminDeleteCarrier, trackLink, adminInit, adminSaveProduct, adminDeleteProduct, adminBatchProducts, adminCodes, adminSaveCode, adminSetCodeOn, adminDeleteCode, adminSaveAdmin, adminLogs, memberLogin, memberOrders, memberSaveProfile, memberReportPay, adminBatchArrival, adminLineHistory, adminBatchOrder, adminPurchaseList, adminLineInfo, adminRecordPayment, adminUpdatePayment, adminDeletePayment, adminStockView, adminAddStockIn, adminDeleteStockIn, adminBatchDeleteLines, adminReport, adminOrders, adminOrderAdjust, adminUpdateOrder, adminEditLine, adminEditLineFull, adminDeleteOrder, adminBatchDeleteOrders, adminCreateShip, adminUpdateShip, adminShipResend, adminShipPrinted, adminRemitMissing, adminBatchShipStatus, adminDeleteShip, adminBatchDeleteShips, adminShipHistory, adminBatch, memberCheckout, memberShipQuote, memberCreateShip, adminShipQuote, adminCreateShipFor, lineStart, lineLiff, adminArrivalCode, adminArrivalUnbind, quote, adminMembers, adminMemberGrants, adminSetLevel, adminGrant, adminVoidGrant, adminLevels, adminSaveLevel, adminDeleteLevel, adminActivities, adminSaveActivity, adminDeleteActivity, adminSettings, adminSaveSettings, adminHistImport, adminHistBindList, adminHistRenotify, adminHistBind};
-export const INTERNAL = {catHit_, page_, doGet, setup, resetAdmin, ss_, raw_, sh_, t_, txt_, rows_, put_, log_, major_, diff_, settings_, cats_, cs_, tiers_, unit_, img_, imgList_, bp_, spec_, specParse_, specs_, specQty_, availOf_, adjStock_, imgs_, pub_, getShop, shopData_, placeOrder, placeCore_, proxyCtx_, proxyWant_, adminProxyQuote, adminPlaceOrder, contactSeen_, hex_, hash_, admins_, saveAdmin_, adminLogin, me_, adminProducts_, vendors_, adminVendors, brandSheet_, brands_, brandKey_, brandPick_, brandResolve_, brandList_, brandName_, adminBrands, adminAddBrand, adminRenameBrand, adminDeleteBrand, catList_, catName_, adminCats, adminAddCat, renameCats_, adminRenameCat, adminRenameBig, adminDeleteBig, adminDeleteCat, adminAddVendor, adminDeleteVendor, carriers_, trackUrl_, shortTrack_, saveCarriers_, adminCarriers, adminSaveCarrier, adminDeleteCarrier, trackLink, adminInit, adminSaveProduct, adminDeleteProduct, adminBatchProducts, codeSheet_, codes_, dstr_, codeState_, findCode_, codeUsed_, codeList_, adminCodes, adminSaveCode, adminSetCodeOn, adminDeleteCode, adminSaveAdmin, adminLogs, nz_, mk_, mem_, lineMeta_, mine_, memberLogin, shipObj_, memberOrders, memberSaveProfile, memberReportPay, authDrive, adminUploadImage, adminBatchArrival, stockMove_, adminLineHistory, adminBatchOrder, allPurch_, buyerName_, purchaseList_, adminPurchaseList, pickPurchase_, adminLineInfo, adminRecordPayment, adminUpdatePayment, adminDeletePayment, stockView_, adminStockView, adminAddStockIn, deleteStockIn_, adminDeleteStockIn, adminBatchDeleteLines, adminReport, lk_, ri_, si_, paidOk_, ordOk_, now_, cp_, ord_, seq_, adminOrders, adminOrderAdjust, adminUpdateOrder, adminEditLine, adminEditLineFull, deleteOrder_, adminDeleteOrder, adminBatchDeleteOrders, adminCreateShip, syncOrderStatus_, adminUpdateShip, adminShipResend, adminShipPrinted, adminRemitMissing, shipNotice_, adminBatchShipStatus, deleteShip_, adminDeleteShip, adminBatchDeleteShips, adminShipHistory, adminBatch, memberCheckout, shipCalc_, pickLines_, memberShipQuote, memberCreateShip, shipCtx_, shipRecv_, adminShipQuote, adminCreateShipFor, ensureSettings_, prop_, lineOn_, lineId_, appUrl_, sha_, tot_, lineStart, lineCallback_, lineLiff, newSession_, upsertMember_, memberRow_, levels_, levelOf_, pushLine_, flexT_, flexBtn_, flexHead_, flexHero_, flexRow_, money_, orderFlex_, shipFlex_, notifyShipped_, mailTo_, authAll, notifyArrival_, setSet_, arrIsAdmin_, arrPend_, arrSave_, adminArrivalCode, adminArrivalUnbind, arrText_, arrCands_, arrPlan_, arrApply_, today_, grants_, balance_, addGrant_, spend_, refund_, meInfo_, eligSub_, calc_, quote, awardCredits_, adminMembers, adminMemberGrants, adminSetLevel, adminGrant, adminVoidGrant, adminLevels, adminSaveLevel, adminDeleteLevel, actOut_, adminActivities, adminSaveActivity, adminDeleteActivity, defSet_, adminSettings, adminSaveSettings, hNum_, hDate_, hNorm_, hEta_, hCls_, hPmap_, hFind_, hMaxSeq_, hNext_, hVendor_, adminHistImport, hProducts_, hOrders_, hVendors_, hStock_, adminHistBindList, adminHistRenotify, adminHistBind};
+export const INTERNAL = {catHit_, page_, doGet, setup, resetAdmin, ss_, raw_, sh_, t_, txt_, rows_, put_, log_, major_, diff_, settings_, cats_, cs_, tiers_, unit_, img_, imgList_, bp_, spec_, specParse_, specs_, specQty_, availOf_, adjStock_, imgs_, pub_, getShop, shopData_, placeOrder, placeCore_, proxyCtx_, proxyWant_, adminProxyQuote, adminPlaceOrder, contactSeen_, hex_, hash_, admins_, saveAdmin_, adminLogin, me_, adminProducts_, vendors_, adminVendors, brandSheet_, brands_, brandKey_, brandPick_, brandResolve_, brandList_, brandName_, adminBrands, adminAddBrand, adminRenameBrand, adminDeleteBrand, catList_, catName_, adminCats, adminAddCat, renameCats_, adminRenameCat, adminRenameBig, adminDeleteBig, adminDeleteCat, adminAddVendor, adminDeleteVendor, carriers_, trackUrl_, shortTrack_, saveCarriers_, adminCarriers, adminSaveCarrier, adminDeleteCarrier, trackLink, adminInit, adminSaveProduct, adminDeleteProduct, adminBatchProducts, codeSheet_, codes_, dstr_, codeState_, findCode_, codeUsed_, codeList_, adminCodes, adminSaveCode, adminSetCodeOn, adminDeleteCode, adminSaveAdmin, adminLogs, nz_, mk_, mem_, lineMeta_, mine_, memberLogin, shipObj_, memberOrders, memberSaveProfile, memberReportPay, authDrive, adminUploadImage, adminBatchArrival, stockMove_, adminLineHistory, adminBatchOrder, allPurch_, buyerName_, purchaseList_, adminPurchaseList, pickPurchase_, adminLineInfo, adminRecordPayment, adminUpdatePayment, adminDeletePayment, stockView_, adminStockView, adminAddStockIn, deleteStockIn_, adminDeleteStockIn, adminBatchDeleteLines, adminReport, lk_, ri_, si_, paidOk_, ordOk_, now_, cp_, ord_, seq_, adminOrders, adminOrderAdjust, adminUpdateOrder, adminEditLine, adminEditLineFull, deleteOrder_, adminDeleteOrder, adminBatchDeleteOrders, adminCreateShip, syncOrderStatus_, adminUpdateShip, adminShipResend, adminShipPrinted, adminRemitMissing, shipNotice_, adminBatchShipStatus, deleteShip_, adminDeleteShip, adminBatchDeleteShips, adminShipHistory, adminBatch, memberCheckout, shipCalc_, pickLines_, memberShipQuote, memberCreateShip, shipCtx_, shipRecv_, adminShipQuote, adminCreateShipFor, ensureSettings_, prop_, lineOn_, lineId_, appUrl_, sha_, tot_, lineStart, lineCallback_, lineLiff, newSession_, upsertMember_, memberRow_, levels_, levelOf_, pushLine_, flexT_, flexBtn_, flexHead_, flexHero_, flexRow_, money_, orderFlex_, poHead_, poCell_, poGrid_, poTable_, poSum_, shipFlex_, notifyShipped_, mailTo_, authAll, notifyArrival_, setSet_, arrIsAdmin_, arrPend_, arrSave_, adminArrivalCode, adminArrivalUnbind, arrText_, arrCands_, arrPlan_, arrApply_, today_, grants_, balance_, addGrant_, spend_, refund_, meInfo_, eligSub_, calc_, quote, awardCredits_, adminMembers, adminMemberGrants, adminSetLevel, adminGrant, adminVoidGrant, adminLevels, adminSaveLevel, adminDeleteLevel, actOut_, adminActivities, adminSaveActivity, adminDeleteActivity, defSet_, adminSettings, adminSaveSettings, hNum_, hDate_, hNorm_, hEta_, hCls_, hPmap_, hFind_, hMaxSeq_, hNext_, hVendor_, adminHistImport, hProducts_, hOrders_, hVendors_, hStock_, adminHistBindList, adminHistRenotify, adminHistBind};
 export { H };
 export function __reset() { SS_ = null; SHC_ = {}; RC_ = {}; }
