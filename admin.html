@@ -120,7 +120,7 @@ fieldset{border:1px solid var(--line);border-radius:2px;margin:14px 0;padding:10
 <script>
 var CR = [], BL = [], T = '', P = [], C = [], A = [], O = null, VL = [], FL = {}, tab = (function () { try { var t = sessionStorage.getItem('tab'); return /^[oxysmpkrcdgalh]$/.test(t || '') ? t : 'o'; } catch (e) { return 'o'; } })(), SEL = {};
 var OF = { from: '', to: '', q: '', st: '', pay: '' }, SF = { from: '', to: '', q: '', st: '', pay: '', method: '', pr: '' }, PF = { q: '', type: '', on: '', lock: '' };
-var ALLST = ['待刷卡', '已刷卡待出貨', '待匯款', '已匯款待查帳', '已查帳待出貨', '待出貨', '已出貨', '已退回'];
+var ALLST = ['待刷卡', '已刷卡待出貨', '待匯款', '已匯款待查帳', '已查帳待出貨', '待出貨', '可自取', '已出貨', '已退回'];
 var $ = function (s) { return document.querySelector(s); };
 function vopt(cur, blank) {
   var l = VL.slice(); cur = cur || ''; if (cur && l.indexOf(cur) < 0) l.unshift(cur);
@@ -631,7 +631,7 @@ function drawSettings() {
     '<div class="warn">LINE 登入:' + (l.login ? '已設定' : '尚未設定(缺 LINE_LOGIN_SECRET)') + ';LINE 推播:' + (l.msg ? '已設定' : '尚未設定(缺 LINE_MSG_TOKEN)') + '\n網站網址(LINE Callback URL 要填這個):' + esc(l.url) + '</div>' +
     '<form id="stf" style="max-width:760px"><div class="g">' + fld('店名', '店名', v.店名) + fld('店到店運費', '店到店運費', v.店到店運費, 'number') + fld('宅配運費', '宅配運費', v.宅配運費, 'number') + fld('免運門檻(訂單金額扣掉優惠後滿多少免運)', '免運門檻', v.免運門檻, 'number') +
     fld('購物金使用門檻(訂單滿多少才能用)', '購物金使用門檻', v.購物金使用門檻, 'number') + fld('購物金折抵上限(每筆最多折幾元,空白=不限)', '購物金折抵上限', v.購物金折抵上限, 'number') + fld('購物金預設有效天數', '購物金預設有效天數', v.購物金預設有效天數, 'number') +
-    '<div class="f">' + fld('加好友連結', '加好友連結', v.加好友連結) + '</div>' + ta('匯款資訊', 3) + ta('公告', 2) + ta('購物金注意事項', 5) + ta('到貨通知內容', 3) + ta('下單成功通知內容', 5) + ta('出貨通知內容', 7) + ta('未收到匯款通知內容', 4) + ta('退回通知內容', 5) + ta('送達通知內容', 4) + '</div><h3 style="margin-top:20px">公司資訊(顯示在前台最下方)</h3><div class="g">' + fld('公司名稱', '公司名稱', v.公司名稱) + fld('統一編號', '統一編號', v.統一編號) + '<div class="f">' + fld('公司地址', '公司地址', v.公司地址) + '</div>' + fld('Instagram 連結(https)', 'IG連結', v.IG連結) + fld('LINE 社群連結(https)', 'LINE社群連結', v.LINE社群連結) + '</div>' +
+    '<div class="f">' + fld('加好友連結', '加好友連結', v.加好友連結) + '</div>' + ta('匯款資訊', 3) + ta('公告', 2) + ta('購物金注意事項', 5) + ta('到貨通知內容', 3) + ta('下單成功通知內容', 5) + ta('出貨通知內容', 7) + ta('可自取通知內容', 4) + ta('未收到匯款通知內容', 4) + ta('退回通知內容', 5) + ta('送達通知內容', 4) + '</div><h3 style="margin-top:20px">公司資訊(顯示在前台最下方)</h3><div class="g">' + fld('公司名稱', '公司名稱', v.公司名稱) + fld('統一編號', '統一編號', v.統一編號) + '<div class="f">' + fld('公司地址', '公司地址', v.公司地址) + '</div>' + fld('Instagram 連結(https)', 'IG連結', v.IG連結) + fld('LINE 社群連結(https)', 'LINE社群連結', v.LINE社群連結) + '</div>' +
     '<p class="m">出貨通知另可用:{附圖}(該行只有上傳了出貨單圖片才會出現,例如「出貨單如圖{附圖}」)<br>到貨通知可用:{姓名} {品名} {訂單} {連結}<br>下單成功通知(客人下單後自動用官方 LINE 傳給他,只有 LINE 登入的會員收得到;內容留空就不發送)可用:{姓名} {訂單編號} {品項} {金額} {連結}<br>出貨通知(出貨單改成「已出貨」時自動用 LINE 發送)可用:{出貨單號} {物流} {物流單號} {追蹤連結} {姓名} {連結};某個變數沒有值時,那一整行會自動省略。<br>送達通知(出貨單改成「已送達」或「已收貨付款」時自動發送,LINE 或 Email)可用:{出貨單號} {物流} {物流單號} {姓名} {連結}。<br>物流清單請在下方「物流管理」新增與修改。例:黑貓=https://網址?no={單號}。物流欄位包含該名稱就會套用。</p><p class="er" id="ste" role="alert"></p><button class="btn a">儲存設定</button></form>' +
     arrSec() + carrierSec() + '<h3 style="margin-top:28px">廠商管理</h3><p class="m">商品與訂單明細的「廠商」都從這裡的清單選。刪除廠商不會改動已經存在的商品和訂單。</p><table style="max-width:420px;min-width:0"><tbody>' +
     (VL.map(function (x) { return '<tr><td>' + esc(x) + '</td><td><button class="btn l s" data-vd="del" data-name="' + esc(x) + '">刪除</button></td></tr>'; }).join('') || '<tr><td class="m">還沒有廠商</td></tr>') + '</tbody></table>' +
@@ -857,7 +857,7 @@ document.addEventListener('submit', function (e) {
       .then(function (r) { AC = r; $('#dlg').close(); drawActs(); }).catch(fail('#ace'));
   } else if (f.id === 'stf') {
     $('#ste').textContent = '';
-    var o = {}; ['店名', '店到店運費', '宅配運費', '免運門檻', '匯款資訊', '公告', '購物金使用門檻', '購物金折抵上限', '購物金預設有效天數', '到貨通知內容', '下單成功通知內容', '出貨通知內容', '退回通知內容', '送達通知內容', '未收到匯款通知內容', '加好友連結', '公司名稱', '公司地址', '統一編號', 'IG連結', 'LINE社群連結'].forEach(function (k) { if (f.elements[k]) o[k] = f.elements[k].value; });
+    var o = {}; ['店名', '店到店運費', '宅配運費', '免運門檻', '匯款資訊', '公告', '購物金使用門檻', '購物金折抵上限', '購物金預設有效天數', '購物金注意事項', '到貨通知內容', '下單成功通知內容', '出貨通知內容', '可自取通知內容', '退回通知內容', '送達通知內容', '未收到匯款通知內容', '加好友連結', '公司名稱', '公司地址', '統一編號', 'IG連結', 'LINE社群連結'].forEach(function (k) { if (f.elements[k]) o[k] = f.elements[k].value; });
     call('adminSaveSettings', T, o).then(function (r) { SG = r; drawSettings(); $('#ste').textContent = '已儲存'; $('#ste').className = 'm'; }).catch(fail('#ste'));
   } else if (f.id === 'lvl') {
     $('#lve').textContent = '';
@@ -1474,7 +1474,7 @@ document.addEventListener('change', function (e) {
   upImages(files, function () { return PIMG.length; }, function (u) { PIMG.push(u); pimDraw(); }, '上傳完成');
 });
 /* ---------- 訂購單 ---------- */
-var STC = { '待匯款': ['#fdf0d5', '#8a5a00'], '待刷卡': ['#fdf0d5', '#8a5a00'], '已匯款待查帳': ['#dbeafe', '#1d4ed8'], '已查帳待出貨': ['#ede4fb', '#6d3fc0'], '待出貨': ['#ede4fb', '#6d3fc0'], '待自取': ['#ffe6d5', '#b24a0a'], '已出貨待送達': ['#d5f3f1', '#0f766e'], '已出貨待收貨': ['#d5f3f1', '#0f766e'], '已出貨': ['#d8f3e0', '#1f7a3d'], '已退回': ['#fde0dc', '#b3261e'], '已收貨付款': ['#d8f3e0', '#1f7a3d'], '已自取付款': ['#d8f3e0', '#1f7a3d'] };
+var STC = { '待匯款': ['#fdf0d5', '#8a5a00'], '待刷卡': ['#fdf0d5', '#8a5a00'], '已匯款待查帳': ['#dbeafe', '#1d4ed8'], '已查帳待出貨': ['#ede4fb', '#6d3fc0'], '待出貨': ['#ede4fb', '#6d3fc0'], '可自取': ['#fde4ec', '#b0306a'], '待自取': ['#ffe6d5', '#b24a0a'], '已出貨待送達': ['#d5f3f1', '#0f766e'], '已出貨待收貨': ['#d5f3f1', '#0f766e'], '已出貨': ['#d8f3e0', '#1f7a3d'], '已退回': ['#fde0dc', '#b3261e'], '已收貨付款': ['#d8f3e0', '#1f7a3d'], '已自取付款': ['#d8f3e0', '#1f7a3d'] };
 function stChip(st) { var c = STC[st] || ['#eee', '#555']; return '<span class="chip" style="background:' + c[0] + ';color:' + c[1] + ';font-weight:600">' + esc(st) + '</span>'; }
 (function () { var st = document.createElement('style'); st.textContent = '.paybox{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;background:#fff6d6;border:3px solid #d99a00;border-radius:10px;padding:10px 14px;margin:8px 0 12px}.paybox .pt{font-size:12px;color:#7a5800;font-weight:700;width:100%}.paybox .pa{font-size:12px;color:#7a5800}.paybox .pa b{display:block;font-size:22px;color:#222;margin-top:2px}.paybox label{margin:0;display:flex;flex-direction:column;gap:4px;font-size:12px;color:#7a5800}.paybox input{width:150px}'; document.head.appendChild(st); })();
 function poLogo() { var m = document.querySelector('#side img'); return m ? m.src : ''; }

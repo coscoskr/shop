@@ -592,13 +592,13 @@ $('#q').addEventListener('input', function () {
 /* ---------- 會員中心 ---------- */
 var mt = LT, MD = null, LCHK = false;
 var FLOW = {
-  '刷卡': ['待刷卡', '已刷卡待出貨', '已出貨'],
-  '匯款': ['待匯款', '已匯款待查帳', '已查帳待出貨', '已出貨'],
+  '刷卡': ['待刷卡', '已刷卡待出貨', '可自取', '已出貨'],
+  '匯款': ['待匯款', '已匯款待查帳', '已查帳待出貨', '可自取', '已出貨'],
   '賣貨便': ['待出貨', '已出貨', '已退回'],
   '付現金': ['待自取', '已自取付款']
 };
 function steps(o) {
-  var f = FLOW[o.pay] || [], i = f.indexOf(o.st);
+  var f = (FLOW[o.pay] || []).filter(function (s) { return s !== '可自取' || o.st === '可自取'; }), i = f.indexOf(o.st);
   return '<div class="stp">' + f.map(function (s, k) { return '<i class="' + (k < i ? 'd' : k === i ? 'n' : '') + '">' + esc(s) + '</i>'; }).join('') + '</div>';
 }
 function memLogin() {

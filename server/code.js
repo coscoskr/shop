@@ -1243,14 +1243,14 @@ function adminReport(tk, f) {
 
 /* ---------- 第三階段:訂單與出貨管理 ---------- */
 var FLOW = {
-  '刷卡': ['待刷卡', '已刷卡待出貨', '已出貨'],
-  '匯款': ['待匯款', '已匯款待查帳', '已查帳待出貨', '已出貨'],
+  '刷卡': ['待刷卡', '已刷卡待出貨', '可自取', '已出貨'],
+  '匯款': ['待匯款', '已匯款待查帳', '已查帳待出貨', '可自取', '已出貨'],
   '賣貨便': ['待出貨', '已出貨', '已退回'],
   '付現金': ['待自取', '已自取付款']
 };
 function lk_(fn) { var L = LockService.getScriptLock(); L.waitLock(20000); try { return fn(); } finally { L.releaseLock(); } }
 function ri_(pay) { return (pay === '賣貨便' || pay === '付現金') ? 0 : pay === '匯款' ? 2 : 1; }   // 可出貨的狀態位置
-function si_(pay) { return (pay === '賣貨便' || pay === '付現金') ? 1 : pay === '匯款' ? 3 : 2; }   // 已出貨的狀態位置
+function si_(pay) { return (pay === '賣貨便' || pay === '付現金') ? 1 : pay === '匯款' ? 4 : 3; }   // 已出貨的狀態位置
 function paidOk_(o) { var f = FLOW[o.付款方式]; return !!f && f.indexOf(o.狀態) >= ri_(o.付款方式); }
 /** 已到貨的品項自動視為已叫貨(叫貨人/時間已有就保留) */
 function ordOk_(n, who) {
@@ -1559,7 +1559,9 @@ function adminRemitMissing(tk, sid) {
 function shipNotice_(oldS, n, f) {
   var oi = f.indexOf(String(oldS.狀態)), ni = f.indexOf(String(n.狀態)), si = si_(n.付款方式), out = [];
   var ret = String(n.狀態) === '已退回';
-  if (ni >= si && oi < si && !ret) out.push(notifyShipped_(n));
+  var pick = String(oldS.狀態) === '可自取';   // 客人自取後改成已出貨,不再發出貨通知
+  if (String(n.狀態) === '可自取' && oi !== ni) out.push(notifyShipped_(n, '可自取通知內容', '商品可自取'));
+  if (ni >= si && oi < si && !ret && !pick) out.push(notifyShipped_(n));
   if (ret && oi !== ni) out.push(notifyShipped_(n, '退回通知內容', '出貨單已退回'));
   if (!ret && ni === f.length - 1 && oi !== ni && si < f.length - 1) out.push(notifyShipped_(n, '送達通知內容', '商品已送達', true));
   return out.filter(function (x) { return x; }).join(';') || null;
@@ -1882,6 +1884,7 @@ var DEFAULT_SETTINGS = [
   ['到貨通知內容', '{姓名} 您好,您訂購的 {品名} 已到貨!請到會員中心勾選要出貨的商品:{連結}'],
   ['下單成功通知內容', '訂單{訂單編號}確認！\n\n商品:{品項}\n訂單金額:NT$ {金額}\n\n預購商品到貨後會再訊息通知您❤️\n到貨商品可以在會員的訂單明細勾選出貨～\n\n有任何問題隨時聯繫我們🫶'],
   ['出貨通知內容', '📢出貨通知\n\n出貨單號:{出貨單號}\n物流:{物流}\n物流單號:{物流單號}\n追蹤連結:{追蹤連結}\n出貨單如圖{附圖}\n\n有任何問題都歡迎聯繫我們唷～'],
+  ['可自取通知內容', '📢您的商品已經可以來自取囉!\n\n出貨單號:{出貨單號}\n\n請於營業時間前來取貨,有任何問題都歡迎聯繫我們唷～'],
   ['退回通知內容', '📢出貨單 {出貨單號} 因為太久沒有取貨,已被退回囉。\n\n請問您還需要這筆商品嗎?需要的話請直接回覆我們,我們再幫您重新安排出貨❤️\n(若不需要也請告訴我們一聲,謝謝您～)'],
   ['送達通知內容', '出貨單號 {出貨單號} 商品已送達,感謝您的購買!\n有任何問題隨時聯繫我們'],
   ['未收到匯款通知內容', '{姓名} 您好,出貨單 {出貨單號} 我們目前還沒有確認到您的匯款款項。\n如果您已經匯款,請直接用 LINE 與我們聯繫,並提供匯款帳號後五碼與匯款時間,我們會盡快幫您查帳,謝謝!'],
@@ -2513,7 +2516,7 @@ function adminDeleteActivity(tk, id) {
   });
   return adminActivities(tk);
 }
-var SET_KEYS = ['店名', '店到店運費', '宅配運費', '免運門檻', '匯款資訊', '公告', '購物金使用門檻', '購物金折抵上限', '購物金預設有效天數', '購物金注意事項', '到貨通知內容', '下單成功通知內容', '出貨通知內容', '退回通知內容', '送達通知內容', '未收到匯款通知內容', '物流追蹤連結', '加好友連結', '公司名稱', '公司地址', '統一編號', 'IG連結', 'LINE社群連結'];
+var SET_KEYS = ['店名', '店到店運費', '宅配運費', '免運門檻', '匯款資訊', '公告', '購物金使用門檻', '購物金折抵上限', '購物金預設有效天數', '購物金注意事項', '到貨通知內容', '下單成功通知內容', '出貨通知內容', '可自取通知內容', '退回通知內容', '送達通知內容', '未收到匯款通知內容', '物流追蹤連結', '加好友連結', '公司名稱', '公司地址', '統一編號', 'IG連結', 'LINE社群連結'];
 function defSet_(k) { var r = DEFAULT_SETTINGS.filter(function (x) { return x[0] === k; })[0]; return r ? r[1] : ''; }
 function adminSettings(tk) {
   me_(tk); var s = settings_(), o = {};
