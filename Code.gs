@@ -1049,7 +1049,8 @@ function adminLineInfo(tk, keys, d) {
     var cost = null;
     if (d.cost !== '' && d.cost != null) { cost = Number(d.cost); if (!(cost >= 0)) throw new Error('成本不正確'); }
     var vendor = t_(d.vendor, 60), src = t_(d.src, 60), hasInfo = !!(vendor || src || cost !== null || ['Y', 'N'].indexOf(d.tax) >= 0);
-    if (!d.arr && !hasInfo) throw new Error('請至少填寫一項要修改的內容');
+    var nm = t_(d.name, 200);
+    if (!d.arr && !hasInfo && !nm) throw new Error('請至少填寫一項要修改的內容');
     var lm = lineMeta_(true);
     pickPurchase_(keys).forEach(function (l) {
       var sh = l._sh || '訂單明細', n = cp_(l), m = lm(l), tag = String(l.訂單ID) + ' ' + l.品名, touched = false;
@@ -1069,6 +1070,7 @@ function adminLineInfo(tk, keys, d) {
           log_(u.acc, '修改進貨資料', tag, '廠商:' + m.vendor + '→' + n.廠商 + ';成本:' + m.cost + '→' + n.成本 + ';貨源:' + m.src + '→' + n.貨源);
         }
       }
+      if (nm && String(l.品名) !== nm) { n.品名 = nm; touched = true; log_(u.acc, '修改品名', String(l.訂單ID), l.品名 + ' → ' + nm); }
       if (touched) { put_(sh, l._r, n); done++; }
     });
     log_(u.acc, '批次修改', '', '共 ' + done + ' 筆' + (skip.length ? ';略過:' + skip.join('、') : '') + ';內容:' + ['到貨=' + (d.arr || ''), '廠商=' + vendor, '貨源=' + src, '成本=' + (cost === null ? '' : cost), '含稅=' + (d.tax || '')].join(','));

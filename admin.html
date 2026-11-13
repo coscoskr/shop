@@ -973,14 +973,15 @@ function pvBatchHtml() {
   var sel = PV.lines.filter(function (l) { return PSEL[l.key]; }), flt = pvLines();
   var arr = pvCommon(sel, function (l) { return l.arr; }), ven = pvCommon(sel, function (l) { return l.vendor || ''; }),
     cost = pvCommon(sel, function (l) { return l.cost === '' ? '' : String(l.cost); }), tax = pvCommon(sel, function (l) { return l.cost === '' ? '' : (l.tax ? 'Y' : 'N'); }),
-    src = pvCommon(sel, function (l) { return l.src || ''; });
-  PBI = { arr: arr === null ? '' : arr, vendor: ven === null ? '' : ven, cost: cost === null ? '' : cost, tax: tax === null ? '' : tax, src: src === null ? '' : src };
+    src = pvCommon(sel, function (l) { return l.src || ''; }), nm = pvCommon(sel, function (l) { return l.name || ''; });
+  PBI = { name: nm === null ? '' : nm, arr: arr === null ? '' : arr, vendor: ven === null ? '' : ven, cost: cost === null ? '' : cost, tax: tax === null ? '' : tax, src: src === null ? '' : src };
   var mix = function (x) { return x === null ? ' <span class="m">(勾選的有不同值)</span>' : ''; };
   var box = 'border:1px solid var(--line);border-radius:6px;padding:8px 12px;margin:8px 0';
   var vo = vopt(ven === null ? '' : ven, ven === null ? '(多個值,不修改)' : '(未填)');
   return '<div style="max-width:680px"><h3 style="margin:0 0 4px">批次修改 <span class="m" style="font-size:12px;font-weight:400">已勾選 ' + nf(PV.lines.filter(function (l) { return PSEL[l.key]; }).reduce(function (a, l) { return a + l.qty; }, 0)) + ' 件</span></h3>' +
     '<p class="m" style="margin:2px 0 6px;font-size:12px">先帶入目前的值,改過的欄位會出現紅框,只有紅框的會被修改。已付款的不能改廠商/成本/貨源;已有出貨單的不能改到貨狀態。</p>' +
     '<form id="pvinfo" class="pvb"><style>.pvb{display:grid;grid-template-columns:repeat(3,1fr);gap:6px 10px}.pvb label{font-size:12px;margin:0!important;display:flex;flex-direction:column;gap:2px}.pvb label>select,.pvb label>input{margin:0!important}.pvb input:not([type=checkbox]),.pvb select{padding:4px 6px;font-size:13px;width:100%;min-width:0}.pvb .full{grid-column:1/-1}.pvb .er:empty{display:none}</style>' +
+    '<label class="full">商品名稱' + mix(nm) + '<input name="name" maxlength="200" value="' + esc(PBI.name) + '"' + (nm === null ? ' placeholder="多個值(填寫後會全部改成同一個名稱)"' : '') + '></label>' +
     '<label>到貨狀態' + mix(arr) + '<select name="arr">' + (arr === null ? '<option value="">(多個值,不修改)</option>' : '') + ['已到貨', '待到貨'].map(function (x) { return '<option' + (x === arr ? ' selected' : '') + '>' + x + '</option>'; }).join('') + '</select></label>' +
     
     '<label>廠商' + mix(ven) + '<select name="vendor">' + vo + '</select></label>' +
@@ -990,18 +991,18 @@ function pvBatchHtml() {
     '<p class="er full" id="pve" role="alert" style="margin:0"></p><div class="full" style="display:flex;align-items:center;gap:8px"><button class="btn a">套用</button> <button type="button" class="btn l" data-a="x">取消</button><span class="m" style="font-size:12px">改成「已到貨」時會自動通知客人</span></div></form></div>';
 }
 function pvBatchChanged(f) {
-  var ch = {}; ['arr', 'vendor', 'cost', 'tax', 'src'].forEach(function (k) { var v = String(f[k].value).trim(); if (v !== '' && v !== PBI[k]) ch[k] = v; }); return ch;
+  var ch = {}; ['name', 'arr', 'vendor', 'cost', 'tax', 'src'].forEach(function (k) { var v = String(f[k].value).trim(); if (v !== '' && v !== PBI[k]) ch[k] = v; }); return ch;
 }
 function pvBatchMark() {
   var f = $('#pvinfo'); if (!f) return;
-  var upd = function () { var ch = pvBatchChanged(f); ['arr', 'vendor', 'cost', 'tax', 'src'].forEach(function (k) { f[k].style.border = ch[k] !== undefined ? '2px solid #d64545' : ''; }); };
+  var upd = function () { var ch = pvBatchChanged(f); ['name', 'arr', 'vendor', 'cost', 'tax', 'src'].forEach(function (k) { f[k].style.border = ch[k] !== undefined ? '2px solid #d64545' : ''; }); };
   f.addEventListener('input', upd); f.addEventListener('change', upd);
 }
 function pvBatchSubmit(f) {
   var ch = pvBatchChanged(f), er = $('#pve'); er.textContent = '';
   if (!Object.keys(ch).length) { er.textContent = '沒有任何欄位被修改(改過的欄位會出現紅框)'; return; }
   wait('修改中…請稍候');
-  call('adminLineInfo', T, pvSel(), { arr: ch.arr || '', notify: true, vendor: ch.vendor || '', cost: ch.cost || '', tax: ch.tax || '', src: ch.src || '' }).then(function (r) {
+  call('adminLineInfo', T, pvSel(), { name: ch.name || '', arr: ch.arr || '', notify: true, vendor: ch.vendor || '', cost: ch.cost || '', tax: ch.tax || '', src: ch.src || '' }).then(function (r) {
     var dq = $('#dq'); dq.oncancel = null; if ($('#dlg').open) $('#dlg').close(); pvSet(r, '修改完成\n' + (r.msg || ''));
   }).catch(function (e) { var dq = $('#dq'); dq.oncancel = null; if (dq.open) dq.close(); var el = $('#pve'); if (el) el.textContent = e.message; else tell(e.message); });
 }
