@@ -725,7 +725,7 @@ function sfState(ch) {
   var cv = f.method.value === '店到店', hm = f.method.value === '宅配';
   $('#mcvs').hidden = !cv; $('#mhome').hidden = !hm;
   f.store.required = cv; f.addr.required = hm;
-  return { method: f.method.value, credit: f.credit ? Number(f.credit.value) || 0 : 0 };
+  return { method: f.method.value, pay: f.pay.value, credit: f.credit ? Number(f.credit.value) || 0 : 0 };
 }
 var SQT = 0;
 function sfQuote(ch) {

@@ -629,7 +629,7 @@ function drawSettings() {
   function ta(k, rows) { return '<label class="f">' + k + '<textarea name="' + k + '" rows="' + rows + '">' + esc(v[k]) + '</textarea></label>'; }
   $('#v').innerHTML = '<h2 style="margin-top:0">設定</h2>' +
     '<div class="warn">LINE 登入:' + (l.login ? '已設定' : '尚未設定(缺 LINE_LOGIN_SECRET)') + ';LINE 推播:' + (l.msg ? '已設定' : '尚未設定(缺 LINE_MSG_TOKEN)') + '\n網站網址(LINE Callback URL 要填這個):' + esc(l.url) + '</div>' +
-    '<form id="stf" style="max-width:760px"><div class="g">' + fld('店名', '店名', v.店名) + fld('店到店運費', '店到店運費', v.店到店運費, 'number') + fld('宅配運費', '宅配運費', v.宅配運費, 'number') + fld('免運門檻(訂單金額扣掉優惠後滿多少免運)', '免運門檻', v.免運門檻, 'number') +
+    '<form id="stf" style="max-width:760px"><div class="g">' + fld('店名', '店名', v.店名) + fld('店到店運費', '店到店運費', v.店到店運費, 'number') + fld('賣貨便運費', '賣貨便運費', v.賣貨便運費, 'number') + fld('宅配運費', '宅配運費', v.宅配運費, 'number') + fld('免運門檻(訂單金額扣掉優惠後滿多少免運)', '免運門檻', v.免運門檻, 'number') +
     fld('購物金使用門檻(訂單滿多少才能用)', '購物金使用門檻', v.購物金使用門檻, 'number') + fld('購物金折抵上限(每筆最多折幾元,空白=不限)', '購物金折抵上限', v.購物金折抵上限, 'number') + fld('購物金預設有效天數', '購物金預設有效天數', v.購物金預設有效天數, 'number') +
     '<div class="f">' + fld('加好友連結', '加好友連結', v.加好友連結) + '</div>' + ta('匯款資訊', 3) + ta('公告', 2) + ta('購物金注意事項', 5) + ta('到貨通知內容', 3) + ta('下單成功通知內容', 5) + ta('出貨通知內容', 7) + ta('可自取通知內容', 4) + ta('未收到匯款通知內容', 4) + ta('退回通知內容', 5) + ta('送達通知內容', 4) + '</div><h3 style="margin-top:20px">公司資訊(顯示在前台最下方)</h3><div class="g">' + fld('公司名稱', '公司名稱', v.公司名稱) + fld('統一編號', '統一編號', v.統一編號) + '<div class="f">' + fld('公司地址', '公司地址', v.公司地址) + '</div>' + fld('Instagram 連結(https)', 'IG連結', v.IG連結) + fld('LINE 社群連結(https)', 'LINE社群連結', v.LINE社群連結) + '</div>' +
     '<p class="m">出貨通知另可用:{附圖}(該行只有上傳了出貨單圖片才會出現,例如「出貨單如圖{附圖}」)<br>到貨通知可用:{姓名} {品名} {訂單} {連結}<br>下單成功通知(客人下單後自動用官方 LINE 傳給他,只有 LINE 登入的會員收得到;內容留空就不發送)可用:{姓名} {訂單編號} {品項} {金額} {連結}<br>出貨通知(出貨單改成「已出貨」時自動用 LINE 發送)可用:{出貨單號} {物流} {物流單號} {追蹤連結} {姓名} {連結};某個變數沒有值時,那一整行會自動省略。<br>送達通知(出貨單改成「已送達」或「已收貨付款」時自動發送,LINE 或 Email)可用:{出貨單號} {物流} {物流單號} {姓名} {連結}。<br>物流清單請在下方「物流管理」新增與修改。例:黑貓=https://網址?no={單號}。物流欄位包含該名稱就會套用。</p><p class="er" id="ste" role="alert"></p><button class="btn a">儲存設定</button></form>' +
@@ -857,7 +857,7 @@ document.addEventListener('submit', function (e) {
       .then(function (r) { AC = r; $('#dlg').close(); drawActs(); }).catch(fail('#ace'));
   } else if (f.id === 'stf') {
     $('#ste').textContent = '';
-    var o = {}; ['店名', '店到店運費', '宅配運費', '免運門檻', '匯款資訊', '公告', '購物金使用門檻', '購物金折抵上限', '購物金預設有效天數', '購物金注意事項', '到貨通知內容', '下單成功通知內容', '出貨通知內容', '可自取通知內容', '退回通知內容', '送達通知內容', '未收到匯款通知內容', '加好友連結', '公司名稱', '公司地址', '統一編號', 'IG連結', 'LINE社群連結'].forEach(function (k) { if (f.elements[k]) o[k] = f.elements[k].value; });
+    var o = {}; ['店名', '店到店運費', '賣貨便運費', '宅配運費', '免運門檻', '匯款資訊', '公告', '購物金使用門檻', '購物金折抵上限', '購物金預設有效天數', '購物金注意事項', '到貨通知內容', '下單成功通知內容', '出貨通知內容', '可自取通知內容', '退回通知內容', '送達通知內容', '未收到匯款通知內容', '加好友連結', '公司名稱', '公司地址', '統一編號', 'IG連結', 'LINE社群連結'].forEach(function (k) { if (f.elements[k]) o[k] = f.elements[k].value; });
     call('adminSaveSettings', T, o).then(function (r) { SG = r; drawSettings(); $('#ste').textContent = '已儲存'; $('#ste').className = 'm'; }).catch(fail('#ste'));
   } else if (f.id === 'lvl') {
     $('#lve').textContent = '';

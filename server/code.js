@@ -1439,7 +1439,7 @@ function adminCreateShip(tk, items, d) {
   if (!PAY[d.pay]) throw new Error('請選擇付款方式');
   if (!t_(d.ship, 200)) throw new Error('請填寫收件資訊');
   lk_(function () {
-    var lines = pickLines_(null, items), c = shipCalc_(lines), o0 = ord_(String(lines[0].訂單ID));
+    var lines = pickLines_(null, items), c = shipCalc_(lines, { pay: d.pay, method: d.method }), o0 = ord_(String(lines[0].訂單ID));
     lines.forEach(function (l) { var ox = ord_(String(l.訂單ID)); if (String(ox['LINE ID'] || '') !== String(o0['LINE ID'] || '') || nz_(ox.電話) !== nz_(o0.電話)) throw new Error('一張出貨單只能合併同一位客人的訂單'); });
     var sid = seq_('出貨單', 'S'), oids = {}; lines.forEach(function (l) { oids[String(l.訂單ID)] = 1; });
     put_('出貨單', 0, { '出貨單ID': sid, '訂單ID': Object.keys(oids).join(','), '狀態': PAY[d.pay], '物流': t_(d.co, 30), '物流單號': t_(d.no, 40), '品項': lines.map(function (l) { return l.品名 + '×' + l.數量; }).join('、'), '建立時間': now_(), '出貨時間': '',
@@ -1742,7 +1742,7 @@ function shipCalc_(lines, opt) {
     }
     alloc[oid] = [d, c]; sub += part; disc += d; cred += c;
   });
-  var free = Number(st.免運門檻) || 0, base = opt.method === '自取' ? 0 : opt.method === '店到店' ? Number(st.店到店運費) || 0 : Number(st.宅配運費) || 0;
+  var free = Number(st.免運門檻) || 0, base = opt.method === '自取' ? 0 : opt.pay === '賣貨便' ? (st.賣貨便運費 === undefined || String(st.賣貨便運費) === '' ? 38 : Number(st.賣貨便運費) || 0) : opt.method === '店到店' ? Number(st.店到店運費) || 0 : Number(st.宅配運費) || 0;
   var fee = (free > 0 && sub - disc >= free) ? 0 : base;
   // 出貨時由客人選擇要用多少購物金(只折商品金額,不折運費)
   var lid = opt.ctx && opt.ctx.lid ? opt.ctx.lid : '', goods = Math.max(0, sub - disc - cred), bal = lid ? balance_(lid) : 0;
@@ -1765,7 +1765,7 @@ function pickLines_(ctx, items) {
 function memberShipQuote(tk, items, d) {
   var ctx = mem_(tk); d = d || {};
   try {
-    var c = shipCalc_(pickLines_(ctx, items), { method: d.method, ctx: ctx, credit: d.credit });
+    var c = shipCalc_(pickLines_(ctx, items), { method: d.method, pay: d.pay, ctx: ctx, credit: d.credit });
     return { ok: true, sub: c.sub, disc: c.disc, cred: c.cred + c.pick, fee: c.fee, total: c.total, pick: c.pick, allowed: c.allowed, balance: c.balance, minSpend: c.minSpend, login: !!ctx.lid };
   }
   catch (e) { return { ok: false, msg: e.message }; }
@@ -1799,7 +1799,7 @@ function memberCreateShip(tk, items, d) {
   if (!/^[0-9+\-\s]{8,20}$/.test(phone)) throw new Error('請填寫正確的聯絡電話');
   var sid;
   lk_(function () {
-    var lines = pickLines_(ctx, items), c = shipCalc_(lines, { method: method, ctx: ctx, credit: d.credit }), o0 = ord_(String(lines[0].訂單ID));
+    var lines = pickLines_(ctx, items), c = shipCalc_(lines, { method: method, pay: pay, ctx: ctx, credit: d.credit }), o0 = ord_(String(lines[0].訂單ID));
     if (c.over) throw new Error('購物金超過可使用額度(最多 ' + c.allowed + ')');
     var cdetail = c.pick > 0 ? spend_(ctx.lid, c.pick) : {};
     sid = seq_('出貨單', 'S');
@@ -1838,7 +1838,7 @@ function shipRecv_(d) {
 function adminShipQuote(tk, items, d) {
   me_(tk); d = d || {};
   try {
-    var ctx = shipCtx_(d), c = shipCalc_(pickLines_(ctx, items), { method: d.method, ctx: ctx, credit: d.credit });
+    var ctx = shipCtx_(d), c = shipCalc_(pickLines_(ctx, items), { method: d.method, pay: d.pay, ctx: ctx, credit: d.credit });
     return { ok: true, sub: c.sub, disc: c.disc, cred: c.cred + c.pick, fee: c.fee, total: c.total, pick: c.pick, allowed: c.allowed, balance: c.balance, minSpend: c.minSpend, login: !!ctx.lid };
   } catch (e) { return { ok: false, msg: e.message }; }
 }
@@ -1853,7 +1853,7 @@ function adminCreateShipFor(tk, items, d) {
   if (!/^[0-9+\-\s]{8,20}$/.test(phone)) throw new Error('請填寫正確的聯絡電話');
   var sid, total = 0, name = '', msg = '', oidsOut = '', itemsTxt = '', lidOut = '';
   lk_(function () {
-    var lines = pickLines_(ctx, items), c = shipCalc_(lines, { method: method, ctx: ctx, credit: d.credit }), o0 = ord_(String(lines[0].訂單ID));
+    var lines = pickLines_(ctx, items), c = shipCalc_(lines, { method: method, pay: pay, ctx: ctx, credit: d.credit }), o0 = ord_(String(lines[0].訂單ID));
     if (c.over) throw new Error('購物金超過可使用額度(最多 ' + c.allowed + ')');
     var cdetail = c.pick > 0 ? spend_(ctx.lid, c.pick) : {};
     sid = seq_('出貨單', 'S');
@@ -1878,7 +1878,7 @@ function adminCreateShipFor(tk, items, d) {
 /* ---------- 第二階段:LINE 登入、會員、購物金、活動 ---------- */
 var LINE_ID_DEFAULT = '2012348090';
 var DEFAULT_SETTINGS = [
-  ['店名', 'coscos韓國選物店'], ['免運門檻', 1500], ['店到店運費', 60], ['宅配運費', 80], ['匯款資訊', '請填寫銀行代碼、帳號、戶名'], ['公告', ''],
+  ['店名', 'coscos韓國選物店'], ['免運門檻', 1500], ['店到店運費', 60], ['賣貨便運費', 38], ['宅配運費', 80], ['匯款資訊', '請填寫銀行代碼、帳號、戶名'], ['公告', ''],
   ['購物金注意事項', '⚠️ 購物金使用注意事項\n▪️ 下次消費滿 $500，可折 $50\n▪️ 下次消費滿 $1,000，可折 $150\n▪️ 每筆消費限使用一種折抵方式\n▪️ 精品、特價商品及指定商品不適用'],
   ['購物金使用門檻', 1000], ['購物金折抵上限', 100], ['購物金預設有效天數', 90],
   ['到貨通知內容', '{姓名} 您好,您訂購的 {品名} 已到貨!請到會員中心勾選要出貨的商品:{連結}'],
@@ -2516,7 +2516,7 @@ function adminDeleteActivity(tk, id) {
   });
   return adminActivities(tk);
 }
-var SET_KEYS = ['店名', '店到店運費', '宅配運費', '免運門檻', '匯款資訊', '公告', '購物金使用門檻', '購物金折抵上限', '購物金預設有效天數', '購物金注意事項', '到貨通知內容', '下單成功通知內容', '出貨通知內容', '可自取通知內容', '退回通知內容', '送達通知內容', '未收到匯款通知內容', '物流追蹤連結', '加好友連結', '公司名稱', '公司地址', '統一編號', 'IG連結', 'LINE社群連結'];
+var SET_KEYS = ['店名', '店到店運費', '賣貨便運費', '宅配運費', '免運門檻', '匯款資訊', '公告', '購物金使用門檻', '購物金折抵上限', '購物金預設有效天數', '購物金注意事項', '到貨通知內容', '下單成功通知內容', '出貨通知內容', '可自取通知內容', '退回通知內容', '送達通知內容', '未收到匯款通知內容', '物流追蹤連結', '加好友連結', '公司名稱', '公司地址', '統一編號', 'IG連結', 'LINE社群連結'];
 function defSet_(k) { var r = DEFAULT_SETTINGS.filter(function (x) { return x[0] === k; })[0]; return r ? r[1] : ''; }
 function adminSettings(tk) {
   me_(tk); var s = settings_(), o = {};
@@ -2526,14 +2526,14 @@ function adminSettings(tk) {
 function adminSaveSettings(tk, v) {
   var u = me_(tk);
   lk_(function () {
-    ['店到店運費', '宅配運費', '免運門檻', '購物金使用門檻', '購物金預設有效天數'].forEach(function (k) { if (!(Number(v[k]) >= 0) || String(v[k]).trim() === '') throw new Error(k + ' 請填數字'); });
+    ['店到店運費', '賣貨便運費', '宅配運費', '免運門檻', '購物金使用門檻', '購物金預設有效天數'].forEach(function (k) { if (!(Number(v[k]) >= 0) || String(v[k]).trim() === '') throw new Error(k + ' 請填數字'); });
     if (String(v.購物金折抵上限).trim() !== '' && !(Number(v.購物金折抵上限) >= 0)) throw new Error('購物金折抵上限請填數字,或留空代表不限制');
     ['加好友連結', 'IG連結', 'LINE社群連結'].forEach(function (k) { if (String(v[k] || '').trim() && !/^https:\/\//.test(String(v[k]).trim())) throw new Error(k + '需以 https:// 開頭'); });
     var cur = rows_('設定'), ch = [];
     SET_KEYS.forEach(function (k) {
       if (v[k] === undefined) return;
       var nv = typeof v[k] === 'string' ? t_(v[k], 1000) : v[k], ex = cur.filter(function (r) { return r.項目 === k; })[0];
-      if (['店到店運費', '宅配運費', '免運門檻', '購物金使用門檻', '購物金預設有效天數'].indexOf(k) >= 0 || (k === '購物金折抵上限' && nv !== '')) nv = Number(nv);
+      if (['店到店運費', '賣貨便運費', '宅配運費', '免運門檻', '購物金使用門檻', '購物金預設有效天數'].indexOf(k) >= 0 || (k === '購物金折抵上限' && nv !== '')) nv = Number(nv);
       if (ex) { if (String(ex.值) !== String(nv)) { ch.push(k + ':' + ex.值 + '→' + nv); put_('設定', ex._r, { '項目': k, '值': nv }); } }
       else { ch.push(k + ':新增'); put_('設定', 0, { '項目': k, '值': nv }); }
     });
