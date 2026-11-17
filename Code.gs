@@ -16,6 +16,9 @@ var H = {
   '訂單': ['訂單ID', '下單時間', '姓名', '電話', '付款方式', '狀態', '商品金額', '運費', '總額', '收件資訊', '備註', 'LINE ID', '付款連結', '匯款後五碼', '會員等級', '優惠名稱', '優惠折抵', '購物金折抵', '購物金明細', '電子郵件', '折扣碼'],
   '訂單明細': ['訂單ID', '商品ID', '品名', '數量', '單價', '小計', '到貨狀態', '可出貨', '申請出貨', '出貨單ID', '型態', '廠商', '成本', '成本含稅', '貨源', '廠商付款ID', '規格', '到貨操作人', '到貨時間', '叫貨狀態', '叫貨人', '叫貨時間'],
   '庫存進貨': ['訂單ID', '商品ID', '品名', '規格', '數量', '到貨狀態', '廠商', '成本', '成本含稅', '貨源', '廠商付款ID', '到貨操作人', '到貨時間', '日期', '建立人', '出貨單ID'],
+  '支出': ['支出ID', '日期', '類別', '項目', '金額', '付款方式', '備註', '建立人', '建立時間'],
+  '固定支出': ['固定ID', '名稱', '金額', '備註', '啟用'],
+  '人事': ['人員ID', '姓名', '薪資', '勞保', '健保', '勞退', '其他', '備註', '啟用'],
   '廠商付款': ['付款ID', '付款日期', '廠商', '金額', '匯款備註', '品項數', '應付成本', '品項', '建立人', '建立時間', '圖片'],
   '出貨單': ['出貨單ID', '訂單ID', '狀態', '物流', '物流單號', '品項', '建立時間', '出貨時間', 'LINE ID', '姓名', '電話', '付款方式', '收件資訊', '備註', '商品金額', '優惠折抵', '購物金折抵', '運費', '總額', '付款連結', '匯款後五碼', '會員等級', '折抵明細', '配送方式', '購物金明細', '匯款日期', '收款帳號', '列印時間', '出貨單圖片'],
   '會員': ['LINE ID', '暱稱', '頭像', '等級', '加入時間', '最近登入', '已加好友', '備註', '姓名', '電話', 'Email', '收件地址'],
@@ -665,7 +668,7 @@ function trackLink(id) {
   if (!s || (!s.物流 && !s.物流單號)) throw new Error('查無這筆物流資料');
   return { id: String(s.出貨單ID), co: String(s.物流 || ''), no: String(s.物流單號 || ''), url: trackUrl_(s.物流, s.物流單號) };
 }
-function adminInit(tk) { me_(tk); return { products: adminProducts_(), cats: cats_(), admins: admins_(), vendors: vendors_(), brands: brands_(), carriers: carriers_() }; }
+function adminInit(tk) { var u0 = me_(tk); return { boss: isBoss_(u0.acc), products: adminProducts_(), cats: cats_(), admins: admins_(), vendors: vendors_(), brands: brands_(), carriers: carriers_() }; }
 
 function adminSaveProduct(tk, d) {
   var u = me_(tk), L = LockService.getScriptLock();
@@ -1668,6 +1671,89 @@ function adminMergeShips(tk, ids) {
     msg = '已合併成出貨單 ' + tid + '(併入 ' + mids.join('、') + ')\n應付 ' + total + ',運費 ' + fee + (fee0 !== fee ? '(原本各張運費合計 ' + fee0 + (fee0 > fee && String(t.狀態) !== FLOW[pay][0] ? ',客人已付的運費多了 ' + (fee0 - fee) + ',請另外處理' : '') + ')' : '');
   });
   var r = adminOrders(tk); r.msg = msg; return r;
+}
+/* ---------- 支出 / 月結(月結僅老闆帳號可看,名單存在伺服器設定 BOSS_ACCOUNTS) ---------- */
+function isBoss_(acc) { return String(prop_('BOSS_ACCOUNTS') || '').split(/[,\s]+/).filter(String).indexOf(String(acc)) >= 0; }
+function boss_(tk) { var u = me_(tk); if (!isBoss_(u.acc)) throw new Error('只有老闆帳號可以查看月結'); return u; }
+var EXP_CATS_ = ['進貨運費', '包材耗材', '廣告行銷', '平台手續費', '水電網路', '交通', '餐費', '雜支', '其他'];
+function expObj_(r) { return { id: String(r.支出ID), date: String(r.日期), cat: String(r.類別), item: String(r.項目), amt: Number(r.金額) || 0, pay: String(r.付款方式 || ''), note: String(r.備註 || ''), by: String(r.建立人 || ''), at: String(r.建立時間 || '') }; }
+function adminExpenses(tk, f) {
+  var u = me_(tk); f = f || {};
+  var L = rows_('支出').filter(function (r) { var d = String(r.日期); return (!f.from || d >= f.from) && (!f.to || d <= f.to); }).map(expObj_);
+  L.sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : (a.id < b.id ? 1 : -1); });
+  return { list: L, cats: EXP_CATS_, boss: isBoss_(u.acc) };
+}
+function adminSaveExpense(tk, d) {
+  var u = me_(tk); d = d || {};
+  lk_(function () {
+    var date = String(d.date || ''), amt = Number(d.amt), item = t_(d.item, 100);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('請選擇日期');
+    if (!item) throw new Error('請填寫項目');
+    if (!(amt > 0)) throw new Error('請填寫金額');
+    var row = { '日期': date, '類別': t_(d.cat, 30), '項目': item, '金額': amt, '付款方式': t_(d.pay, 30), '備註': t_(d.note, 300) };
+    if (d.id) {
+      var ex = rows_('支出').filter(function (r) { return String(r.支出ID) === String(d.id); })[0]; if (!ex) throw new Error('找不到這筆支出');
+      var n = cp_(ex); Object.keys(row).forEach(function (k) { n[k] = row[k]; }); put_('支出', ex._r, n); log_(u.acc, '修改支出', String(d.id), diff_(ex, n));
+    } else {
+      var id = seq_('支出', 'E'); row.支出ID = id; row.建立人 = u.acc; row.建立時間 = now_(); put_('支出', 0, row);
+      log_(u.acc, '新增支出', id, date + ' ' + row.類別 + ' ' + item + ' ' + amt);
+    }
+  });
+  return adminExpenses(tk, { from: d.from, to: d.to });
+}
+function adminDeleteExpense(tk, id, f) {
+  var u = me_(tk);
+  lk_(function () {
+    var ex = rows_('支出').filter(function (r) { return String(r.支出ID) === String(id); })[0]; if (!ex) throw new Error('找不到這筆支出');
+    sh_('支出').deleteRow(ex._r); log_(u.acc, '刪除支出', String(id), ex.日期 + ' ' + ex.項目 + ' ' + ex.金額);
+  });
+  return adminExpenses(tk, f || {});
+}
+function staffTotal_(r) { return (Number(r.薪資) || 0) + (Number(r.勞保) || 0) + (Number(r.健保) || 0) + (Number(r.勞退) || 0) + (Number(r.其他) || 0); }
+function adminMonthly(tk, ym) {
+  boss_(tk);
+  ym = /^\d{4}-\d{2}$/.test(String(ym || '')) ? String(ym) : Utilities.formatDate(new Date(), TZ, 'yyyy-MM');
+  var from = ym + '-01', to = ym + '-31';
+  var rep = adminReport(tk, { oFrom: from, oTo: to }).sum;
+  var ex = rows_('支出').filter(function (r) { var d = String(r.日期); return d >= from && d <= to; }).map(expObj_);
+  var byCat = {}; ex.forEach(function (e) { var k = e.cat || '未分類'; byCat[k] = (byCat[k] || 0) + e.amt; });
+  var fixed = rows_('固定支出').map(function (r) { return { id: String(r.固定ID), name: String(r.名稱), amt: Number(r.金額) || 0, note: String(r.備註 || ''), on: String(r.啟用) !== 'N' }; });
+  var staff = rows_('人事').map(function (r) { return { id: String(r.人員ID), name: String(r.姓名), salary: Number(r.薪資) || 0, labor: Number(r.勞保) || 0, health: Number(r.健保) || 0, pension: Number(r.勞退) || 0, other: Number(r.其他) || 0, total: staffTotal_(r), note: String(r.備註 || ''), on: String(r.啟用) !== 'N' }; });
+  var sumEx = ex.reduce(function (a, e) { return a + e.amt; }, 0), sumFix = fixed.reduce(function (a, x) { return a + (x.on ? x.amt : 0); }, 0), sumStaff = staff.reduce(function (a, x) { return a + (x.on ? x.total : 0); }, 0);
+  return { ym: ym, revenue: rep.revenue, cost: rep.cost, gross: rep.revenue - rep.cost, noCost: rep.noCost, orders: rep.orders,
+    expense: sumEx, byCat: byCat, fixed: fixed, sumFixed: sumFix, staff: staff, sumStaff: sumStaff, net: rep.revenue - rep.cost - sumEx - sumFix - sumStaff };
+}
+function adminSaveFixed(tk, d, ym) {
+  var u = boss_(tk); d = d || {};
+  lk_(function () {
+    var name = t_(d.name, 60), amt = Number(d.amt);
+    if (!name) throw new Error('請填寫名稱'); if (!(amt >= 0)) throw new Error('金額不正確');
+    var row = { '名稱': name, '金額': amt, '備註': t_(d.note, 200), '啟用': d.on === false ? 'N' : 'Y' };
+    var ex = d.id ? rows_('固定支出').filter(function (r) { return String(r.固定ID) === String(d.id); })[0] : null;
+    if (ex) { var n = cp_(ex); Object.keys(row).forEach(function (k) { n[k] = row[k]; }); put_('固定支出', ex._r, n); log_(u.acc, '修改固定支出', String(d.id), diff_(ex, n)); }
+    else { row.固定ID = seq_('固定支出', 'F'); put_('固定支出', 0, row); log_(u.acc, '新增固定支出', row.固定ID, name + ' ' + amt); }
+  });
+  return adminMonthly(tk, ym);
+}
+function adminSaveStaff(tk, d, ym) {
+  var u = boss_(tk); d = d || {};
+  lk_(function () {
+    var name = t_(d.name, 30); if (!name) throw new Error('請填寫姓名');
+    var row = { '姓名': name, '備註': t_(d.note, 200), '啟用': d.on === false ? 'N' : 'Y' };
+    [['salary', '薪資'], ['labor', '勞保'], ['health', '健保'], ['pension', '勞退'], ['other', '其他']].forEach(function (k) { var v = Number(d[k[0]] || 0); if (!(v >= 0)) throw new Error(k[1] + '金額不正確'); row[k[1]] = v; });
+    var ex = d.id ? rows_('人事').filter(function (r) { return String(r.人員ID) === String(d.id); })[0] : null;
+    if (ex) { var n = cp_(ex); Object.keys(row).forEach(function (k) { n[k] = row[k]; }); put_('人事', ex._r, n); log_(u.acc, '修改人事支出', String(d.id), name); }
+    else { row.人員ID = seq_('人事', 'H'); put_('人事', 0, row); log_(u.acc, '新增人事支出', row.人員ID, name); }
+  });
+  return adminMonthly(tk, ym);
+}
+function adminDeleteMonthlyItem(tk, kind, id, ym) {
+  var u = boss_(tk), sh = kind === 'staff' ? '人事' : '固定支出', key = kind === 'staff' ? '人員ID' : '固定ID';
+  lk_(function () {
+    var ex = rows_(sh).filter(function (r) { return String(r[key]) === String(id); })[0]; if (!ex) throw new Error('找不到資料');
+    sh_(sh).deleteRow(ex._r); log_(u.acc, '刪除' + (kind === 'staff' ? '人事支出' : '固定支出'), String(id), String(ex.姓名 || ex.名稱));
+  });
+  return adminMonthly(tk, ym);
 }
 function adminBatchDeleteShips(tk, ids) {
   var u = me_(tk), done = 0, skip = [];
@@ -2773,7 +2859,19 @@ function adminHistBindList(tk) {
   });
   var gs = Object.keys(cnt).map(function (k) { return cnt[k]; }).sort(function (a, b) { return b.items - a.items; });
   var ms = rows_('會員').map(function (m) { return { id: String(m['LINE ID']), nick: String(m.暱稱 || ''), real: String(m.姓名 || '') }; });
-  return { groups: gs, members: ms };
+  var notes = {}; try { notes = JSON.parse(String(settings_().舊訂單備註 || '{}')) || {}; } catch (e) {}
+  return { groups: gs, members: ms, notes: notes };
+}
+/** 匯入舊資料:每位購買人的備註(存在設定「舊訂單備註」) */
+function adminHistNote(tk, name, note) {
+  var u = me_(tk); name = String(name || '').slice(0, 100); note = t_(note, 200);
+  lk_(function () {
+    var m = {}; try { m = JSON.parse(String(settings_().舊訂單備註 || '{}')) || {}; } catch (e) {}
+    if (note) m[name] = note; else delete m[name];
+    setSet_('舊訂單備註', JSON.stringify(m));
+    log_(u.acc, '舊訂單備註', name, note);
+  });
+  return { ok: true };
 }
 var BIND_MSG_ = 'coscos網站綁定成功!之後下單成功、到貨、出貨都會傳通知到這邊唷❤️謝謝您～';
 /** 補發「綁定成功」通知給單一會員(回傳成功/失敗原因) */
