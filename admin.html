@@ -349,7 +349,7 @@ function openOrder(id) {
         '<div class="r2"><label>現貨/預購<select class="ln_t"' + dis + '>' + opts(['現貨', '預購'], i.typ) + '</select></label>' +
         '<label>單價<input class="lu" type="number" min="0" value="' + i.unit + '"' + dis + '></label><label>數量<input class="lq" type="number" min="1" value="' + i.qty + '"' + dis + '></label>' +
         '<label>複價<output class="lt">' + money(i.sub) + '</output></label>' +
-        '<label>到貨狀態<select class="ln_a"' + dis + '>' + opts(['待到貨', '已到貨'], i.arr) + '</select></label><label>到貨日期<input class="ln_e" type="date" value="' + esc(i.eta === '排隊中' ? '' : i.eta || '') + '"' + (i.eta === '排隊中' ? ' disabled' : '') + '><span class="ck" style="display:block;margin-top:3px"><input type="checkbox" class="ln_q"' + (i.eta === '排隊中' ? ' checked' : '') + '> 暫不確定,排隊中</span></label></div>' +
+        '<label>到貨狀態<select class="ln_a"' + dis + '>' + opts(['待到貨', '已到貨', '已出貨'], i.arr) + '</select></label><label>到貨日期<input class="ln_e" type="date" value="' + esc(i.eta === '排隊中' ? '' : i.eta || '') + '"' + (i.eta === '排隊中' ? ' disabled' : '') + '><span class="ck" style="display:block;margin-top:3px"><input type="checkbox" class="ln_q"' + (i.eta === '排隊中' ? ' checked' : '') + '> 暫不確定,排隊中</span></label></div>' +
         '<div class="r3"><label>廠商<select class="ln_v">' + vopt(i.vendor, '—') + '</select></label><label>成本<input class="ln_c" type="number" min="0" value="' + (i.cost === '' || i.cost == null ? '' : i.cost) + '"></label>' +
         '<label>稅<select class="ln_x">' + opts(['未稅', '含稅'], i.tax ? '含稅' : '未稅') + '</select></label><label>貨源<input class="ln_s" value="' + esc(i.src || '') + '"></label>' +
         '<label>出貨單<output>' + esc(i.sid || '—') + '</output></label><div class="sv"><button class="btn a" data-a="sl" data-oid="' + esc(o.id) + '" data-pid="' + esc(i.pid) + '">儲存後關閉</button></div></div></div>';
@@ -965,7 +965,7 @@ function purchView() {
   $('#v').innerHTML = '<p class="m">載入中…</p>';
   call('adminPurchaseList', T).then(function (d) { PV = d; VL = d.vlist || VL; PVT = Date.now(); PVDIRTY = false; PSEL = {}; pvDraw(); }).catch(function (e) { $('#v').innerHTML = '<p class="er">' + esc(e.message) + '</p>'; });
 }
-function pvSt(l) { return l.sid && !l.stock ? (/已出貨|已送達|已收貨付款|已自取付款/.test(l.sst || '') ? '已出貨' : '待出貨') : l.arr === '已到貨' ? '已到貨' : '未到貨'; }
+function pvSt(l) { return l.sid && !l.stock ? (/已出貨|已送達|已收貨付款|已自取付款/.test(l.sst || '') ? '已出貨' : '待出貨') : l.arr === '已出貨' ? '已出貨' : l.arr === '已到貨' ? '已到貨' : '未到貨'; }
 function pvLines() {
   var f = VF, hit = function (txt, q) { q = String(q || '').toLowerCase().trim(); if (!q) return true; var hay = String(txt || '').toLowerCase(); return q.split(/[\s,，、]+/).filter(Boolean).every(function (w) { return hay.indexOf(w) >= 0; }); };
   return PV.lines.filter(function (l) {
@@ -1075,7 +1075,7 @@ function pvBatchHtml() {
     '<p class="m" style="margin:2px 0 6px;font-size:12px">先帶入目前的值,改過的欄位會出現紅框,只有紅框的會被修改。已付款的不能改廠商/成本/貨源;已有出貨單的不能改到貨狀態。</p>' +
     '<form id="pvinfo" class="pvb"><style>.pvb{display:grid;grid-template-columns:repeat(3,1fr);gap:6px 10px}.pvb label{font-size:12px;margin:0!important;display:flex;flex-direction:column;gap:2px}.pvb label>select,.pvb label>input{margin:0!important}.pvb input:not([type=checkbox]),.pvb select{padding:4px 6px;font-size:13px;width:100%;min-width:0}.pvb .full{grid-column:1/-1}.pvb .er:empty{display:none}</style>' +
     '<label class="full">商品名稱' + mix(nm) + '<input name="name" maxlength="200" value="' + esc(PBI.name) + '"' + (nm === null ? ' placeholder="多個值(填寫後會全部改成同一個名稱)"' : '') + '></label>' +
-    '<label>到貨狀態' + mix(arr) + '<select name="arr">' + (arr === null ? '<option value="">(多個值,不修改)</option>' : '') + ['已到貨', '待到貨'].map(function (x) { return '<option' + (x === arr ? ' selected' : '') + '>' + x + '</option>'; }).join('') + '</select></label>' +
+    '<label>到貨狀態' + mix(arr) + '<select name="arr">' + (arr === null ? '<option value="">(多個值,不修改)</option>' : '') + ['已到貨', '待到貨', '已出貨'].map(function (x) { return '<option' + (x === arr ? ' selected' : '') + '>' + x + '</option>'; }).join('') + '</select></label>' +
     
     '<label>廠商' + mix(ven) + '<select name="vendor">' + vo + '</select></label>' +
     '<label>單件成本' + mix(cost) + '<input name="cost" type="number" min="0" step="any" value="' + esc(PBI.cost) + '"' + (cost === null ? ' placeholder="多個值"' : '') + '></label>' +

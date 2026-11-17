@@ -1048,22 +1048,24 @@ function pickPurchase_(keys) {
 function adminLineInfo(tk, keys, d) {
   var u = me_(tk), done = 0, infoDone = 0, skip = [], arrived = {};
   d = d || {};
-  if (d.arr && ['待到貨', '已到貨'].indexOf(d.arr) < 0) throw new Error('到貨狀態不正確');
+  if (d.arr && ['待到貨', '已到貨', '已出貨'].indexOf(d.arr) < 0) throw new Error('到貨狀態不正確');
   lk_(function () {
     var cost = null;
     if (d.cost !== '' && d.cost != null) { cost = Number(d.cost); if (!(cost >= 0)) throw new Error('成本不正確'); }
     var vendor = t_(d.vendor, 60), src = t_(d.src, 60), hasInfo = !!(vendor || src || cost !== null || ['Y', 'N'].indexOf(d.tax) >= 0);
-    var nm = t_(d.name, 200), ren = {};
+    var nm = t_(d.name, 200), ren = {}, synced = null;
     if (!d.arr && !hasInfo && !nm) throw new Error('請至少填寫一項要修改的內容');
     var lm = lineMeta_(true);
     pickPurchase_(keys).forEach(function (l) {
       var sh = l._sh || '訂單明細', n = cp_(l), m = lm(l), tag = String(l.訂單ID) + ' ' + l.品名, touched = false;
       if (d.arr && String(l.到貨狀態) !== d.arr) {
         if (l.出貨單ID) skip.push(tag + '(已建立出貨單 ' + l.出貨單ID + ',到貨狀態不能改)');
+        else if (sh === '庫存進貨' && d.arr === '已出貨') skip.push(tag + '(公司庫存不能設為已出貨)');
         else {
-          n.到貨狀態 = d.arr; n.可出貨 = d.arr === '已到貨' ? 'Y' : 'N'; n.到貨操作人 = u.acc; n.到貨時間 = now_(); if (d.arr === '已到貨' && sh !== '庫存進貨') ordOk_(n, u.acc); touched = true;
+          n.到貨狀態 = d.arr; n.可出貨 = d.arr === '已到貨' ? 'Y' : 'N'; n.到貨操作人 = u.acc; n.到貨時間 = now_(); if (d.arr !== '待到貨' && sh !== '庫存進貨') ordOk_(n, u.acc); touched = true;
           log_(u.acc, '到貨', tag, '到貨:' + l.到貨狀態 + '→' + d.arr + '(批次)');
           if (sh === '庫存進貨') stockMove_(l, d.arr === '已到貨' ? Number(l.數量) : -Number(l.數量));
+          if (sh !== '庫存進貨' && (d.arr === '已出貨' || String(l.到貨狀態) === '已出貨')) (synced = synced || {})[String(l.訂單ID)] = 1;
           else if (d.arr === '已到貨') (arrived[String(l.訂單ID)] = arrived[String(l.訂單ID)] || []).push(l.品名);
         }
       }
@@ -1077,6 +1079,7 @@ function adminLineInfo(tk, keys, d) {
       if (nm && String(l.品名) !== nm) { n.品名 = nm; touched = true; log_(u.acc, '修改品名', String(l.訂單ID), l.品名 + ' → ' + nm); if (l.出貨單ID) (ren[String(l.出貨單ID)] = ren[String(l.出貨單ID)] || []).push([String(l.品名), nm]); }
       if (touched) { put_(sh, l._r, n); done++; }
     });
+    if (synced) Object.keys(synced).forEach(function (oid) { syncOrderStatus_(oid, u.acc); });
     // 改名後同步出貨單的「品項」文字
     if (Object.keys(ren).length) rows_('出貨單').forEach(function (s) {
       var rr = ren[String(s.出貨單ID)]; if (!rr) return;
@@ -1364,7 +1367,7 @@ function adminEditLineFull(tk, oid, pid, d) {
     var arr = d.keep ? String(l.到貨狀態) : String(d.arr || l.到貨狀態);
     if (!name) throw new Error('請填寫品名');
     if (type && ['現貨', '預購'].indexOf(type) < 0) throw new Error('型態只能是現貨或預購');
-    if (['待到貨', '已到貨'].indexOf(arr) < 0) throw new Error('到貨狀態不正確');
+    if (['待到貨', '已到貨', '已出貨'].indexOf(arr) < 0) throw new Error('到貨狀態不正確');
     var shipped = !!l.出貨單ID;
     if (shipped && (q !== Number(l.數量) || up !== Number(l.單價) || arr !== String(l.到貨狀態))) throw new Error('此品項已建立出貨單,數量、單價、到貨狀態需先刪除出貨單才能修改');
     var delta = q - Number(l.數量);
@@ -1393,7 +1396,7 @@ function adminEditLineFull(tk, oid, pid, d) {
     if (!d.keep && d.spec !== undefined) n.規格 = t_(d.spec, 60);
     n.品名 = name; n.型態 = type; n.數量 = q; n.單價 = up; n.小計 = q * up;
     if (newInfo) Object.keys(newInfo).forEach(function (k) { n[k] = newInfo[k]; });
-    if (arr !== String(l.到貨狀態)) { n.到貨狀態 = arr; n.可出貨 = arr === '已到貨' ? 'Y' : 'N'; if (arr === '已到貨') { arrNames = [name]; ordOk_(n, u.acc); } n.到貨操作人 = u.acc; n.到貨時間 = now_(); }
+    if (arr !== String(l.到貨狀態)) { n.到貨狀態 = arr; n.可出貨 = arr === '已到貨' ? 'Y' : 'N'; if (arr === '已出貨') ordOk_(n, u.acc); if (arr === '已到貨') { arrNames = [name]; ordOk_(n, u.acc); } n.到貨操作人 = u.acc; n.到貨時間 = now_(); }
     put_('訂單明細', l._r, n);
     var sub = 0;
     rows_('訂單明細').forEach(function (x) { if (String(x.訂單ID) === oid) sub += Number(x.小計); });
@@ -1469,11 +1472,11 @@ function syncOrderStatus_(oid, acc) {
   var lines = rows_('訂單明細').filter(function (l) { return String(l.訂單ID) === oid; });
   var sids = {}; lines.forEach(function (l) { if (l.出貨單ID) sids[String(l.出貨單ID)] = 1; });
   var ships = rows_('出貨單').filter(function (s) { return sids[String(s.出貨單ID)]; });
-  var shipped = lines.filter(function (l) { return !!l.出貨單ID; }).length;
+  var shipped = lines.filter(function (l) { return !!l.出貨單ID || String(l.到貨狀態) === '已出貨'; }).length;
   var to = '已下訂';
   if (shipped > 0 && shipped < lines.length) to = '部分出貨';
   else if (shipped === lines.length && lines.length > 0) {
-    var fin = ships.length > 0 && ships.every(function (s) { var f = FLOW[s.付款方式]; return !!f && String(s.狀態) !== '已退回' && f.indexOf(String(s.狀態)) >= si_(s.付款方式); });
+    var fin = ships.every(function (s) { var f = FLOW[s.付款方式]; return !!f && String(s.狀態) !== '已退回' && f.indexOf(String(s.狀態)) >= si_(s.付款方式); });
     to = fin ? '已完成' : '已全部出貨';
   }
   if (to !== o.狀態) {
@@ -1816,7 +1819,7 @@ function adminBatch(tk, ids, op, d) {
       if (op === 'arrive') {
         p.銷售型態 = '現貨'; p.到貨日期 = today; put_('商品', p._r, p);
         lines.forEach(function (l) {
-          if (bp_(l.商品ID) === id && l.到貨狀態 !== '已到貨') {
+          if (bp_(l.商品ID) === id && ['已到貨', '已出貨'].indexOf(String(l.到貨狀態)) < 0) {
             var n = cp_(l); n.到貨狀態 = '已到貨'; n.可出貨 = 'Y'; n.到貨操作人 = u.acc; n.到貨時間 = now_(); ordOk_(n, u.acc); put_('訂單明細', l._r, n); l.到貨狀態 = '已到貨';
             log_(u.acc, '到貨', String(l.訂單ID) + ' ' + l.品名, '到貨:' + '待到貨→已到貨(商品批次到貨)');
             (arrived[String(l.訂單ID)] = arrived[String(l.訂單ID)] || []).push(l.品名);
@@ -2338,7 +2341,7 @@ function arrText_(uid, text) {
 function arrCands_() {
   var out = {};
   rows_('訂單明細').forEach(function (l) {
-    if (String(l.到貨狀態) === '已到貨' || l.出貨單ID) return;
+    if (String(l.到貨狀態) === '已到貨' || String(l.到貨狀態) === '已出貨' || l.出貨單ID) return;
     var k = bp_(l.商品ID) + '|' + String(l.規格 || ''); out[k] = (out[k] || 0) + Number(l.數量);
   });
   var rows = rows_('商品').map(function (p) {
@@ -2374,7 +2377,7 @@ function arrPlan_(items) {
   order.forEach(function (k) {
     var a = agg[k], left = a.qty, got = [];
     var cand = lines.filter(function (l) {
-      return bp_(l.商品ID) === a.pid && String(l.規格 || '') === a.spec && String(l.到貨狀態) !== '已到貨' && !l.出貨單ID && !taken[l.訂單ID + '|' + l.商品ID] && ords[String(l.訂單ID)];
+      return bp_(l.商品ID) === a.pid && String(l.規格 || '') === a.spec && ['已到貨', '已出貨'].indexOf(String(l.到貨狀態)) < 0 && !l.出貨單ID && !taken[l.訂單ID + '|' + l.商品ID] && ords[String(l.訂單ID)];
     }).sort(function (x, y) {
       var tx = String(ords[String(x.訂單ID)].下單時間 || ''), ty = String(ords[String(y.訂單ID)].下單時間 || '');
       return tx < ty ? -1 : tx > ty ? 1 : (String(x.訂單ID) < String(y.訂單ID) ? -1 : 1);
@@ -2403,7 +2406,7 @@ function arrApply_() {
   pend.forEach(function (pl) {
     pl.assign.forEach(function (a) {
       var l = rows_('訂單明細').filter(function (x) { return String(x.訂單ID) === a.oid && String(x.商品ID) === a.pid; })[0];
-      if (!l || String(l.到貨狀態) === '已到貨' || l.出貨單ID) { miss.push(a.oid + ' ' + a.name); return; }
+      if (!l || ['已到貨', '已出貨'].indexOf(String(l.到貨狀態)) >= 0 || l.出貨單ID) { miss.push(a.oid + ' ' + a.name); return; }
       var n = cp_(l); n.到貨狀態 = '已到貨'; n.可出貨 = 'Y'; n.到貨操作人 = WHO; n.到貨時間 = now_(); ordOk_(n, WHO);
       put_('訂單明細', l._r, n);
       log_(WHO, '到貨', a.oid + ' ' + a.name, '到貨:' + l.到貨狀態 + '→已到貨(LINE 轉傳到貨通知)');
