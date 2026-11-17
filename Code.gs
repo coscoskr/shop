@@ -1892,10 +1892,21 @@ function shipCalc_(lines, opt) {
   var fee = (free > 0 && sub - disc >= free) ? 0 : base;
   // 出貨時由客人選擇要用多少購物金(只折商品金額,不折運費)
   var lid = opt.ctx && opt.ctx.lid ? opt.ctx.lid : '', goods = Math.max(0, sub - disc - cred), bal = lid ? balance_(lid) : 0;
-  var minSpend = Number(st.購物金使用門檻) || 0, capS = String(st.購物金折抵上限 === undefined ? '' : st.購物金折抵上限).trim(), cap = capS === '' ? Infinity : Number(capS);
-  var allowed = lid && goods >= minSpend ? Math.max(0, Math.min(bal, cap, goods)) : 0;
+  var cr = creditRule_(st, goods), minSpend = cr.min;
+  var allowed = lid && cr.ok ? Math.max(0, Math.min(bal, cr.cap, goods)) : 0;
   var want = Math.max(0, Math.floor(Number(opt.credit) || 0)), pick = Math.min(want, allowed);
   return { sub: sub, disc: disc, cred: cred, pick: pick, over: want > allowed, allowed: allowed, balance: bal, minSpend: minSpend, fee: fee, total: Math.max(0, goods - pick) + fee, alloc: alloc };
+}
+/** 購物金可折抵上限:有設「購物金折抵級距」(例:500=50,1000=150)就照級距,否則用「購物金使用門檻」+「購物金折抵上限」 */
+function creditTiers_(st) {
+  var v = st.購物金折抵級距 === undefined ? defSet_('購物金折抵級距') : st.購物金折抵級距;
+  return String(v || '').split(/[,，\s]+/).map(function (x) { var m = x.match(/^(\d+)=(\d+)$/); return m ? [Number(m[1]), Number(m[2])] : null; }).filter(Boolean).sort(function (a, b) { return a[0] - b[0]; });
+}
+function creditRule_(st, amount) {
+  var t = creditTiers_(st);
+  if (t.length) { var c = 0; t.forEach(function (x) { if (amount >= x[0]) c = x[1]; }); return { ok: c > 0, cap: c, min: t[0][0] }; }
+  var minSpend = Number(st.購物金使用門檻) || 0, capS = String(st.購物金折抵上限 === undefined ? '' : st.購物金折抵上限).trim();
+  return { ok: amount >= minSpend, cap: capS === '' ? Infinity : Number(capS), min: minSpend };
 }
 function pickLines_(ctx, items) {
   var want = {}; (items || []).forEach(function (i) { want[String(i.oid) + '|' + String(i.pid)] = 1; });
@@ -2026,7 +2037,7 @@ var LINE_ID_DEFAULT = '2012348090';
 var DEFAULT_SETTINGS = [
   ['店名', 'coscos韓國選物店'], ['免運門檻', 1500], ['店到店運費', 60], ['賣貨便運費', 38], ['宅配運費', 80], ['匯款資訊', '請填寫銀行代碼、帳號、戶名'], ['公告', ''],
   ['購物金注意事項', '⚠️ 購物金使用注意事項\n▪️ 下次消費滿 $500，可折 $50\n▪️ 下次消費滿 $1,000，可折 $150\n▪️ 每筆消費限使用一種折抵方式\n▪️ 精品、特價商品及指定商品不適用'],
-  ['購物金使用門檻', 1000], ['購物金折抵上限', 100], ['購物金預設有效天數', 90],
+  ['購物金折抵級距', '500=50,1000=150'], ['購物金使用門檻', 1000], ['購物金折抵上限', 100], ['購物金預設有效天數', 90],
   ['到貨通知內容', '{姓名} 您好,您訂購的 {品名} 已到貨!請到會員中心勾選要出貨的商品:{連結}'],
   ['下單成功通知內容', '訂單{訂單編號}確認！\n\n商品:{品項}\n訂單金額:NT$ {金額}\n\n預購商品到貨後會再訊息通知您❤️\n到貨商品可以在會員的訂單明細勾選出貨～\n\n有任何問題隨時聯繫我們🫶'],
   ['出貨通知內容', '📢出貨通知\n\n出貨單號:{出貨單號}\n物流:{物流}\n物流單號:{物流單號}\n追蹤連結:{追蹤連結}\n出貨單如圖{附圖}\n\n有任何問題都歡迎聯繫我們唷～'],
@@ -2508,9 +2519,8 @@ function calc_(want, ctx, wantCredit, code) {
   });
   var after = Math.max(0, sub - best.amt), free = Number(st.免運門檻) || 0;
   var fee = 0;   // 運費改於出貨時依出貨金額計算(滿免運門檻免運),下單時不收
-  var bal = lid ? balance_(lid) : 0, minSpend = Number(st.購物金使用門檻) || 0, capS = String(st.購物金折抵上限 === undefined ? '' : st.購物金折抵上限).trim();
-  var cap = capS === '' ? Infinity : Number(capS);
-  var allowed = lid && after >= minSpend ? Math.max(0, Math.min(bal, cap, after)) : 0;
+  var bal = lid ? balance_(lid) : 0, cr = creditRule_(st, after), minSpend = cr.min;
+  var allowed = lid && cr.ok ? Math.max(0, Math.min(bal, cr.cap, after)) : 0;
   var credit = Math.min(Math.floor(Number(wantCredit) || 0), allowed);
   return { lines: lines, sub: sub, discount: best.amt, dname: best.amt ? best.name : '', fee: fee, credit: credit, total: after - credit + fee,
     level: lvl, balance: bal, codeName: codeRow ? String(codeRow.折扣碼) : '', allowed: allowed, minSpend: minSpend, codeOk: codeOk, codeMin: codeMin };
@@ -2670,7 +2680,7 @@ function adminDeleteActivity(tk, id) {
   });
   return adminActivities(tk);
 }
-var SET_KEYS = ['店名', '店到店運費', '賣貨便運費', '宅配運費', '免運門檻', '匯款資訊', '公告', '購物金使用門檻', '購物金折抵上限', '購物金預設有效天數', '購物金注意事項', '到貨通知內容', '下單成功通知內容', '出貨通知內容', '分享回饋通知內容', '可自取通知內容', '退回通知內容', '送達通知內容', '未收到匯款通知內容', '物流追蹤連結', '加好友連結', '公司名稱', '公司地址', '統一編號', 'IG連結', 'LINE社群連結'];
+var SET_KEYS = ['店名', '店到店運費', '賣貨便運費', '宅配運費', '免運門檻', '匯款資訊', '公告', '購物金折抵級距', '購物金使用門檻', '購物金折抵上限', '購物金預設有效天數', '購物金注意事項', '到貨通知內容', '下單成功通知內容', '出貨通知內容', '分享回饋通知內容', '可自取通知內容', '退回通知內容', '送達通知內容', '未收到匯款通知內容', '物流追蹤連結', '加好友連結', '公司名稱', '公司地址', '統一編號', 'IG連結', 'LINE社群連結'];
 function defSet_(k) { var r = DEFAULT_SETTINGS.filter(function (x) { return x[0] === k; })[0]; return r ? r[1] : ''; }
 function adminSettings(tk) {
   me_(tk); var s = settings_(), o = {};
@@ -2682,6 +2692,7 @@ function adminSaveSettings(tk, v) {
   lk_(function () {
     ['店到店運費', '賣貨便運費', '宅配運費', '免運門檻', '購物金使用門檻', '購物金預設有效天數'].forEach(function (k) { if (!(Number(v[k]) >= 0) || String(v[k]).trim() === '') throw new Error(k + ' 請填數字'); });
     if (String(v.購物金折抵上限).trim() !== '' && !(Number(v.購物金折抵上限) >= 0)) throw new Error('購物金折抵上限請填數字,或留空代表不限制');
+    if (String(v.購物金折抵級距 || '').trim() && !String(v.購物金折抵級距).trim().split(/[,，\s]+/).every(function (x) { return /^\d+=\d+$/.test(x); })) throw new Error('購物金折抵級距格式:滿多少=折多少,用逗號分隔,例如 500=50,1000=150;留空代表改用門檻+上限');
     ['加好友連結', 'IG連結', 'LINE社群連結'].forEach(function (k) { if (String(v[k] || '').trim() && !/^https:\/\//.test(String(v[k]).trim())) throw new Error(k + '需以 https:// 開頭'); });
     var cur = rows_('設定'), ch = [];
     SET_KEYS.forEach(function (k) {
