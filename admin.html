@@ -118,7 +118,7 @@ fieldset{border:1px solid var(--line);border-radius:2px;margin:14px 0;padding:10
 
 <script src="api.js"></script>
 <script>
-var CR = [], BL = [], T = '', P = [], C = [], A = [], O = null, VL = [], FL = {}, tab = (function () { try { var t = sessionStorage.getItem('tab'); return /^[oxysmpkrcdgalh]$/.test(t || '') ? t : 'o'; } catch (e) { return 'o'; } })(), SEL = {};
+var CR = [], BL = [], T = '', P = [], C = [], A = [], O = null, VL = [], FL = {}, tab = (function () { try { var t = sessionStorage.getItem('tab'); return /^[osmpkrcdgalh]$/.test(t || '') ? t : 'o'; } catch (e) { return 'o'; } })(), SEL = {};
 var OF = { from: '', to: '', q: '', st: '', pay: '' }, SF = { from: '', to: '', q: '', st: '', pay: '', method: '', pr: '' }, PF = { q: '', type: '', on: '', lock: '' };
 var ALLST = ['待刷卡', '已刷卡待出貨', '待匯款', '已匯款待查帳', '已查帳待出貨', '待出貨', '可自取', '已出貨', '已退回'];
 var $ = function (s) { return document.querySelector(s); };
