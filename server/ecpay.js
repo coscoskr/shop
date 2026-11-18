@@ -78,10 +78,11 @@ export async function payFields(cfg, o) {
 
 /* ---------- 物流(超商店到店 C2C) ---------- */
 const LOGI_STAGE = { mid: '2000933', key: 'XBERn1YOvpM9nfZc', iv: 'h1ONHk4P4yqbl5LK', host: 'https://logistics-stage.ecpay.com.tw', test: true };
-/** props 有 ECPAY_LOGI_LIVE=1 才用正式環境(金鑰沿用金流那組,可用 ECPAY_LOGI_KEY/IV 另外指定) */
+/** 正式環境:ECPAY_LOGI_LIVE=1,或金流已上線(ECPAY_PAY_LIVE=1,物流與金流共用同一組金鑰)。
+ *  ECPAY_LOGI_LIVE 另外控制「客人可選超商取貨付款」;後台替已付款的店到店產生物流單號只需要正式金鑰 */
 export function logiCfg(props) {
   props = props || {};
-  if (String(props.ECPAY_LOGI_LIVE || '') === '1') return { mid: String(props.ECPAY_LOGI_MID || props.ECPAY_PAY_MID || '').trim(), key: String(props.ECPAY_LOGI_KEY || props.ECPAY_PAY_KEY || '').trim(), iv: String(props.ECPAY_LOGI_IV || props.ECPAY_PAY_IV || '').trim(), host: 'https://logistics.ecpay.com.tw', test: false };
+  if (String(props.ECPAY_LOGI_LIVE || '') === '1' || (String(props.ECPAY_PAY_LIVE || '') === '1' && props.ECPAY_PAY_MID && props.ECPAY_PAY_KEY && props.ECPAY_PAY_IV)) return { mid: String(props.ECPAY_LOGI_MID || props.ECPAY_PAY_MID || '').trim(), key: String(props.ECPAY_LOGI_KEY || props.ECPAY_PAY_KEY || '').trim(), iv: String(props.ECPAY_LOGI_IV || props.ECPAY_PAY_IV || '').trim(), host: 'https://logistics.ecpay.com.tw', test: false };
   return Object.assign({}, LOGI_STAGE);
 }
 export function logiMac(cfg, params) {

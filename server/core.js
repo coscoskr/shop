@@ -40,6 +40,19 @@ const SPECIAL = {
     if (!r.ok) throw new Error('綠界建立物流單失敗:' + r.msg);
     return withRt(rt, () => code.INTERNAL.logiSave_(tk, prep, r, cfg.test));
   },
+  // 後台:勾選多張出貨單,批次產生綠界物流單號
+  async adminLogiBatch({ rt, args, props, env }) {
+    const [tk, ids] = args;
+    const prep = withRt(rt, () => code.INTERNAL.logiBatchPrep_(tk, ids));
+    const cfg = logiCfg(props), pairs = [];
+    for (const p of prep.ok) {
+      let r;
+      try { r = await logiCreate(cfg, Object.assign({ reply: env.SUPABASE_URL + '/functions/v1/api?ecpay=logi' }, p)); }
+      catch (e) { r = { ok: false, msg: String(e && e.message || e) }; }
+      pairs.push({ prep: p, r });
+    }
+    return withRt(rt, () => code.INTERNAL.logiBatchSave_(tk, pairs, prep.bad, cfg.test));
+  },
   // 後台:列印寄件單
   async adminLogiPrint({ rt, args, props }) {
     const [tk, sid] = args;

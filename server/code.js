@@ -1555,6 +1555,10 @@ function adminUpdateShip(tk, sid, d) {
       if (mNew !== String(s.配送方式 || '') && fee === Number(s.運費)) fee = feeFor_(mNew, payNew, Number(s.商品金額) - Number(s.優惠折抵 || 0)); // 改了配送方式但沒動運費 → 依設定重算
     }
     if (!ship) throw new Error('請填寫收件資訊');
+    if (String(s.綠界物流ID || '')) { // 已產生綠界物流單:收件資訊、物流單號以綠界為準
+      if (ship !== String(s.收件資訊 || '') || mNew !== String(s.配送方式 || '')) throw new Error('這張出貨單已產生綠界物流單號,不能再改收件資訊。要改請先到綠界後台取消該物流單,再按出貨單裡的「清除物流單」後重新產生');
+      d.co = String(s.物流 || ''); d.no = String(s.物流單號 || '');
+    }
     var link = t_(d.link, 500); if (link && !/^https:\/\//.test(link)) throw new Error('付款連結需以 https:// 開頭');
     var n = cp_(s);
     n.付款方式 = payNew; n.狀態 = d.st; if (payChanged && payNew === '匯款') n.收款帳號 = String(settings_().匯款資訊 || ''); n.物流 = t_(d.co, 30); n.物流單號 = t_(d.no, 40); n.付款連結 = link; if (d.last5 !== undefined) n.匯款後五碼 = t_(d.last5, 5); if (d.rdate !== undefined) { var rd = String(d.rdate || ''); if (rd && !/^\d{4}-\d{2}-\d{2}$/.test(rd)) throw new Error('匯款日期格式不正確'); n.匯款日期 = rd; } n.收件資訊 = ship; n.備註 = t_(d.note, 200); n.電話 = t_(d.phone, 20) || s.電話;
@@ -2150,17 +2154,62 @@ function logiPrep_(tk, sid) {
   if (!s) throw new Error('找不到出貨單');
   if (String(s.配送方式) !== '店到店') throw new Error('只有店到店的出貨單可以建立超商物流單');
   if (String(s.綠界物流ID || '')) throw new Error('這張出貨單已經建立過綠界物流單');
+  if (String(s.付款方式) === '賣貨便' && !logiOn_()) throw new Error('賣貨便的出貨單請到賣貨便後台建立寄件單(門市由客人在賣貨便填寫)');
   var c = cvsOf_(s); if (!c) throw new Error('收件資訊格式不正確,請先在「配送 / 收件資訊」重新填寫');
   if (!c.id) throw new Error('門市沒有店號。請在取貨門市後面加上「(店號 xxxxxx)」,或請客人重新用地圖選門市');
   var st = settings_(), sn = String(st.寄件人姓名 || '').trim(), sp = nz_(st.寄件人手機);
   if (/^9\d{8}$/.test(sp)) sp = '0' + sp; // 設定值是純數字時會被當成數字,開頭的 0 會不見
   if (!sn || !/^09\d{8}$/.test(sp)) throw new Error('請先到「設定」填寫寄件人姓名(本名)與寄件人手機');
+  var rnc = c.rn.replace(/\s/g, '');
+  if (/[\u4e00-\u9fff]/.test(rnc) ? !/^[\u4e00-\u9fff]{2,5}$/.test(rnc) : !/^[A-Za-z]{4,10}$/.test(c.rn.replace(/\s/g, ''))) throw new Error('收件人「' + c.rn + '」不符合超商規定(中文 2~5 個字,或英文 4~10 個字母),請先在「配送 / 收件資訊」修改收件人');
+  if (/先生|小姐|太太|女士|老闆|寶貝|測試|收件人|本人|同上/.test(rnc)) throw new Error('收件人「' + c.rn + '」不是本名,超商取件需核對證件,請先在「配送 / 收件資訊」改成本名');
+  c.rn = rnc;
   var ph = nz_(s.電話); if (!/^09\d{8}$/.test(ph)) throw new Error('客人電話不是 09 開頭的手機,超商無法簡訊通知取貨,請先修改電話');
   var cod = String(s.付款方式) === '賣貨便';
   if (!cod && !paidOk_(s)) throw new Error('客人還沒付款(目前「' + s.狀態 + '」),不能寄出');
   var amt = cod ? Math.round(Number(s.總額) || 0) : Math.round(Number(s.商品金額) || 0);
   amt = Math.max(1, amt); if (amt > 20000) throw new Error('超商取貨金額上限 20,000 元,這張出貨單超過了');
   return { sid: sid, sub: c.sub, cvs: c.cvs, store: c.id, rn: c.rn, ph: ph, sn: sn, sp: sp, cod: cod, amt: amt };
+}
+/** 批次產生物流單號:先逐張檢查,不能建立的列出原因 */
+function logiBatchPrep_(tk, ids) {
+  me_(tk); var ok = [], bad = [];
+  (ids || []).map(String).filter(function (x, i, a) { return x && a.indexOf(x) === i; }).forEach(function (sid) {
+    try { ok.push(logiPrep_(tk, sid)); } catch (e) { bad.push(sid + ':' + (e && e.message || e)); }
+  });
+  return { ok: ok, bad: bad };
+}
+/** 批次建立結果寫回(成功的寫入寄件代碼,失敗的列出原因) */
+function logiBatchSave_(tk, pairs, bad, test) {
+  var u = me_(tk), good = [];
+  lk_(function () {
+    pairs.forEach(function (x) {
+      var prep = x.prep, r = x.r;
+      if (!r.ok) { bad.push(prep.sid + ':綠界回覆「' + r.msg + '」'); return; }
+      var s = rows_('出貨單').filter(function (y) { return String(y.出貨單ID) === prep.sid; })[0]; if (!s) return;
+      var code = String(r.payNo || '') + String(r.valNo || '');
+      var n = cp_(s); n.物流 = prep.cvs; n.物流單號 = code; n.綠界物流ID = (test ? '測試:' : '') + [r.id, r.payNo || '', r.valNo || '', prep.sub].join('|'); put_('出貨單', s._r, n);
+      log_(u.acc, '建立綠界物流單', prep.sid, (test ? '(測試環境)' : '') + prep.cvs + ' 店號 ' + prep.store + (prep.cod ? ' 取貨付款 ' + prep.amt : ' 取貨不付款') + ' 寄件代碼 ' + code + ' 物流編號 ' + r.id);
+      good.push(prep.sid + ' ' + prep.cvs + ' ' + code);
+    });
+  });
+  var res = adminOrders(tk);
+  res.msg = (test ? '【目前是綠界物流測試環境,不是真的寄件單】\n' : '') + (good.length ? '已產生 ' + good.length + ' 張物流單號:\n' + good.join('\n') + '\n\n點出貨單裡的「列印寄件單」,或到超商用寄件代碼寄件。' : '沒有產生任何物流單號。') + (bad.length ? '\n\n略過 ' + bad.length + ' 張:\n' + bad.join('\n') : '');
+  return res;
+}
+/** 清除綠界物流單紀錄(已在綠界後台取消,或要改門市重新產生) */
+function adminLogiClear(tk, sid) {
+  var u = me_(tk); sid = String(sid || '');
+  lk_(function () {
+    var s = rows_('出貨單').filter(function (x) { return String(x.出貨單ID) === sid; })[0];
+    if (!s) throw new Error('找不到出貨單');
+    if (!String(s.綠界物流ID || '')) throw new Error('這張出貨單沒有綠界物流單');
+    var f = FLOW[s.付款方式] || [];
+    if (f.indexOf(String(s.狀態)) >= si_(s.付款方式)) throw new Error('出貨單已出貨,不能清除物流單');
+    var n = cp_(s); n.綠界物流ID = ''; n.物流 = ''; n.物流單號 = ''; put_('出貨單', s._r, n);
+    log_(u.acc, '清除綠界物流單', sid, '原物流 ' + s.物流 + ' ' + s.物流單號 + ' 綠界 ' + s.綠界物流ID);
+  });
+  var res = adminOrders(tk); res.msg = '已清除出貨單 ' + sid + ' 的物流單號,可修改收件資訊後重新產生。\n(請確認已在綠界後台取消原本的物流單)'; return res;
 }
 /** 建立成功:寫回物流、寄件代碼 */
 function logiSave_(tk, prep, r, test) {
@@ -3269,7 +3318,7 @@ function adminHistBind(tk, pairs) {
 
 
 /* ===== 以下由 build.py 加入 ===== */
-export const API = {resetAdmin, getShop, placeOrder, adminProxyQuote, adminPlaceOrder, adminLogin, adminVendors, adminBrands, adminAddBrand, adminRenameBrand, adminDeleteBrand, adminCats, adminAddCat, adminRenameCat, adminRenameBig, adminDeleteBig, adminDeleteCat, adminAddVendor, adminDeleteVendor, adminCarriers, adminSaveCarrier, adminDeleteCarrier, trackLink, adminInit, adminSaveProduct, adminDeleteProduct, adminBatchProducts, adminCodes, adminSaveCode, adminSetCodeOn, adminDeleteCode, adminSaveAdmin, adminLogs, memberLogin, memberOrders, memberSaveProfile, memberChangePay, memberReportPay, adminBatchArrival, adminLineHistory, adminBatchOrder, adminPurchaseList, adminLineInfo, adminRecordPayment, adminUpdatePayment, adminDeletePayment, adminStockView, adminAddStockIn, adminDeleteStockIn, adminBatchDeleteLines, adminReport, adminOrders, adminOrderAdjust, adminUpdateOrder, adminEditLine, adminEditLineFull, adminDeleteOrder, adminBatchDeleteOrders, adminCreateShip, adminUpdateShip, adminShipResend, adminShipPrinted, adminRemitMissing, adminBatchShipStatus, adminDeleteShip, adminAdjustShip, adminMergeShips, adminExpenses, adminSaveExpense, adminDeleteExpense, adminMonthly, adminSaveFixed, adminSaveStaff, adminDeleteMonthlyItem, adminBatchDeleteShips, adminShipHistory, adminBatch, memberCheckout, memberShipQuote, memberCreateShip, adminShipQuote, adminCreateShipFor, lineStart, lineLiff, adminArrivalCode, adminArrivalUnbind, quote, adminMembers, adminMemberGrants, adminSetLevel, adminGrant, adminVoidGrant, adminLevels, adminSaveLevel, adminDeleteLevel, adminActivities, adminSaveActivity, adminDeleteActivity, adminSettings, adminSaveSettings, adminHistImport, adminHistBindList, adminHistNote, adminHistRenotify, adminHistBind};
-export const INTERNAL = {catHit_, page_, doGet, setup, resetAdmin, ss_, raw_, sh_, t_, txt_, rows_, put_, log_, major_, diff_, settings_, cats_, cs_, tiers_, unit_, img_, imgList_, bp_, spec_, specParse_, specs_, specQty_, availOf_, adjStock_, imgs_, pub_, getShop, shopData_, placeOrder, placeOrder0_, placeCore_, proxyCtx_, proxyWant_, adminProxyQuote, adminPlaceOrder, contactSeen_, hex_, hash_, admins_, saveAdmin_, adminLogin, me_, adminProducts_, vendors_, adminVendors, brandSheet_, brands_, brandKey_, brandPick_, brandResolve_, brandList_, brandName_, adminBrands, adminAddBrand, adminRenameBrand, adminDeleteBrand, catList_, catName_, adminCats, adminAddCat, renameCats_, adminRenameCat, adminRenameBig, adminDeleteBig, adminDeleteCat, adminAddVendor, adminDeleteVendor, carriers_, trackUrl_, shortTrack_, saveCarriers_, adminCarriers, adminSaveCarrier, adminDeleteCarrier, trackLink, adminInit, adminSaveProduct, adminDeleteProduct, adminBatchProducts, codeSheet_, codes_, dstr_, codeState_, findCode_, codeUsed_, codeList_, adminCodes, adminSaveCode, adminSetCodeOn, adminDeleteCode, adminSaveAdmin, adminLogs, nz_, mk_, mem_, lineMeta_, mine_, memberLogin, shipObj_, memberOrders, memberSaveProfile, memberChangePay, memberReportPay, authDrive, adminUploadImage, adminBatchArrival, stockMove_, adminLineHistory, adminBatchOrder, allPurch_, buyerName_, purchaseList_, adminPurchaseList, pickPurchase_, adminLineInfo, adminRecordPayment, adminUpdatePayment, adminDeletePayment, stockView_, adminStockView, adminAddStockIn, deleteStockIn_, adminDeleteStockIn, adminBatchDeleteLines, adminReport, lk_, ri_, si_, paidOk_, ordOk_, now_, cp_, ord_, seq_, adminOrders, adminOrderAdjust, adminUpdateOrder, adminEditLine, adminEditLineFull, deleteOrder_, adminDeleteOrder, adminBatchDeleteOrders, adminCreateShip, syncOrderStatus_, adminUpdateShip, adminShipResend, adminShipPrinted, adminRemitMissing, shipNotice_, adminBatchShipStatus, deleteShip_, adminDeleteShip, invPrep_, invSave_, shipAlloc_, adminAdjustShip, adminMergeShips, isBoss_, boss_, expObj_, adminExpenses, adminSaveExpense, adminDeleteExpense, staffTotal_, adminMonthly, adminSaveFixed, adminSaveStaff, adminDeleteMonthlyItem, adminBatchDeleteShips, adminShipHistory, adminBatch, memberCheckout, shipCalc_, creditTiers_, creditRule_, pickLines_, memberShipQuote, payPrep_, payDone_, kindOk_, payLabel_, logiOn_, cvsOf_, logiPrep_, logiSave_, logiPrintPrep_, logiStatus_, realName_, memberCreateShip, memberCreateShip0_, shipCtx_, shipRecv_, adminRecv_, feeFor_, adminShipQuote, adminCreateShipFor, ensureSettings_, prop_, lineOn_, lineId_, appUrl_, sha_, tot_, lineStart, lineCallback_, lineLiff, newSession_, upsertMember_, memberRow_, levels_, levelOf_, pushLine_, flexT_, flexBtn_, flexHead_, flexHero_, flexRow_, money_, orderFlex_, arrFlex_, poBtn_, siteUrl_, poHead_, poCell_, poGrid_, poTable_, poSum_, shareText_, shareNotice_, shipFlex_, invFlex_, notifyShipped_, mailTo_, authAll, notifyArrival_, setSet_, arrIsAdmin_, arrPend_, arrSave_, adminArrivalCode, adminArrivalUnbind, arrText_, arrCands_, arrPlan_, arrApply_, today_, grants_, balance_, addGrant_, spend_, refund_, meInfo_, eligSub_, calc_, quote, awardCredits_, adminMembers, adminMemberGrants, adminSetLevel, adminGrant, adminVoidGrant, adminLevels, adminSaveLevel, adminDeleteLevel, actOut_, adminActivities, adminSaveActivity, adminDeleteActivity, defSet_, adminSettings, adminSaveSettings, hNum_, hDate_, hNorm_, hEta_, hCls_, hPmap_, hFind_, hMaxSeq_, hNext_, hVendor_, adminHistImport, hProducts_, hOrders_, hVendors_, hStock_, adminHistBindList, adminHistNote, adminHistRenotify, adminHistBind};
+export const API = {resetAdmin, getShop, placeOrder, adminProxyQuote, adminPlaceOrder, adminLogin, adminVendors, adminBrands, adminAddBrand, adminRenameBrand, adminDeleteBrand, adminCats, adminAddCat, adminRenameCat, adminRenameBig, adminDeleteBig, adminDeleteCat, adminAddVendor, adminDeleteVendor, adminCarriers, adminSaveCarrier, adminDeleteCarrier, trackLink, adminInit, adminSaveProduct, adminDeleteProduct, adminBatchProducts, adminCodes, adminSaveCode, adminSetCodeOn, adminDeleteCode, adminSaveAdmin, adminLogs, memberLogin, memberOrders, memberSaveProfile, memberChangePay, memberReportPay, adminBatchArrival, adminLineHistory, adminBatchOrder, adminPurchaseList, adminLineInfo, adminRecordPayment, adminUpdatePayment, adminDeletePayment, adminStockView, adminAddStockIn, adminDeleteStockIn, adminBatchDeleteLines, adminReport, adminOrders, adminOrderAdjust, adminUpdateOrder, adminEditLine, adminEditLineFull, adminDeleteOrder, adminBatchDeleteOrders, adminCreateShip, adminUpdateShip, adminShipResend, adminShipPrinted, adminRemitMissing, adminBatchShipStatus, adminDeleteShip, adminAdjustShip, adminMergeShips, adminExpenses, adminSaveExpense, adminDeleteExpense, adminMonthly, adminSaveFixed, adminSaveStaff, adminDeleteMonthlyItem, adminBatchDeleteShips, adminShipHistory, adminBatch, memberCheckout, memberShipQuote, adminLogiClear, memberCreateShip, adminShipQuote, adminCreateShipFor, lineStart, lineLiff, adminArrivalCode, adminArrivalUnbind, quote, adminMembers, adminMemberGrants, adminSetLevel, adminGrant, adminVoidGrant, adminLevels, adminSaveLevel, adminDeleteLevel, adminActivities, adminSaveActivity, adminDeleteActivity, adminSettings, adminSaveSettings, adminHistImport, adminHistBindList, adminHistNote, adminHistRenotify, adminHistBind};
+export const INTERNAL = {catHit_, page_, doGet, setup, resetAdmin, ss_, raw_, sh_, t_, txt_, rows_, put_, log_, major_, diff_, settings_, cats_, cs_, tiers_, unit_, img_, imgList_, bp_, spec_, specParse_, specs_, specQty_, availOf_, adjStock_, imgs_, pub_, getShop, shopData_, placeOrder, placeOrder0_, placeCore_, proxyCtx_, proxyWant_, adminProxyQuote, adminPlaceOrder, contactSeen_, hex_, hash_, admins_, saveAdmin_, adminLogin, me_, adminProducts_, vendors_, adminVendors, brandSheet_, brands_, brandKey_, brandPick_, brandResolve_, brandList_, brandName_, adminBrands, adminAddBrand, adminRenameBrand, adminDeleteBrand, catList_, catName_, adminCats, adminAddCat, renameCats_, adminRenameCat, adminRenameBig, adminDeleteBig, adminDeleteCat, adminAddVendor, adminDeleteVendor, carriers_, trackUrl_, shortTrack_, saveCarriers_, adminCarriers, adminSaveCarrier, adminDeleteCarrier, trackLink, adminInit, adminSaveProduct, adminDeleteProduct, adminBatchProducts, codeSheet_, codes_, dstr_, codeState_, findCode_, codeUsed_, codeList_, adminCodes, adminSaveCode, adminSetCodeOn, adminDeleteCode, adminSaveAdmin, adminLogs, nz_, mk_, mem_, lineMeta_, mine_, memberLogin, shipObj_, memberOrders, memberSaveProfile, memberChangePay, memberReportPay, authDrive, adminUploadImage, adminBatchArrival, stockMove_, adminLineHistory, adminBatchOrder, allPurch_, buyerName_, purchaseList_, adminPurchaseList, pickPurchase_, adminLineInfo, adminRecordPayment, adminUpdatePayment, adminDeletePayment, stockView_, adminStockView, adminAddStockIn, deleteStockIn_, adminDeleteStockIn, adminBatchDeleteLines, adminReport, lk_, ri_, si_, paidOk_, ordOk_, now_, cp_, ord_, seq_, adminOrders, adminOrderAdjust, adminUpdateOrder, adminEditLine, adminEditLineFull, deleteOrder_, adminDeleteOrder, adminBatchDeleteOrders, adminCreateShip, syncOrderStatus_, adminUpdateShip, adminShipResend, adminShipPrinted, adminRemitMissing, shipNotice_, adminBatchShipStatus, deleteShip_, adminDeleteShip, invPrep_, invSave_, shipAlloc_, adminAdjustShip, adminMergeShips, isBoss_, boss_, expObj_, adminExpenses, adminSaveExpense, adminDeleteExpense, staffTotal_, adminMonthly, adminSaveFixed, adminSaveStaff, adminDeleteMonthlyItem, adminBatchDeleteShips, adminShipHistory, adminBatch, memberCheckout, shipCalc_, creditTiers_, creditRule_, pickLines_, memberShipQuote, payPrep_, payDone_, kindOk_, payLabel_, logiOn_, cvsOf_, logiPrep_, logiBatchPrep_, logiBatchSave_, adminLogiClear, logiSave_, logiPrintPrep_, logiStatus_, realName_, memberCreateShip, memberCreateShip0_, shipCtx_, shipRecv_, adminRecv_, feeFor_, adminShipQuote, adminCreateShipFor, ensureSettings_, prop_, lineOn_, lineId_, appUrl_, sha_, tot_, lineStart, lineCallback_, lineLiff, newSession_, upsertMember_, memberRow_, levels_, levelOf_, pushLine_, flexT_, flexBtn_, flexHead_, flexHero_, flexRow_, money_, orderFlex_, arrFlex_, poBtn_, siteUrl_, poHead_, poCell_, poGrid_, poTable_, poSum_, shareText_, shareNotice_, shipFlex_, invFlex_, notifyShipped_, mailTo_, authAll, notifyArrival_, setSet_, arrIsAdmin_, arrPend_, arrSave_, adminArrivalCode, adminArrivalUnbind, arrText_, arrCands_, arrPlan_, arrApply_, today_, grants_, balance_, addGrant_, spend_, refund_, meInfo_, eligSub_, calc_, quote, awardCredits_, adminMembers, adminMemberGrants, adminSetLevel, adminGrant, adminVoidGrant, adminLevels, adminSaveLevel, adminDeleteLevel, actOut_, adminActivities, adminSaveActivity, adminDeleteActivity, defSet_, adminSettings, adminSaveSettings, hNum_, hDate_, hNorm_, hEta_, hCls_, hPmap_, hFind_, hMaxSeq_, hNext_, hVendor_, adminHistImport, hProducts_, hOrders_, hVendors_, hStock_, adminHistBindList, adminHistNote, adminHistRenotify, adminHistBind};
 export { H };
 export function __reset() { SS_ = null; SHC_ = {}; RC_ = {}; }
