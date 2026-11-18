@@ -698,6 +698,7 @@ function shipPo(s) {
 function shipDetail(s) {
   var h = '<h2>' + esc(s.id) + '</h2><span class="chip">' + esc(s.st) + '</span>' + steps(s) + memAct(s) + shipPo(s);
   if (s.co || s.no) h += '<p style="margin-top:10px">物流:<b>' + esc(s.co) + '</b>' + (s.no ? ' 單號 <b>' + esc(s.no) + '</b> <button type="button" class="cp" data-a="cp" data-v="' + esc(s.no) + '">複製</button>' : '') + (s.at ? '<br><small>出貨時間 ' + esc(s.at) + '</small>' : '') + '</p>' + (s.trk ? '<p><a class="btn l" style="display:inline-block;text-decoration:none;line-height:26px" href="' + esc(s.trk) + '" target="_blank" rel="noopener">查詢物流動態</a></p>' : '');
+  if (s.inv && s.inv.indexOf('測試') !== 0) h += '<p style="margin-top:10px">🧾 電子發票:<b>' + esc(s.inv) + '</b>' + (s.invd ? '<br><small>開立日期 ' + esc(s.invd.slice(0, 10)) + ',金額 ' + money(s.total) + ',已存綠界載具(手機號碼)</small>' : '') + '</p>';
   return h + '<p><button class="btn l" data-a="mb">返回</button> <button class="btn l" data-a="x">關閉</button></p>';
 }
 function shipForm() {
