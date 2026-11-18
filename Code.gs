@@ -2006,6 +2006,15 @@ function memberShipQuote(tk, items, d) {
   }
   catch (e) { return { ok: false, msg: e.message }; }
 }
+/** 收件人必須填本名(超商取貨要核對證件):中文 2~6 字,或英文姓名 */
+function realName_(v) {
+  var rn = t_(v, 30).replace(/\s+/g, ' ').trim(), err = '收件人請填寫本名(與證件相同,取貨時需核對),例如:王小明';
+  if (!rn) throw new Error('請填寫收件人姓名(本名)');
+  if (/[\u4e00-\u9fff]/.test(rn)) { rn = rn.replace(/\s/g, ''); if (!/^[\u4e00-\u9fff·・．]{2,6}$/.test(rn)) throw new Error(err); }
+  else if (!/^[A-Za-z][A-Za-z.'\- ]{1,29}$/.test(rn)) throw new Error(err);
+  if (/先生|小姐|太太|女士|老闆|寶貝|測試|收件人|本人|同上/.test(rn)) throw new Error(err);
+  return rn;
+}
 /** 客人勾選已到貨品項 →「確定出貨」→ 建立出貨單,之後走付款與出貨流程 */
 function memberCreateShip(tk, items, d) {
   var ctx = mem_(tk); d = d || {};
@@ -2017,8 +2026,7 @@ function memberCreateShip(tk, items, d) {
   if (pay === '付現金' && method !== '自取') throw new Error('付現金只能選擇自取');
   if (method) {
     if (['店到店', '宅配', '自取'].indexOf(method) < 0) throw new Error('請選擇配送方式');
-    var rn = t_(d.rname, 30);
-    if (!rn) throw new Error('請填寫收件人姓名');
+    var rn = realName_(d.rname);
     if (method === '店到店') {
       var cvs = t_(d.cvs, 20), store = t_(d.store, 60);
       if (['7-11', '全家'].indexOf(cvs) < 0) throw new Error('超商僅提供 7-11 或全家'); if (!store) throw new Error('請填寫取貨門市(店名或店號)');
@@ -2062,7 +2070,7 @@ function shipCtx_(d) {
 function shipRecv_(d) {
   var method = String(d.method || ''), rn = t_(d.rname, 30), ship = '';
   if (['店到店', '宅配', '自取'].indexOf(method) < 0) throw new Error('請選擇配送方式');
-  if (!rn) throw new Error('請填寫收件人姓名');
+  rn = realName_(rn);
   if (method === '自取') { return { method: method, ship: '【自取】取貨人 ' + rn }; }
   if (method === '店到店') {
     var cvs = t_(d.cvs, 20), store = t_(d.store, 60);

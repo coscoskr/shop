@@ -710,7 +710,7 @@ function shipForm() {
     picked.map(function (i) { var spc = sp(i.pid); return '<tr><td>' + esc(i.name) + (spc ? '<br><small>' + esc(spc) + '</small>' : '') + '</td><td class="n">' + i.qty + '</td><td class="n">' + i.unit + '</td><td class="n">' + i.sub + '</td></tr>'; }).join('') + '</tbody></table>' +
     '<div id="sq" class="ds" style="margin-top:8px">計算金額中…</div></div>' +
     '<form id="sf"><fieldset><legend>配送方式</legend><label><input type="radio" name="method" value="店到店" checked> 店到店 ' + money(MD.feeCvs) + '</label><label><input type="radio" name="method" value="宅配"> 宅配 ' + money(MD.fee) + '</label><label><input type="radio" name="method" value="自取"> 自取(免運)</label>' + (MD.free ? '<small class="ds">滿 ' + money(MD.free) + ' 免運</small>' : '') + '</fieldset>' +
-    '<label>收件人姓名<input name="rname" required maxlength="30" value="' + esc((MD.me && MD.me.pname) || o0.nm || '') + '"></label>' +
+    '<label>收件人姓名(請填本名)<input name="rname" required maxlength="30" placeholder="與證件相同,例如:王小明" value="' + esc((MD.me && MD.me.pname) || o0.nm || '') + '"><small class="ds" style="color:var(--acc)">超商取貨需核對證件,請填寫本名,不可填暱稱</small></label>' +
     '<label>聯絡電話<input name="phone" required inputmode="tel" value="' + esc((MD.me && MD.me.phone) || o0.ph || '') + '"></label>' +
     '<div id="mcvs"><label>超商<select name="cvs"><option>7-11</option><option>全家</option></select></label><label>取貨門市(店名或店號)<input name="store" maxlength="60"></label><small class="ds" id="mfh" hidden style="color:var(--acc)">賣貨便只能寄到 7-11 門市,請填 7-11 的店名或店號(不能填全家或地址)</small></div>' +
     '<div id="mhome" hidden><label>收件地址<input name="addr" maxlength="150" value="' + esc((MD.me && MD.me.addr) || '') + '"></label></div>' +
