@@ -144,4 +144,28 @@ a = run((I) => I.arrText_('UADMIN', '確認'));
 ok(L('O5', 'P008').arrival_status === '已到貨' && Number(L('O5', 'P008').cost) === 550, 'correction before confirmation is used when confirmed: cost ' + L('O5', 'P008').cost);
 r = await post({ type: 'cost', items: [{ wid: 'w9', cost: 560 }] });
 ok(r.body.updated === 1 && Number(L('O5', 'P008').cost) === 560, 'and still linked afterwards');
+// 11) 到貨數量不夠分:照下單先後,先下單的客人先拿、那一列拆單;不會跳給後面數量比較少的客人
+order('O6', '2026-11-06 10:00:00', 'U6'); line('O6', 'P072', '蝴蝶結貓耳毛帽', '灰', 3);
+order('O7', '2026-11-07 10:00:00', 'U7'); line('O7', 'P072', '蝴蝶結貓耳毛帽', '灰', 1);
+sent.length = 0;
+r = await post({ type: 'arrival', batch: 'b6', items: [Object.assign({}, GREY, { specid: 23234, spec: '標準', qty: 2, price: 990, lots: [[2, 990, 'w20']] })] });
+const LX = (oid, pid) => DB['訂單明細'].find(x => x.order_id === oid && x.product_id === pid);
+ok(r.body.auto === 1 && r.body.autoQty === 2 && r.body.stock === 0, 'partial arrival result ' + JSON.stringify(r.body));
+ok(Number(L('O6', 'P072').qty) === 2 && L('O6', 'P072').arrival_status === '已到貨' && Number(L('O6', 'P072').line_total) === 2000 && Number(L('O6', 'P072').cost) === 990, 'O6 (ordered 3): 2 arrived stay on the original line');
+ok(LX('O6', 'P072~灰~2') && Number(LX('O6', 'P072~灰~2').qty) === 1 && LX('O6', 'P072~灰~2').arrival_status === '未到貨' && LX('O6', 'P072~灰~2').spec === '灰' && Number(LX('O6', 'P072~灰~2').line_total) === 1000, 'O6: the remaining 1 is split into its own waiting line');
+ok(L('O7', 'P072').arrival_status === '未到貨', 'O7 (ordered later, qty 1) does NOT jump the queue');
+ok(sent.some(x => x.to === 'UADMIN' && /訂 3 件,先到 2 件,剩 1 件繼續等/.test(x.text)) && sent.some(x => x.to === 'U6') && !sent.some(x => x.to === 'U7'), 'admin told about the split; only U6 notified');
+r = await post({ type: 'arrival', batch: 'b7', items: [Object.assign({}, GREY, { specid: 23234, spec: '標準', qty: 2, price: 995, lots: [[2, 995, 'w21']] })] });
+ok(r.body.auto === 2 && r.body.stock === 0 && LX('O6', 'P072~灰~2').arrival_status === '已到貨' && Number(LX('O6', 'P072~灰~2').cost) === 995 && L('O7', 'P072').arrival_status === '已到貨', 'next arrival: O6 remainder first, then O7');
+r = await post({ type: 'cost', items: [{ wid: 'w20', cost: 1001 }] });
+ok(r.body.updated === 1 && Number(L('O6', 'P072').cost) === 1001 && Number(LX('O6', 'P072~灰~2').cost) === 995, 'cost correction still finds the split line');
+ok(typeof r.body.updated === 'number' && (await post({ type: 'arrival', batch: 'b8', items: [Object.assign({}, GREY, { specid: 23234, spec: '標準', qty: 1, price: 995, lots: [[1, 995, 'w22']] })] })).body.costNew !== undefined, 'arrival result reports costSame/costNew for the automatic check');
+// 12) 手動轉傳的流程也一樣拆單:預覽先說明,回「確認」才拆
+order('O8', '2026-11-08 10:00:00', 'U8'); line('O8', 'P008', 'Hello Kitty聯名款擴香3入禮盒組', '', 3);
+a = run((I) => I.arrPlan_([{ pid: 'P008', spec: '', qty: 2, price: null, text: '擴香' }]));
+ok(/O8 .*×2\(訂 3 件,先到 2 件,剩 1 件繼續等\)/.test(a.r) && Number(L('O8', 'P008').qty) === 3, 'manual preview explains the split, nothing changed yet');
+a = run((I) => I.arrPlan_([{ pid: 'P008', spec: '', qty: 1, price: null, text: '擴香' }]));
+ok(/O8 .*×1/.test(a.r) && !/現貨庫存/.test(a.r), 'a second preview before confirming gives the remaining 1 to the same customer (not to stock)');
+a = run((I) => I.arrText_('UADMIN', '確認'));
+ok(Number(L('O8', 'P008').qty) === 2 && L('O8', 'P008').arrival_status === '已到貨' && LX('O8', 'P008~~2') && Number(LX('O8', 'P008~~2').qty) === 1 && LX('O8', 'P008~~2').arrival_status === '已到貨', 'confirm applies both previews: 2 + 1 all arrived for O8');
 console.log(fails ? fails + ' FAILED' : 'ALL PASSED');
