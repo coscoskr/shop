@@ -53,7 +53,7 @@ Deno.serve(async (req: Request) => {
   const eck = new URL(req.url).searchParams.get("ecpay");
   if (eck === "map") {
     // 綠界超商地圖選完門市
-    try { return new Response(await handleEcpayMap({ rawBody: await req.text(), db, env }), { headers: { "Content-Type": "text/html; charset=utf-8" } }); }
+    try { return new Response(null, { status: 303, headers: { Location: await handleEcpayMap({ rawBody: await req.text(), db, env }) } }); }
     catch (e) { console.error("ecpay map error", e); return new Response("門市選擇失敗,請回上一頁重試", { status: 500, headers: { "Content-Type": "text/plain; charset=utf-8" } }); }
   }
   if (eck === "logi") {

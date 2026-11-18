@@ -42,6 +42,6 @@ r = await cb('2063'); ok(r === '1|OK', 'arrive cb');
 S('S1').status = '已出貨'; r = await cb('2074'); ok(r === '1|OK' && S('S1').status === '已退回', 'return → 已退回');
 r = await handleEcpayLogi({ rawBody: 'MerchantID=' + cfg.mid + '&AllPayLogisticsID=1&CheckMacValue=BAD', db: fakeDb, env: {} }); ok(r.startsWith('0|'), 'bad mac');
 const html = await handleEcpayMap({ rawBody: 'LogisticsSubType=FAMIC2C&CVSStoreID=F012&CVSStoreName=' + encodeURIComponent('全家台中店') + '&CVSAddress=x', db: fakeDb, env: {} });
-ok(/#cvs=/.test(html) && /F012/.test(decodeURIComponent(html)), 'map redirect');
+ok(/^https:.*#cvs=/.test(html) && /F012/.test(decodeURIComponent(html)), 'map redirect');
 console.log(DB['操作紀錄'].slice(-4).map(x => x.action + ' ' + x.detail));
 console.log(fails ? fails + ' FAILED' : 'ALL PASSED');

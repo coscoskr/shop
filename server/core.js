@@ -339,7 +339,7 @@ export async function handleEcpayMap({ rawBody, db, env }) {
   await db.withTx(async (tx) => { const { props } = await tx.loadAll(); app = (env.props && env.props.APP_URL) || props.APP_URL || ''; await tx.commit([], []); }, { lock: false });
   const pick = { t: p.LogisticsSubType === 'FAMIC2C' ? '全家' : '7-11', id: String(p.CVSStoreID || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 10), n: String(p.CVSStoreName || '').slice(0, 40), a: String(p.CVSAddress || '').slice(0, 80) };
   const url = (/^https:\/\//.test(app) ? app : 'https://coscoskr.github.io/shop/') + '#cvs=' + encodeURIComponent(JSON.stringify(pick));
-  return '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>返回商店</title><p style="font:16px sans-serif;text-align:center;margin-top:40px">門市已選好,正在返回商店…</p><script>location.replace(' + JSON.stringify(url).replace(/</g, '\\u003c') + ')</script>';
+  return url; // 用 303 轉址回網站(Supabase 不允許函式直接回傳 HTML 頁面)
 }
 /** 綠界物流狀態通知(ServerReplyURL):驗證檢查碼(MD5)後處理,回應 1|OK */
 export async function handleEcpayLogi({ rawBody, db, env }) {
