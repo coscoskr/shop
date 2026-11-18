@@ -18,11 +18,11 @@ const LINE_FRIEND_URL = 'https://api.line.me/friendship/v1/status';
 const SPECIAL = {
   // 信用卡:組綠界全方位金流付款表單(前端送出到綠界)
   async memberPayStart({ rt, args, props, env }) {
-    const [tk, sid] = args;
+    const [tk, sid, kind] = args;
     const info = withRt(rt, () => code.INTERNAL.payPrep_(tk, sid));
     const cfg = payCfg(props);
     const back = /^https:\/\//.test(info.url) ? info.url + (info.url.indexOf('?') >= 0 ? '&' : '?') + 's=' + encodeURIComponent(info.sid) : '';
-    return payFields(cfg, { sid: info.sid, total: info.total, items: info.items, returnUrl: env.SUPABASE_URL + '/functions/v1/api?ecpay=pay', backUrl: back });
+    return payFields(cfg, { sid: info.sid, total: info.total, items: info.items, returnUrl: env.SUPABASE_URL + '/functions/v1/api?ecpay=pay', backUrl: back, kind: kind === 'BNPL' ? 'BNPL' : 'Credit' });
   },
 
   // 批次開立電子發票(綠界):先整理資料 → 逐張向綠界開立 → 把發票號碼寫回出貨單

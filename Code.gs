@@ -2025,12 +2025,13 @@ function payDone_(p, test) {
   lk_(function () {
     var s = rows_('出貨單').filter(function (x) { return String(x.出貨單ID) === sid; })[0];
     if (!s) { out = 'no ship'; return; }
+    if (String(p.RtnCode) === '2' && /BNPL/i.test(String(p.PaymentType || ''))) { log_('綠界', '無卡分期申請中', sid, '金額 ' + p.TradeAmt + ' 綠界交易 ' + (p.TradeNo || '')); out = 'bnpl-apply'; return; }
     if (String(p.RtnCode) !== '1') { log_('綠界', '刷卡失敗', sid, String(p.RtnMsg || '') + ' ' + (p.TradeNo || '')); out = 'fail'; return; }
     if (!test && String(p.SimulatePaid) === '1') { log_('綠界', '模擬付款(略過)', sid, String(p.TradeNo || '')); out = 'sim'; return; }
     if (Number(p.TradeAmt) !== Math.round(Number(s.總額))) { log_('綠界', '刷卡金額不符', sid, '應付 ' + s.總額 + ',實收 ' + p.TradeAmt + ' 交易 ' + p.TradeNo); major_('綠界', '刷卡金額不符', sid, '應付 ' + s.總額 + ' 實收 ' + p.TradeAmt, p); out = 'amount'; return; }
     if (String(s.狀態) !== '待刷卡') { out = 'dup'; return; }
     var n = cp_(s); n.狀態 = '已刷卡待出貨'; n.匯款日期 = String(p.PaymentDate || '').slice(0, 10).replace(/\//g, '-'); put_('出貨單', s._r, n);
-    log_('綠界', '刷卡成功', sid, (test ? '(測試環境)' : '') + '金額 ' + p.TradeAmt + ' 綠界交易 ' + p.TradeNo + ' 卡號末四碼 ' + (p.card4no || ''));
+    log_('綠界', /BNPL/i.test(String(p.PaymentType || '')) ? '無卡分期付款成功' : '刷卡成功', sid, (test ? '(測試環境)' : '') + String(p.PaymentType || '') + ' 金額 ' + p.TradeAmt + ' 綠界交易 ' + p.TradeNo + ' 卡號末四碼 ' + (p.card4no || ''));
     String(s.訂單ID).split(',').forEach(function (oid) { syncOrderStatus_(oid, '綠界'); });
     awardCredits_(sid, '綠界');
     out = 'ok';
