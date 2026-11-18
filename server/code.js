@@ -2782,12 +2782,14 @@ function arrPlan_(items, opt) {
     var k = pid + '|' + sp;
     if (!agg[k]) { agg[k] = { pid: pid, spec: sp, qty: 0, price: '', name: String(p.名稱) }; order.push(k); }
     agg[k].qty += q;
+    if (it.lots) agg[k].lots = (agg[k].lots || []).concat(it.lots.map(function (x) { return [Number(x[0]), Number(x[1])]; })); // 酷柏:這批貨每件的實際進價(依酷柏下單先後)
     if (it.price !== null && it.price !== undefined && it.price !== '' && Number(it.price) > 0) agg[k].price = Number(it.price);
   });
-  var plan = { assign: [], surplus: [], unk: unk, skip: [], cb: (opt && opt.cb) || [] }, msg = [];
+  var plan = { assign: [], surplus: [], unk: unk, skip: [], cb: (opt && opt.cb) || [], cost: {} }, msg = [];
   var lines = rows_('訂單明細');
   order.forEach(function (k) {
     var a = agg[k], left = a.qty, got = [];
+    if (a.lots && a.price !== '') plan.cost[a.pid] = a.price; // 酷柏:商品成本跟著最新進價
     var cand = lines.filter(function (l) {
       return bp_(l.商品ID) === a.pid && String(l.規格 || '') === a.spec && ['已到貨', '已出貨'].indexOf(String(l.到貨狀態)) < 0 && !l.出貨單ID && !taken[l.訂單ID + '|' + l.商品ID] && ords[String(l.訂單ID)];
     }).sort(function (x, y) {
@@ -2796,11 +2798,11 @@ function arrPlan_(items, opt) {
     });
     cand.forEach(function (l) {
       var q = Number(l.數量), o = ords[String(l.訂單ID)], who = buyerName_(o, mem);
-      if (q <= left) { left -= q; taken[l.訂單ID + '|' + l.商品ID] = 1; plan.assign.push({ oid: String(l.訂單ID), pid: String(l.商品ID), name: a.name, spec: a.spec, qty: q, who: who }); got.push('  ✔ ' + l.訂單ID + ' ' + who + ' ×' + q); }
+      if (q <= left) { left -= q; taken[l.訂單ID + '|' + l.商品ID] = 1; plan.assign.push({ oid: String(l.訂單ID), pid: String(l.商品ID), name: a.name, spec: a.spec, qty: q, who: who, cost: a.lots ? cbTake_(a.lots, q) : '' }); got.push('  ✔ ' + l.訂單ID + ' ' + who + ' ×' + q); }
       else plan.skip.push(a.name + (a.spec ? '(' + a.spec + ')' : '') + ' ' + l.訂單ID + ' ' + who + ' 要 ' + q + ' 件,到貨數不夠分,先略過');
     });
     if (left > 0 && plan.skip.some(function (x) { return x.indexOf(a.name) === 0; })) got.push('  ❓ 還剩 ' + left + ' 件沒分配(有客人的數量大於剩餘,不能拆單),先不轉庫存,請到後台處理');
-    else if (left > 0) { plan.surplus.push({ pid: a.pid, spec: a.spec, qty: left, price: a.price, name: a.name }); got.push('  ➕ 現貨庫存 ×' + left); }
+    else if (left > 0) { plan.surplus.push({ pid: a.pid, spec: a.spec, qty: left, price: a.lots && a.lots.length ? cbTake_(a.lots, left) : a.price, name: a.name }); got.push('  ➕ 現貨庫存 ×' + left); }
     msg.push('・' + a.name + (a.spec ? '(' + a.spec + ')' : '') + ' 到 ' + a.qty + ' 件' + (a.price !== '' ? ',進價 ' + a.price : '') + '\n' + (got.join('\n') || '  (沒有待到貨的訂單)'));
   });
   var head = (opt && opt.head) || '📦 到貨預覽';
@@ -2818,13 +2820,15 @@ function arrPlan_(items, opt) {
 function arrApply_(plans, why) {
   var pend = plans || arrPend_(); if (!pend.length) return '目前沒有待確認的到貨(可能已超過 6 小時失效),請重新轉傳。';
   var arrived = {}, nAs = 0, nSur = 0, miss = [], WHO = why ? '酷柏到貨' : '到貨助理', WHY = why || 'LINE 轉傳到貨通知';
+  var meta = null;
   pend.forEach(function (pl) {
     pl.assign.forEach(function (a) {
       var l = rows_('訂單明細').filter(function (x) { return String(x.訂單ID) === a.oid && String(x.商品ID) === a.pid; })[0];
       if (!l || ['已到貨', '已出貨'].indexOf(String(l.到貨狀態)) >= 0 || l.出貨單ID) { miss.push(a.oid + ' ' + a.name); return; }
       var n = cp_(l); n.到貨狀態 = '已到貨'; n.可出貨 = 'Y'; n.到貨操作人 = WHO; n.到貨時間 = now_(); ordOk_(n, WHO);
+      var cc = cbCost_(n, l, a.cost, meta || (meta = lineMeta_(true)));
       put_('訂單明細', l._r, n);
-      log_(WHO, '到貨', a.oid + ' ' + a.name, '到貨:' + l.到貨狀態 + '→已到貨(' + WHY + ')');
+      log_(WHO, '到貨', a.oid + ' ' + a.name, '到貨:' + l.到貨狀態 + '→已到貨(' + WHY + ')' + cc);
       (arrived[a.oid] = arrived[a.oid] || []).push(a.name); nAs++;
     });
     pl.surplus.forEach(function (s) {
@@ -2840,6 +2844,7 @@ function arrApply_(plans, why) {
       nSur += s.qty;
     });
   });
+  pend.forEach(function (pl) { cbInnCost_(pl.cost); });
   cbDone_(pend);
   if (!plans) arrSave_([]);
   var nt = Object.keys(arrived).length ? notifyArrival_(arrived) : { sent: 0, noLine: 0, failed: 0 };
@@ -2855,6 +2860,37 @@ function arrApply_(plans, why) {
    配對後傳預覽給到貨管理員,回「確認」才入帳,同時記住對照,之後同品項就全自動。
    管理員 LINE 指令:「酷柏」重新配對待對應品項;「酷柏清除」清掉待對應(已在後台手動處理時用)。 */
 var CB_MAP_ = '酷柏對照 ', CB_PEND_ = '酷柏待對應';
+/** 酷柏送來的進價批次 [[件數, 單價]…](依酷柏下單先後);沒有就用單一進價 */
+function cbLots_(it) {
+  var out = [];
+  (Array.isArray(it && it.lots) ? it.lots : []).slice(0, 60).forEach(function (x) { var q = Math.floor(Number(x && x[0])), p = Number(x && x[1]); if (q >= 1 && p > 0) out.push([q, p]); });
+  if (!out.length && it && Number(it.price) > 0 && Math.floor(Number(it.qty)) >= 1) out.push([Math.floor(Number(it.qty)), Number(it.price)]);
+  return out;
+}
+/** 從進價批次依序取 q 件,回傳這 q 件的平均單價(沒有批次回 '') */
+function cbTake_(lots, q) {
+  var sum = 0, got = 0;
+  while (got < q && lots && lots.length) { var t = Math.min(q - got, lots[0][0]); sum += t * lots[0][1]; got += t; lots[0][0] -= t; if (lots[0][0] <= 0) lots.shift(); }
+  return got ? Math.round(sum / got * 100) / 100 : '';
+}
+/** 成本同步:把酷柏的實際進價寫進這筆訂單品項(已記錄廠商付款的不動;廠商、貨源、含稅沿用原本的設定)。回傳要接在操作紀錄後面的文字 */
+function cbCost_(n, l, cost, meta) {
+  if (cost === '' || cost === undefined || cost === null || !(Number(cost) > 0) || l.廠商付款ID) return '';
+  var m = meta(l);
+  n.廠商 = m.vendor; n.成本 = Number(cost); n.成本含稅 = m.tax ? 'Y' : 'N'; n.貨源 = m.src;
+  return String(m.cost) === String(Number(cost)) ? '' : ';成本:' + m.cost + '→' + Number(cost) + '(酷柏實際進價)';
+}
+/** 成本同步:商品的成本改成酷柏最新進價(鎖定的商品不動),之後新訂單就會帶這個成本 */
+function cbInnCost_(cost) {
+  Object.keys(cost || {}).forEach(function (pid) {
+    var c = Number(cost[pid]); if (!(c > 0)) return;
+    var i = rows_('商品_內部').filter(function (r) { return String(r.商品ID) === pid; })[0];
+    if (i && (i.鎖定 === 'Y' || String(i.成本) === String(c))) return;
+    var n = i ? cp_(i) : { '商品ID': pid, '廠商': '酷柏', '成本': '', '成本含稅': 'N', '貨源': '', '鎖定': 'N' }, old = n.成本 === undefined ? '' : n.成本;
+    n.成本 = c; put_('商品_內部', i ? i._r : 0, n);
+    log_('酷柏到貨', '同步成本', pid, '商品成本:' + old + '→' + c + '(酷柏最新進價)');
+  });
+}
 function cbNorm_(s) { return String(s || '').replace(/\s+/g, '').replace(/（/g, '(').replace(/）/g, ')').toLowerCase().slice(0, 80); }
 /** 一個酷柏品項可用的對照鍵(由精確到寬鬆):商品+規格編號、商品+規格文字、整個商品(只有單一規格的商品才用) */
 function cbKeys_(it) {
@@ -2888,6 +2924,7 @@ function cbPendAdd_(items) {
     var k = cbPk_(it), q = Math.floor(Number(it.qty));
     if (ix[k] === undefined) { ix[k] = a.length; a.push({ proid: String(it.proid), specid: String(it.specid || ''), title: t_(it.title, 120), spec: t_(it.spec, 80), single: it.single ? 1 : 0, qty: 0, price: '' }); }
     var x = a[ix[k]]; x.qty += q; if (Number(it.price) > 0) x.price = Number(it.price);
+    x.lots = (x.lots || []).concat(cbLots_(it)).slice(0, 60);
   });
   cbPendSave_(a);
 }
@@ -2907,7 +2944,7 @@ function cbArrIn_(d) {
   (d.items || []).slice(0, 300).forEach(function (it) {
     var q = Math.floor(Number(it && it.qty)); if (!it || !it.proid || !(q >= 1)) return;
     var m = cbMapGet_(it, st, prods);
-    if (m) auto.push({ pid: m.pid, spec: m.spec, qty: q, price: it.price, text: t_(it.title, 40) }); else unk.push(it);
+    if (m) auto.push({ pid: m.pid, spec: m.spec, qty: q, price: it.price, lots: cbLots_(it), text: t_(it.title, 40) }); else unk.push(it);
   });
   var res = { ok: true, auto: 0, stock: 0, skip: 0, pending: 0, added: unk.length }, admin = String(st.到貨管理員LINE || ''), text = '';
   if (auto.length) {
@@ -2939,7 +2976,7 @@ function cbPendPlan_(ai) {
     var i = Math.floor(Number(r && r.ref)) - 1, x = pe[i]; if (!x || seen[i] || !r.pid) return;
     var t = cbTarget_(String(r.pid) + '|' + String(r.spec || '').trim(), prods); if (!t) return;
     seen[i] = 1;
-    items.push({ pid: t.pid, spec: t.spec, qty: x.qty, price: x.price, text: x.title });
+    items.push({ pid: t.pid, spec: t.spec, qty: x.qty, price: x.price, lots: cbLots_(x), text: x.title });
     cb.push({ proid: x.proid, specid: x.specid, spec: x.spec, single: x.single, pid: t.pid, cspec: t.spec, k: cbPk_(x) });
     link.push('・' + x.title + (x.spec ? '(' + x.spec + ')' : '') + '\n   → ' + String(prods[t.pid].名稱) + (t.spec ? '(' + t.spec + ')' : ''));
   });
@@ -3450,6 +3487,6 @@ function adminHistBind(tk, pairs) {
 
 /* ===== 以下由 build.py 加入 ===== */
 export const API = {resetAdmin, getShop, placeOrder, adminProxyQuote, adminPlaceOrder, adminLogin, adminVendors, adminBrands, adminAddBrand, adminRenameBrand, adminDeleteBrand, adminCats, adminAddCat, adminRenameCat, adminRenameBig, adminDeleteBig, adminDeleteCat, adminAddVendor, adminDeleteVendor, adminCarriers, adminSaveCarrier, adminDeleteCarrier, trackLink, adminInit, adminSaveProduct, adminDeleteProduct, adminBatchProducts, adminCodes, adminSaveCode, adminSetCodeOn, adminDeleteCode, adminSaveAdmin, adminLogs, memberLogin, memberOrders, memberSaveProfile, memberChangePay, memberReportPay, adminBatchArrival, adminLineHistory, adminBatchOrder, adminPurchaseList, adminLineInfo, adminRecordPayment, adminUpdatePayment, adminDeletePayment, adminStockView, adminAddStockIn, adminDeleteStockIn, adminBatchDeleteLines, adminReport, adminOrders, adminOrderAdjust, adminUpdateOrder, adminEditLine, adminEditLineFull, adminDeleteOrder, adminBatchDeleteOrders, adminCreateShip, adminUpdateShip, adminShipResend, adminShipPrinted, adminRemitMissing, adminBatchShipStatus, adminDeleteShip, adminAdjustShip, adminMergeShips, adminExpenses, adminSaveExpense, adminDeleteExpense, adminMonthly, adminSaveFixed, adminSaveStaff, adminDeleteMonthlyItem, adminBatchDeleteShips, adminShipHistory, adminBatch, memberCheckout, memberShipQuote, adminLogiClear, memberCreateShip, adminShipQuote, adminCreateShipFor, lineStart, lineLiff, adminArrivalCode, adminArrivalUnbind, quote, adminMembers, adminMemberGrants, adminSetLevel, adminGrant, adminVoidGrant, adminLevels, adminSaveLevel, adminDeleteLevel, adminActivities, adminSaveActivity, adminDeleteActivity, adminSettings, adminSaveSettings, adminHistImport, adminHistBindList, adminHistNote, adminHistRenotify, adminHistBind};
-export const INTERNAL = {catHit_, page_, doGet, setup, resetAdmin, ss_, raw_, sh_, t_, txt_, rows_, put_, log_, major_, diff_, settings_, cats_, cs_, tiers_, unit_, img_, imgList_, bp_, spec_, specParse_, specs_, specQty_, availOf_, adjStock_, imgs_, pub_, getShop, shopData_, placeOrder, placeOrder0_, placeCore_, proxyCtx_, proxyWant_, adminProxyQuote, adminPlaceOrder, contactSeen_, hex_, hash_, admins_, saveAdmin_, adminLogin, me_, adminProducts_, vendors_, adminVendors, brandSheet_, brands_, brandKey_, brandPick_, brandResolve_, brandList_, brandName_, adminBrands, adminAddBrand, adminRenameBrand, adminDeleteBrand, catList_, catName_, adminCats, adminAddCat, renameCats_, adminRenameCat, adminRenameBig, adminDeleteBig, adminDeleteCat, adminAddVendor, adminDeleteVendor, carriers_, trackUrl_, shortTrack_, saveCarriers_, adminCarriers, adminSaveCarrier, adminDeleteCarrier, trackLink, adminInit, adminSaveProduct, adminDeleteProduct, adminBatchProducts, codeSheet_, codes_, dstr_, codeState_, findCode_, codeUsed_, codeList_, adminCodes, adminSaveCode, adminSetCodeOn, adminDeleteCode, adminSaveAdmin, adminLogs, nz_, mk_, mem_, lineMeta_, mine_, memberLogin, shipObj_, memberOrders, memberSaveProfile, memberChangePay, memberReportPay, authDrive, adminUploadImage, adminBatchArrival, stockMove_, adminLineHistory, adminBatchOrder, allPurch_, buyerName_, purchaseList_, adminPurchaseList, pickPurchase_, adminLineInfo, adminRecordPayment, adminUpdatePayment, adminDeletePayment, stockView_, adminStockView, adminAddStockIn, deleteStockIn_, adminDeleteStockIn, adminBatchDeleteLines, adminReport, lk_, ri_, si_, paidOk_, ordOk_, now_, cp_, ord_, seq_, adminOrders, adminOrderAdjust, adminUpdateOrder, adminEditLine, adminEditLineFull, deleteOrder_, adminDeleteOrder, adminBatchDeleteOrders, adminCreateShip, syncOrderStatus_, adminUpdateShip, adminShipResend, adminShipPrinted, adminRemitMissing, shipNotice_, adminBatchShipStatus, deleteShip_, adminDeleteShip, invPrep_, invSave_, shipAlloc_, adminAdjustShip, adminMergeShips, isBoss_, boss_, expObj_, adminExpenses, adminSaveExpense, adminDeleteExpense, staffTotal_, adminMonthly, adminSaveFixed, adminSaveStaff, adminDeleteMonthlyItem, adminBatchDeleteShips, adminShipHistory, adminBatch, memberCheckout, shipCalc_, creditTiers_, creditRule_, pickLines_, memberShipQuote, payPrep_, payDone_, kindOk_, payLabel_, logiOn_, cvsOf_, logiPrep_, logiBatchPrep_, logiBatchSave_, adminLogiClear, logiSave_, logiPrintPrep_, logiStatus_, realName_, memberCreateShip, memberCreateShip0_, shipCtx_, shipRecv_, adminRecv_, feeFor_, adminShipQuote, adminCreateShipFor, ensureSettings_, prop_, lineOn_, lineId_, appUrl_, sha_, tot_, lineStart, lineCallback_, lineLiff, newSession_, upsertMember_, memberRow_, levels_, levelOf_, pushLine_, flexT_, flexBtn_, flexHead_, flexHero_, flexRow_, money_, orderFlex_, arrFlex_, poBtn_, siteUrl_, poHead_, poCell_, poGrid_, poTable_, poSum_, shareText_, shareNotice_, shipFlex_, invFlex_, notifyShipped_, mailTo_, authAll, notifyArrival_, setSet_, arrIsAdmin_, arrPend_, arrSave_, adminArrivalCode, adminArrivalUnbind, arrText_, arrCands_, arrPlan_, arrApply_, cbNorm_, cbKeys_, cbPk_, cbTarget_, cbMapGet_, cbMapPut_, cbOn_, cbPend_, cbPendSave_, cbPendAdd_, cbDone_, cbArrIn_, cbPendList_, cbPendPlan_, today_, grants_, balance_, addGrant_, spend_, refund_, meInfo_, eligSub_, calc_, quote, awardCredits_, adminMembers, adminMemberGrants, adminSetLevel, adminGrant, adminVoidGrant, adminLevels, adminSaveLevel, adminDeleteLevel, actOut_, adminActivities, adminSaveActivity, adminDeleteActivity, defSet_, adminSettings, adminSaveSettings, hNum_, hDate_, hNorm_, hEta_, hCls_, hPmap_, hFind_, hMaxSeq_, hNext_, hVendor_, adminHistImport, hProducts_, hOrders_, hVendors_, hStock_, adminHistBindList, adminHistNote, adminHistRenotify, adminHistBind};
+export const INTERNAL = {catHit_, page_, doGet, setup, resetAdmin, ss_, raw_, sh_, t_, txt_, rows_, put_, log_, major_, diff_, settings_, cats_, cs_, tiers_, unit_, img_, imgList_, bp_, spec_, specParse_, specs_, specQty_, availOf_, adjStock_, imgs_, pub_, getShop, shopData_, placeOrder, placeOrder0_, placeCore_, proxyCtx_, proxyWant_, adminProxyQuote, adminPlaceOrder, contactSeen_, hex_, hash_, admins_, saveAdmin_, adminLogin, me_, adminProducts_, vendors_, adminVendors, brandSheet_, brands_, brandKey_, brandPick_, brandResolve_, brandList_, brandName_, adminBrands, adminAddBrand, adminRenameBrand, adminDeleteBrand, catList_, catName_, adminCats, adminAddCat, renameCats_, adminRenameCat, adminRenameBig, adminDeleteBig, adminDeleteCat, adminAddVendor, adminDeleteVendor, carriers_, trackUrl_, shortTrack_, saveCarriers_, adminCarriers, adminSaveCarrier, adminDeleteCarrier, trackLink, adminInit, adminSaveProduct, adminDeleteProduct, adminBatchProducts, codeSheet_, codes_, dstr_, codeState_, findCode_, codeUsed_, codeList_, adminCodes, adminSaveCode, adminSetCodeOn, adminDeleteCode, adminSaveAdmin, adminLogs, nz_, mk_, mem_, lineMeta_, mine_, memberLogin, shipObj_, memberOrders, memberSaveProfile, memberChangePay, memberReportPay, authDrive, adminUploadImage, adminBatchArrival, stockMove_, adminLineHistory, adminBatchOrder, allPurch_, buyerName_, purchaseList_, adminPurchaseList, pickPurchase_, adminLineInfo, adminRecordPayment, adminUpdatePayment, adminDeletePayment, stockView_, adminStockView, adminAddStockIn, deleteStockIn_, adminDeleteStockIn, adminBatchDeleteLines, adminReport, lk_, ri_, si_, paidOk_, ordOk_, now_, cp_, ord_, seq_, adminOrders, adminOrderAdjust, adminUpdateOrder, adminEditLine, adminEditLineFull, deleteOrder_, adminDeleteOrder, adminBatchDeleteOrders, adminCreateShip, syncOrderStatus_, adminUpdateShip, adminShipResend, adminShipPrinted, adminRemitMissing, shipNotice_, adminBatchShipStatus, deleteShip_, adminDeleteShip, invPrep_, invSave_, shipAlloc_, adminAdjustShip, adminMergeShips, isBoss_, boss_, expObj_, adminExpenses, adminSaveExpense, adminDeleteExpense, staffTotal_, adminMonthly, adminSaveFixed, adminSaveStaff, adminDeleteMonthlyItem, adminBatchDeleteShips, adminShipHistory, adminBatch, memberCheckout, shipCalc_, creditTiers_, creditRule_, pickLines_, memberShipQuote, payPrep_, payDone_, kindOk_, payLabel_, logiOn_, cvsOf_, logiPrep_, logiBatchPrep_, logiBatchSave_, adminLogiClear, logiSave_, logiPrintPrep_, logiStatus_, realName_, memberCreateShip, memberCreateShip0_, shipCtx_, shipRecv_, adminRecv_, feeFor_, adminShipQuote, adminCreateShipFor, ensureSettings_, prop_, lineOn_, lineId_, appUrl_, sha_, tot_, lineStart, lineCallback_, lineLiff, newSession_, upsertMember_, memberRow_, levels_, levelOf_, pushLine_, flexT_, flexBtn_, flexHead_, flexHero_, flexRow_, money_, orderFlex_, arrFlex_, poBtn_, siteUrl_, poHead_, poCell_, poGrid_, poTable_, poSum_, shareText_, shareNotice_, shipFlex_, invFlex_, notifyShipped_, mailTo_, authAll, notifyArrival_, setSet_, arrIsAdmin_, arrPend_, arrSave_, adminArrivalCode, adminArrivalUnbind, arrText_, arrCands_, arrPlan_, arrApply_, cbLots_, cbTake_, cbCost_, cbInnCost_, cbNorm_, cbKeys_, cbPk_, cbTarget_, cbMapGet_, cbMapPut_, cbOn_, cbPend_, cbPendSave_, cbPendAdd_, cbDone_, cbArrIn_, cbPendList_, cbPendPlan_, today_, grants_, balance_, addGrant_, spend_, refund_, meInfo_, eligSub_, calc_, quote, awardCredits_, adminMembers, adminMemberGrants, adminSetLevel, adminGrant, adminVoidGrant, adminLevels, adminSaveLevel, adminDeleteLevel, actOut_, adminActivities, adminSaveActivity, adminDeleteActivity, defSet_, adminSettings, adminSaveSettings, hNum_, hDate_, hNorm_, hEta_, hCls_, hPmap_, hFind_, hMaxSeq_, hNext_, hVendor_, adminHistImport, hProducts_, hOrders_, hVendors_, hStock_, adminHistBindList, adminHistNote, adminHistRenotify, adminHistBind};
 export { H };
 export function __reset() { SS_ = null; SHC_ = {}; RC_ = {}; }

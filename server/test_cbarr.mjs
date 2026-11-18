@@ -32,6 +32,9 @@ const post = async (d, o) => { const body = JSON.stringify(Object.assign({ v: 1,
 DB['商品'].push({ id: 'P072', name: '蝴蝶結貓耳毛帽', categories: '', sale_type: '預購', price: 1280, stock: null, specs: '黑|白|灰|粉', on_sale: 'Y', brand: 'MLB' });
 DB['商品'].push({ id: 'P008', name: 'Hello Kitty聯名款擴香3入禮盒組', categories: '', sale_type: '預購', price: 1100, stock: null, specs: '', on_sale: 'Y', brand: 'Hetras' });
 DB['設定'].push({ key: '到貨管理員LINE', value: 'UADMIN' });
+DB['商品_內部'].push({ product_id: 'P072', vendor: '酷柏', cost: 900, cost_tax_incl: 'N', source: '韓國', locked: 'N' });
+DB['商品_內部'].push({ product_id: 'P008', vendor: '酷柏', cost: 700, cost_tax_incl: 'N', source: '韓國', locked: 'Y' });
+const INN = (pid) => DB['商品_內部'].find(r => r.product_id === pid);
 const order = (id, at, lid) => DB['訂單'].push({ order_id: id, ordered_at: at, name: '客' + id, phone: '0912345678', status: '處理中', subtotal: 1000, shipping: 0, total: 1000, line_id: lid });
 const line = (oid, pid, name, spec, qty) => DB['訂單明細'].push({ id: NEXT++, order_id: oid, product_id: pid, product_name: name, qty, unit_price: 1000, line_total: 1000 * qty, arrival_status: '未到貨', shippable: '', ship_requested: '', ship_id: '', sale_type: '預購', spec });
 order('O1', '2026-11-01 10:00:00', 'U1'); order('O2', '2026-11-02 10:00:00', 'U2'); order('O3', '2026-11-03 10:00:00', 'U3');
@@ -72,14 +75,19 @@ ok(/已入帳:客訂到貨 3 筆/.test(a.r.reply), 'confirm applies: ' + a.r.rep
 ok(L('O1', 'P072').arrival_status === '已到貨' && L('O2', 'P072').arrival_status === '已到貨' && L('O3', 'P072').arrival_status === '未到貨' && L('O1', 'P008').arrival_status === '已到貨', 'FIFO: O1,O2 灰 + O1 擴香 arrived, O3 still waiting');
 ok(setv('酷柏對照 6717|22371') === 'P072|灰' && setv('酷柏對照 6717|*') === 'P072|灰' && setv('酷柏對照 7104|*') === 'P008|', 'mapping remembered');
 ok(JSON.parse(setv('酷柏待對應')).length === 0, 'pending cleared');
+ok(Number(L('O1', 'P072').cost) === 983 && L('O1', 'P072').vendor === '酷柏' && L('O1', 'P072').source === '韓國' && L('O1', 'P072').cost_tax_incl === 'N', 'cost sync: arrived line gets the real purchase price, vendor/source kept');
+ok(Number(INN('P072').cost) === 983 && Number(INN('P008').cost) === 700 && Number(L('O1', 'P008').cost) === 850, 'cost sync: product cost follows latest price; locked product untouched (its line still gets real price)');
 ok(a.pushes.filter(f => /message\/push/.test(f.url)).length === 2, 'customers notified (2 orders)');
 
 // 5) 之後同品項(規格編號、規格文字都換了,但是單一規格商品):全自動
 sent.length = 0;
-r = await post({ type: 'arrival', batch: 'b2', items: [Object.assign({}, GREY, { specid: 23234, spec: '標準', qty: 3 })] });
-ok(r.body.auto === 1 && r.body.stock === 2 && r.body.pending === 0 && aiCalls === 1, 'known item: auto applied, surplus to stock ' + JSON.stringify(r.body));
+order('O4', '2026-11-04 10:00:00', 'U4'); line('O4', 'P072', '蝴蝶結貓耳毛帽', '灰', 1);
+Object.assign(L('O3', 'P072'), { vendor: '酷柏', cost: 800, cost_tax_incl: 'N', source: '韓國', vendor_payment_id: 'V001' }); // 已記錄廠商付款:成本不能動
+r = await post({ type: 'arrival', batch: 'b2', items: [Object.assign({}, GREY, { specid: 23234, spec: '標準', qty: 4, price: 1060, lots: [[1, 1055], [3, 1060]] })] });
+ok(r.body.auto === 2 && r.body.stock === 2 && r.body.pending === 0 && aiCalls === 1, 'known item: auto applied, surplus to stock ' + JSON.stringify(r.body));
 ok(L('O3', 'P072').arrival_status === '已到貨' && L('O3', 'P072').arrived_by === '酷柏到貨', 'O3 arrived automatically');
-ok(DB['庫存進貨'].length === 1 && Number(DB['庫存進貨'][0].qty) === 2 && DB['庫存進貨'][0].spec === '灰' && Number(DB['庫存進貨'][0].cost) === 983, 'surplus 2 → 庫存進貨 with cost');
+ok(DB['庫存進貨'].length === 1 && Number(DB['庫存進貨'][0].qty) === 2 && DB['庫存進貨'][0].spec === '灰' && Number(DB['庫存進貨'][0].cost) === 1060, 'surplus 2 → 庫存進貨 with cost');
+ok(Number(L('O3', 'P072').cost) === 800 && Number(L('O4', 'P072').cost) === 1060 && L('O4', 'P072').arrival_status === '已到貨' && Number(INN('P072').cost) === 1060, 'cost sync: lots applied in order (paid line kept 800, next line 1060), product cost → 1060');
 ok(sent.some(s => s.to === 'UADMIN' && /已自動入帳/.test(s.text) && !/回「確認」/.test(s.text)) && sent.some(s => s.to === 'U3'), 'admin got summary, customer U3 notified');
 ok(run((I) => I.arrPend_().length).r === 0, 'no leftover preview');
 
