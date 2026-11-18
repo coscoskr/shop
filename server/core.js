@@ -240,7 +240,7 @@ export async function handleWebhook({ rawBody, signature, db, env }) {
         if (ev.message.type === 'text') {
           const r = withRt(rt, () => code.INTERNAL.arrText_(uid, ev.message.text));
           if (r && r.reply) jobs.push({ kind: 'reply', uid, token: ev.replyToken, text: r.reply });
-          else if (r && r.ai) jobs.push({ kind: 'ai', uid, token: ev.replyToken, text: String(ev.message.text || '').slice(0, 6000) });
+          else if (r && r.ai) jobs.push({ kind: r.cb ? 'cb' : 'ai', uid, token: ev.replyToken, text: String(ev.message.text || '').slice(0, 6000) });
         } else if (ev.message.type === 'image') {
           if (withRt(rt, () => code.INTERNAL.arrIsAdmin_(uid))) jobs.push({ kind: 'ai', uid, token: ev.replyToken, imageId: ev.message.id });
         }
@@ -256,7 +256,7 @@ export async function handleWebhook({ rawBody, signature, db, env }) {
     await runAfter(after, env);
     console.log('webhook jobs', JSON.stringify(jobs.map((j) => j.kind + ':' + (j.imageId ? 'img' : 'txt'))));
     for (const job of jobs) {
-      try { if (job.kind === 'reply') await lineReply(job, job.text, env); else await runArrivalJob(job, { db, env }); } catch (e) { console.error('arrival job error', e); await lineReply(job, '處理失敗,請稍後再試或到後台手動處理。', env).catch(() => {}); }
+      try { if (job.kind === 'reply') await lineReply(job, job.text, env); else if (job.kind === 'cb') await runCoolbauJob({ db, env, job }); else await runArrivalJob(job, { db, env }); } catch (e) { console.error('arrival job error', e); await lineReply(job, '處理失敗,請稍後再試或到後台手動處理。', env).catch(() => {}); }
     }
   })();
   return { ok: true, later };
@@ -326,6 +326,85 @@ async function runArrivalJob(job, { db, env }) {
 }
 
 // 管理員在 LINE 回「確認」時入帳(上面 arrText_ 已在交易內完成),這裡不用再做事
+
+/* ---------- 酷柏到貨自動入帳 ----------
+   酷柏批發系統 KEY 到貨後,直接把我們帳號這次到貨的品項 POST 過來(標頭 x-coolbau-signature = HMAC-SHA256(金鑰, 內容) 的十六進位)。
+   金鑰:COOLBAU_ARR_SECRET(Edge Function 的 Secrets,或 props 表)。商業邏輯在 Code.gs 的「酷柏到貨自動入帳」。 */
+const CB_SYSTEM = '你是韓國代購店「coscos」的到貨對照員。供應商「酷柏」的系統會送來這次到貨的品項(格式:#編號|酷柏品名|酷柏規格|件數)。\n' +
+  '我會提供店內商品清單(格式:商品ID|名稱|規格(待到貨件數))。同一件商品在兩邊的寫法不同:酷柏品名常帶【韓國】、品牌、貨號、顏色;店內可能把顏色或尺寸放在規格。請依品牌、品名、貨號、顏色、尺寸判斷是不是同一件商品。\n' +
+  '只輸出 JSON,不要任何其他文字,格式:{"items":[{"ref":編號(整數),"pid":"商品ID或null","spec":"店內規格(沒有規格就空字串,必須與清單中的規格文字完全一致,不含括號內的待到貨數)"}]}\n' +
+  '規則:每個編號都要輸出一筆;沒有把握是同一件商品就把 pid 設為 null,不要猜;酷柏規格如果只是交期或「標準」之類的字,代表該品項沒有分規格,顏色/款式請從酷柏品名判斷。';
+
+async function hmacHex(secret, body) {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const mac = new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(body)));
+  return Array.from(mac).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+function sameStr(a, b) { a = String(a); b = String(b); let d = a.length ^ b.length; for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ (b.charCodeAt(i) || 0); return d === 0; }
+async function cbAuth(secret, rawBody, signature, d) {
+  if (String(secret || '').length < 16) return 'not configured';
+  if (!sameStr(await hmacHex(String(secret), rawBody), String(signature || '').trim().toLowerCase())) return 'bad signature';
+  if (!(Math.abs(Date.now() / 1000 - Number(d && d.ts)) <= 900)) return 'stale';
+  return '';
+}
+
+export async function handleCoolbau({ rawBody, signature, db, env }) {
+  let d;
+  try { d = JSON.parse(rawBody); } catch (e) { return { status: 400, body: { ok: false, error: 'bad json' } }; }
+  const fail = (bad) => ({ status: bad === 'not configured' ? 503 : 401, body: { ok: false, error: bad } });
+  const envSecret = (env.props || {}).COOLBAU_ARR_SECRET;
+  if (envSecret) { const b0 = await cbAuth(envSecret, rawBody, signature, d); if (b0) return fail(b0); } // 金鑰在環境變數時,先驗證再進交易
+  let out = null, bad = '';
+  const after = [];
+  await db.withTx(async (tx) => {
+    const { tableData, kv, props: dbProps } = await tx.loadAll();
+    const props = Object.assign({}, env.props || {}, dbProps);
+    if (!envSecret || props.COOLBAU_ARR_SECRET !== envSecret) { bad = await cbAuth(props.COOLBAU_ARR_SECRET, rawBody, signature, d); if (bad) return; }
+    const rt = createRuntime({ H: code.H, tableData, kv, props, fetchMap: {} });
+    out = withRt(rt, () => (d.type === 'poke' ? { ok: true, poke: true, added: 0, pending: code.INTERNAL.cbPend_().length } : code.INTERNAL.cbArrIn_(d)));
+    await tx.commit(rt.collectOps(), rt.kvOps);
+    rt.fetchQueue.forEach((f) => after.push({ type: 'fetch', f }));
+    rt.mailQueue.forEach((m) => after.push({ type: 'mail', m }));
+  });
+  if (bad) return fail(bad);
+  const later = (async () => {
+    await runAfter(after, env);
+    // 有第一次出現的品項(或酷柏每天提醒一次):配對後把預覽傳給到貨管理員
+    if (out.pending > 0 && (out.added > 0 || out.poke)) { try { await runCoolbauJob({ db, env }); } catch (e) { console.error('coolbau job error', e); } }
+  })();
+  return { status: 200, body: out, later };
+}
+
+/** 把「酷柏待對應」的品項配對到店內商品,存成待確認計畫並傳預覽給到貨管理員(job 有給時回覆該則訊息) */
+async function runCoolbauJob({ db, env, job }) {
+  const { list, n, cands, key, admin, props } = await db.withTx(async (tx) => {
+    const { tableData, kv, props: dbProps } = await tx.loadAll();
+    const props = Object.assign({}, env.props || {}, dbProps);
+    const rt = createRuntime({ H: code.H, tableData, kv, props, fetchMap: {} });
+    return withRt(rt, () => ({ list: code.INTERNAL.cbPendList_(), n: code.INTERNAL.cbPend_().length, cands: code.INTERNAL.arrCands_(), key: props.ANTHROPIC_API_KEY || '', admin: String(code.INTERNAL.settings_().到貨管理員LINE || ''), props }));
+  }, { lock: false });
+  const to = job || { uid: admin };
+  if (!n || !to.uid) return; // 沒有綁定到貨管理員:品項留在待對應,後台設定頁會顯示數量
+  if (!key) { await lineReply(to, '📦 酷柏到貨:有 ' + n + ' 項第一次出現的品項需要對應,但尚未設定 Anthropic 金鑰,無法自動配對。請到後台手動處理到貨後,傳「酷柏清除」。', env, props); return; }
+  const ar = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST', headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+    body: JSON.stringify({ model: 'claude-sonnet-5-5', max_tokens: 6000, system: CB_SYSTEM, messages: [{ role: 'user', content: [{ type: 'text', text: '店內商品清單:\n' + cands + '\n\n酷柏這次到貨、需要對照的品項:\n' + list }] }] }),
+  });
+  if (!ar.ok) { console.error('anthropic', ar.status, (await ar.text()).slice(0, 200)); await lineReply(to, '📦 酷柏到貨:有 ' + n + ' 項需要對應,但配對服務暫時無法使用(' + ar.status + ')。稍後傳「酷柏」可重新配對。', env, props); return; }
+  const aj = await ar.json();
+  const txt = ((aj.content || []).find((b) => b.type === 'text') || {}).text || '';
+  let items = [];
+  try { const m = txt.match(/\{[\s\S]*\}/); items = (JSON.parse(m ? m[0] : '{}').items || []).slice(0, 200); } catch (e) { items = []; }
+  const text = await db.withTx(async (tx) => {
+    const { tableData, kv, props: dbProps } = await tx.loadAll();
+    const rt = createRuntime({ H: code.H, tableData, kv, props: Object.assign({}, env.props || {}, dbProps), fetchMap: {} });
+    const t = withRt(rt, () => code.INTERNAL.cbPendPlan_(items));
+    await tx.commit(rt.collectOps(), rt.kvOps);
+    return t;
+  });
+  if (text) await lineReply(to, text, env, props);
+}
+
 
 /** 綠界付款結果通知(ReturnURL,表單格式):驗證檢查碼後更新出貨單,回應 1|OK */
 export async function handleEcpayPay({ rawBody, db, env }) {
