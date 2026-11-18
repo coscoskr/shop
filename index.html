@@ -73,7 +73,7 @@ fieldset label{display:inline-block;margin:2px 10px 2px 0}
 .payg{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .payc{position:relative;display:flex!important;gap:10px;align-items:flex-start;border:1.5px solid var(--line);border-radius:12px;padding:12px 10px;margin:0!important;background:#fff;cursor:pointer;transition:border-color .15s,background .15s}
 .payc input{position:absolute;opacity:0;pointer-events:none}
-.payc .ic{font-size:22px;line-height:1}.payc b{display:block;font-size:14px;color:var(--ink)}.payc small{display:block;color:var(--mute);font-size:12px;line-height:1.4;margin-top:2px}
+.payc .ic{line-height:0;color:var(--acc);flex:0 0 24px}.payc b{display:block;font-size:14px;color:var(--ink)}.payc small{display:block;color:var(--mute);font-size:12px;line-height:1.4;margin-top:2px}
 .payc:has(input:checked){border-color:var(--acc);background:var(--soft);box-shadow:0 0 0 2px rgba(169,91,77,.15)}
 .payc:has(input:checked)::after{content:'✓';position:absolute;top:6px;right:8px;color:var(--acc);font-weight:700}
 .payc:has(input:focus-visible){outline:2px solid var(--acc);outline-offset:2px}
@@ -84,7 +84,7 @@ fieldset label{display:inline-block;margin:2px 10px 2px 0}
 .ih,.ir{display:grid;grid-template-columns:1fr 84px 96px 84px;gap:8px;align-items:center;padding:10px 12px}
 .ih{background:var(--soft);font-size:12px;color:var(--mute);font-weight:700}.ih span:not(:first-child){text-align:right}.ih span:nth-child(3){text-align:center}
 .ir{border-top:1px solid var(--line)}.ip{display:flex;gap:10px;align-items:flex-start;min-width:0}
-.ip img,.nop{width:52px;height:52px;border-radius:8px;object-fit:cover;flex:0 0 52px;background:var(--soft);display:flex;align-items:center;justify-content:center;font-size:22px}
+.ip img,.nop{color:var(--pink);width:52px;height:52px;border-radius:8px;object-fit:cover;flex:0 0 52px;background:var(--soft);display:flex;align-items:center;justify-content:center;font-size:22px}
 .in{min-width:0}.ib{display:block;color:var(--acc);font-size:11px;font-weight:700;letter-spacing:.3px}.inm{font-size:14px;line-height:1.35;word-break:break-word}
 .isp{display:inline-block;margin-top:3px;font-size:11px;background:var(--soft);color:var(--ink);border-radius:999px;padding:1px 8px}
 .irm{display:block;margin-top:4px;border:0;background:none;color:var(--mute);font-size:12px;padding:0;text-decoration:underline;cursor:pointer}
@@ -515,7 +515,7 @@ function detail(p) {
 /* 購物車/下單:商品明細列(品牌、品名、規格、單價、數量、小計) */
 function itemRow(p, id, u, n, edit) {
   var orig = p.price > u ? '<s>' + money(p.price) + '</s>' : '';
-  return '<div class="ir"><div class="ip">' + (p.img ? '<img src="' + esc(p.img) + '" alt="" referrerpolicy="no-referrer" loading="lazy">' : '<span class="nop">🛍️</span>') +
+  return '<div class="ir"><div class="ip">' + (p.img ? '<img src="' + esc(p.img) + '" alt="" referrerpolicy="no-referrer" loading="lazy">' : '<span class="nop">' + ICO.store + '</span>') +
     '<div class="in">' + (p.brand ? '<small class="ib">' + esc(p.brand) + '</small>' : '') + '<div class="inm">' + esc(p.name) + '</div>' + (sp(id) ? '<span class="isp">' + esc(sp(id)) + '</span>' : '') + (edit ? '<button type="button" class="irm" data-a="del" data-id="' + esc(id) + '">移除</button>' : '') + '</div></div>' +
     '<div class="iu"><span class="il">單價</span>' + money(u) + orig + '</div>' +
     '<div class="iq"><span class="il">數量</span>' + (edit ? '<span class="stp"><button type="button" data-a="dec" data-id="' + esc(id) + '" aria-label="減少">−</button><b>' + n + '</b><button type="button" data-a="inc" data-id="' + esc(id) + '" aria-label="增加">+</button></span>' : '<b>' + n + '</b>') + '</div>' +
@@ -748,8 +748,8 @@ function l5Form(o, btn, cls) {
 }
 function memAct(o) {
   if (o.pay === '刷卡' && o.st === '待刷卡')
-    { var k0 = PAYK[o.kind] ? o.kind : 'Credit', alt = Object.keys(PAYK).filter(function (k) { return k !== k0; });
-      return '<div class="paynow"><p style="margin:0 0 8px"><b>應付 ' + money(o.total) + '</b> · ' + esc(PAYK[k0]) + '</p><button class="btn a" data-a="pay" data-k="' + k0 + '" data-id="' + esc(o.id) + '">🔒 前往付款</button>' +
+    { var k0 = PAYK[o.kind] ? o.kind : 'Credit', alt = Object.keys(PAYK).filter(function (k) { return k !== k0 && (k === 'Credit' ? payOn() : k === 'Installment' ? instOn() : bnplOn()); });
+      return '<div class="paynow"><p style="margin:0 0 8px"><b>應付 ' + money(o.total) + '</b> · ' + esc(PAYK[k0]) + '</p><button class="btn a" data-a="pay" data-k="' + k0 + '" data-id="' + esc(o.id) + '">前往付款</button>' +
         '<p class="ds" style="margin:10px 0 0">想換方式:' + alt.map(function (k) { return '<a href="#" data-a="pay" data-k="' + k + '" data-id="' + esc(o.id) + '">' + PAYK[k] + '</a>'; }).join(' · ') + '</p>' +
         '<p class="ds" style="margin:6px 0 0">將前往綠界安全付款頁,付款完成回到這裡狀態會自動更新。' + (k0 === 'BNPL' ? '無卡分期需線上申請審核,分期利息依分期公司規定由您負擔。' : '') + '</p><p class="er" id="paye"></p></div>'; }
   if (o.pay === '匯款' && o.st === '已匯款待查帳')
@@ -774,7 +774,7 @@ function shipPo(s) {
 function shipDetail(s) {
   var h = '<h2>' + esc(s.id) + '</h2><span class="chip">' + esc(s.st) + '</span>' + steps(s) + memAct(s) + shipPo(s);
   if (s.co || s.no) h += '<p style="margin-top:10px">物流:<b>' + esc(s.co) + '</b>' + (s.no ? ' 單號 <b>' + esc(s.no) + '</b> <button type="button" class="cp" data-a="cp" data-v="' + esc(s.no) + '">複製</button>' : '') + (s.at ? '<br><small>出貨時間 ' + esc(s.at) + '</small>' : '') + '</p>' + (s.trk ? '<p><a class="btn l" style="display:inline-block;text-decoration:none;line-height:26px" href="' + esc(s.trk) + '" target="_blank" rel="noopener">查詢物流動態</a></p>' : '');
-  if (s.inv && s.inv.indexOf('測試') !== 0) h += '<p style="margin-top:10px">🧾 電子發票:<b>' + esc(s.inv) + '</b>' + (s.invd ? '<br><small>開立日期 ' + esc(s.invd.slice(0, 10)) + ',金額 ' + money(s.total) + ',已存綠界載具(手機號碼)</small>' : '') + '</p>';
+  if (s.inv && s.inv.indexOf('測試') !== 0) h += '<p style="margin-top:10px">電子發票:<b>' + esc(s.inv) + '</b>' + (s.invd ? '<br><small>開立日期 ' + esc(s.invd.slice(0, 10)) + ',金額 ' + money(s.total) + ',已存綠界載具(手機號碼)</small>' : '') + '</p>';
   return h + '<p><button class="btn l" data-a="mb">返回</button> <button class="btn l" data-a="x">關閉</button></p>';
 }
 function shipForm() {
@@ -786,10 +786,10 @@ function shipForm() {
     picked.map(function (i) { var spc = sp(i.pid); return '<tr><td>' + esc(i.name) + (spc ? '<br><small>' + esc(spc) + '</small>' : '') + '</td><td class="n">' + i.qty + '</td><td class="n">' + i.unit + '</td><td class="n">' + i.sub + '</td></tr>'; }).join('') + '</tbody></table>' +
     '<div id="sq" class="ds" style="margin-top:8px">計算金額中…</div></div>' +
     '<form id="sf"><fieldset class="payf"><legend>配送方式' + (MD.free ? ' <small class="ds" style="font-weight:400">滿 ' + money(MD.free) + ' 免運</small>' : '') + '</legend><div class="payg">' +
-      shipCard('店到店', '🏪', '超商店到店', '7-11/全家門市取貨 · ' + money(MD.feeCvs), true) + shipCard('宅配', '🚚', '宅配到府', '送到指定地址 · ' + money(MD.fee)) + shipCard('自取', '🏠', '到店自取', '台中門市自取 · 免運') + '</div></fieldset>' +
+      shipCard('店到店', ICO.store, '超商店到店', '7-11/全家門市取貨 · ' + money(MD.feeCvs), true) + shipCard('宅配', ICO.truck, '宅配到府', '送到指定地址 · ' + money(MD.fee)) + shipCard('自取', ICO.home, '到店自取', '台中門市自取 · 免運') + '</div></fieldset>' +
     '<label>收件人姓名(請填本名)<input name="rname" required maxlength="30" placeholder="與證件相同,例如:王小明" value="' + esc((MD.me && MD.me.pname) || o0.nm || '') + '"><small class="ds" style="color:var(--acc)">超商取貨需核對證件,請填寫本名,不可填暱稱</small></label>' +
     '<label>聯絡電話<input name="phone" required inputmode="tel" value="' + esc((MD.me && MD.me.phone) || o0.ph || '') + '"></label>' +
-    (logiOn() ? '<div id="mcvs"><label>超商<select name="cvs"><option>7-11</option><option>全家</option></select></label><input type="hidden" name="store"><input type="hidden" name="cvsid"><div class="cvsp"><div id="cvsn" class="ds">尚未選擇門市</div><button type="button" class="btn l" data-a="map">📍 選擇門市(開啟超商地圖)</button></div><small class="ds" id="mfh" hidden></small></div>'
+    (logiOn() ? '<div id="mcvs"><label>超商<select name="cvs"><option>7-11</option><option>全家</option></select></label><input type="hidden" name="store"><input type="hidden" name="cvsid"><div class="cvsp"><div id="cvsn" class="ds">尚未選擇門市</div><button type="button" class="btn l" data-a="map">選擇門市(開啟超商地圖)</button></div><small class="ds" id="mfh" hidden></small></div>'
       : '<div id="mcvs"><label>超商<select name="cvs"><option>7-11</option><option>全家</option></select></label><label>取貨門市(店名或店號)<input name="store" maxlength="60"></label><small class="ds" id="mfh" hidden style="color:var(--acc)">賣貨便只能寄到 7-11 門市,請填 7-11 的店名或店號(不能填全家或地址)</small></div>') +
     '<div id="mhome" hidden><label>收件地址<input name="addr" maxlength="150" value="' + esc((MD.me && MD.me.addr) || '') + '"></label></div>' +
     (bal > 0 ? '<label>使用購物金(餘額 ' + money(bal) + ')<input name="credit" type="number" min="0" step="1" value="0" inputmode="numeric"></label><small class="ds" id="crh"></small>' + credNote() : '') +
@@ -902,19 +902,37 @@ document.addEventListener('submit', function (e) {
 
 function payOn() { try { if (/[?&]paytest=1/.test(location.search)) sessionStorage.setItem('paytest', '1'); return !!(window.D && D.payLive) || sessionStorage.getItem('paytest') === '1'; } catch (e) { return false; } }
 payOn();
+var ICO = (function () {
+  var w = function (p) { return '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + p + '</svg>'; };
+  return {
+    bank: w('<path d="M3 10h18L12 4 3 10z"/><path d="M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18"/>'),
+    card: w('<rect x="3" y="5.5" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h4"/>'),
+    cal: w('<rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4M8 14h2M12 14h2M16 14h0"/>'),
+    phone: w('<rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 17.5h2"/>'),
+    store: w('<path d="M4 9.5 5.5 4h13L20 9.5"/><path d="M4 9.5c0 1.4 1.1 2.5 2.7 2.5S9.3 10.9 9.3 9.5c0 1.4 1.2 2.5 2.7 2.5s2.7-1.1 2.7-2.5c0 1.4 1.1 2.5 2.6 2.5S20 10.9 20 9.5"/><path d="M5.5 12v8h13v-8M10 20v-4.5h4V20"/>'),
+    cash: w('<rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6.5 9.5v5M17.5 9.5v5"/>'),
+    truck: w('<path d="M3 6h11v10H3zM14 9.5h3.5L21 13v3h-7"/><circle cx="7" cy="17.5" r="1.6"/><circle cx="17" cy="17.5" r="1.6"/>'),
+    home: w('<path d="M4 11 12 4l8 7"/><path d="M6 9.5V20h12V9.5M10 20v-5h4v5"/>'),
+    pin: w('<path d="M12 21s6.5-6.1 6.5-11.2A6.5 6.5 0 0 0 5.5 9.8C5.5 14.9 12 21 12 21z"/><circle cx="12" cy="9.8" r="2.3"/>'),
+    lock: w('<rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/>')
+  };
+})();
 /* 付款方式卡片 */
 var PAYK = { Credit: '信用卡一次付清', Installment: '信用卡分期', BNPL: '無卡分期' };
 function payCards() {
   var on = payOn(), c = function (v, k, ic, t, d, chk, off) {
     return '<label class="payc' + (off ? ' off' : '') + '"><input type="radio" name="pay" value="' + v + '"' + (k ? ' data-k="' + k + '"' : '') + (chk ? ' checked' : '') + (off ? ' disabled' : '') + '><span class="ic">' + ic + '</span><span><b>' + t + '</b><small>' + d + '</small></span></label>';
   };
-  return c('匯款', '', '🏦', '銀行匯款', '轉帳後回報後五碼,確認收款即出貨', true) +
-    c('刷卡', 'Credit', '💳', '信用卡一次付清', on ? '線上刷卡,付款完成自動確認' : '即將開放', false, !on) +
-    c('刷卡', 'Installment', '🗓️', '信用卡分期', on ? '3～24 期,依發卡銀行核准' : '即將開放', false, !on) +
-    c('刷卡', 'BNPL', '📱', '無卡分期', on ? '免信用卡,線上申請審核' : '即將開放', false, !on) +
-    (logiOn() ? c('賣貨便', '', '🏪', '超商取貨付款', '7-11/全家門市取貨時付款') : c('賣貨便', '', '🏪', '賣貨便', '7-11 取貨付款,僅店到店')) +
-    c('付現金', '', '💵', '付現金', '到店自取時當面付款');
+  var ins = instOn(), bn2 = bnplOn();
+  return c('匯款', '', ICO.bank, '銀行匯款', '轉帳後回報後五碼,確認收款即出貨', true) +
+    c('刷卡', 'Credit', ICO.card, '信用卡一次付清', on ? '線上刷卡,付款完成自動確認' : '即將開放', false, !on) +
+    c('刷卡', 'Installment', ICO.cal, '信用卡分期', ins ? '3～24 期,依發卡銀行核准' : '即將開放', false, !ins) +
+    c('刷卡', 'BNPL', ICO.phone, '無卡分期', bn2 ? '免信用卡,線上申請審核' : '即將開放', false, !bn2) +
+    (logiOn() ? c('賣貨便', '', ICO.store, '超商取貨付款', '7-11/全家門市取貨時付款') : c('賣貨便', '', ICO.store, '賣貨便', '7-11 取貨付款,僅店到店')) +
+    c('付現金', '', ICO.cash, '付現金', '到店自取時當面付款');
 }
+function instOn() { return !!(window.D && D.instLive) || payOn(); }
+function bnplOn() { return !!(window.D && D.bnplLive) || payOn(); }
 function logiOn() { return !!(window.D && D.logiLive) || payOn(); }
 /* 超商地圖:先把填到一半的出貨單存起來,選完門市回來再接著填 */
 function goMap() {
@@ -926,7 +944,7 @@ function goMap() {
     var fm = document.createElement('form'); fm.method = 'POST'; fm.action = r.action; fm.target = '_top';
     Object.keys(r.fields).forEach(function (k) { var i = document.createElement('input'); i.type = 'hidden'; i.name = k; i.value = r.fields[k]; fm.appendChild(i); });
     document.body.appendChild(fm);
-    var bb = $('#busy'); if (bb) { bb.firstElementChild.innerHTML = '📍 即將開啟 ' + esc(v.cvs || '7-11') + ' 門市地圖<br><small style="font-weight:400">選好門市後會自動回到這裡</small>'; bb.classList.add('on'); }
+    var bb = $('#busy'); if (bb) { bb.firstElementChild.innerHTML = '即將開啟 ' + esc(v.cvs || '7-11') + ' 門市地圖<br><small style="font-weight:400">選好門市後會自動回到這裡</small>'; bb.classList.add('on'); }
     setTimeout(function () { fm.submit(); }, 800);
   }).withFailureHandler(function (er) { $('#sfe').textContent = er.message; }).memberMapStart(v.cvs || '7-11', v.pay === '賣貨便', /Mobi|Android|iPhone/i.test(navigator.userAgent));
 }
@@ -943,7 +961,7 @@ function resumeDraft() {
     if (f.credit && v.credit) f.credit.value = v.credit;
     var rr = [].slice.call(f.querySelectorAll('input[name="pay"]')).filter(function (x) { return x.value === v.pay && (x.dataset.k || '') === (v.kind || ''); })[0]; if (rr && !rr.disabled) rr.checked = true;
     f.method.value = '店到店'; f.cvs.value = pick.t; f.cvsid.value = pick.id; f.store.value = pick.n;
-    $('#cvsn').innerHTML = '✅ <b>' + esc(pick.t + ' ' + pick.n) + '</b>(店號 ' + esc(pick.id) + ')<br><small>' + esc(pick.a) + '</small>';
+    $('#cvsn').innerHTML = '<b>' + esc(pick.t + ' ' + pick.n) + '</b>(店號 ' + esc(pick.id) + ')<br><small>' + esc(pick.a) + '</small>';
     sfQuote();
   });
 }
@@ -957,7 +975,7 @@ function goPay(sid, kind) {
     var f = document.createElement('form'); f.method = 'POST'; f.action = r.action; f.target = '_top';
     Object.keys(r.fields).forEach(function (k) { var i = document.createElement('input'); i.type = 'hidden'; i.name = k; i.value = r.fields[k]; f.appendChild(i); });
     document.body.appendChild(f);
-    var bb = $('#busy'); if (bb) { bb.firstElementChild.innerHTML = '🔒 即將前往綠界安全付款頁面<br><small style="font-weight:400">' + esc(PAYK[kind] || '線上付款') + ' · 請勿關閉或重新整理</small>'; bb.classList.add('on'); }
+    var bb = $('#busy'); if (bb) { bb.firstElementChild.innerHTML = '即將前往綠界安全付款頁面<br><small style="font-weight:400">' + esc(PAYK[kind] || '線上付款') + ' · 請勿關閉或重新整理</small>'; bb.classList.add('on'); }
     setTimeout(function () { f.submit(); }, 900);
   }).withFailureHandler(function (er) { var e2 = $('#paye'); if (e2) e2.textContent = er.message; else alert(er.message); }).memberPayStart(mt, sid, kind || 'Credit');
 }

@@ -228,7 +228,7 @@ function getShop() {
 }
 function shopData_() {
   var st = settings_();
-  return { payLive: prop_('ECPAY_PAY_LIVE') === '1', logiLive: prop_('ECPAY_LOGI_LIVE') === '1',
+  return { payLive: prop_('ECPAY_PAY_LIVE') === '1', logiLive: prop_('ECPAY_LOGI_LIVE') === '1', instLive: prop_('ECPAY_INST_LIVE') === '1', bnplLive: prop_('ECPAY_BNPL_LIVE') === '1',
     store: st.店名 || '', notice: st.公告 || '', creditNote: st.購物金注意事項 === undefined ? defSet_('購物金注意事項') : String(st.購物金注意事項 || ''), free: Number(st.免運門檻) || 0, fee: Number(st.宅配運費) || 0, feeCvs: Number(st.店到店運費) || 0,
     line: { on: lineOn_(), liff: prop_('LIFF_ID'), friend: String(st.加好友連結 || ''), community: String(st.LINE社群連結 || '') },
     biz: { name: String(st.公司名稱 || ''), addr: String(st.公司地址 || ''), tax: /^\d+$/.test(String(st.統一編號 || '')) ? ('00000000' + st.統一編號).slice(-8) : String(st.統一編號 || ''), ig: String(st.IG連結 || '') },
@@ -2096,6 +2096,13 @@ function payDone_(p, test) {
   return out;
 }
 /* ---------- 綠界物流(超商店到店 C2C):實際連線在 server/core.js ---------- */
+function kindOk_(d) {
+  var k = ['Credit', 'Installment', 'BNPL'].indexOf(d.kind) >= 0 ? d.kind : 'Credit';
+  if (k === 'Installment' && prop_('ECPAY_INST_LIVE') !== '1' && !d.paytest) throw new Error('信用卡分期即將開放,請先選擇其他付款方式');
+  if (k === 'BNPL' && prop_('ECPAY_BNPL_LIVE') !== '1' && !d.paytest) throw new Error('無卡分期即將開放,請先選擇其他付款方式');
+  return k;
+}
+function payLabel_(p) { return String(p) === '賣貨便' && logiOn_() ? '超商取貨付款' : String(p || ''); }
 function logiOn_(d) { return prop_('ECPAY_LOGI_LIVE') === '1' || !!(d && d.paytest); }
 function cvsOf_(s) {
   var m = String(s.收件資訊 || '').match(/^【店到店】(7-11|全家)\s*(.*?)｜收件人\s*(.*)$/); if (!m) return null;
@@ -2216,7 +2223,7 @@ function memberCreateShip0_(tk, items, d) {
     var oids = {}; lines.forEach(function (l) { oids[String(l.訂單ID)] = 1; });
     put_('出貨單', 0, { '出貨單ID': sid, '訂單ID': Object.keys(oids).join(','), '狀態': PAY[pay], '物流': '', '物流單號': '', '品項': lines.map(function (l) { return l.品名 + '×' + l.數量; }).join('、'), '建立時間': now_(), '出貨時間': '',
       'LINE ID': ctx.lid || '', '姓名': String(o0.姓名), '電話': phone, '付款方式': pay, '收件資訊': ship, '備註': t_(d.note, 200), '商品金額': c.sub, '優惠折抵': c.disc, '購物金折抵': c.cred + c.pick, '運費': c.fee, '總額': c.total,
-      '付款連結': '', '匯款後五碼': '', '會員等級': String(o0.會員等級 || ''), '折抵明細': JSON.stringify(c.alloc), '配送方式': method, '購物金明細': JSON.stringify(cdetail), '收款帳號': pay === '匯款' ? String(settings_().匯款資訊 || '') : '', '付款類型': pay === '刷卡' ? (['Credit', 'Installment', 'BNPL'].indexOf(d.kind) >= 0 ? d.kind : 'Credit') : '' });
+      '付款連結': '', '匯款後五碼': '', '會員等級': String(o0.會員等級 || ''), '折抵明細': JSON.stringify(c.alloc), '配送方式': method, '購物金明細': JSON.stringify(cdetail), '收款帳號': pay === '匯款' ? String(settings_().匯款資訊 || '') : '', '付款類型': pay === '刷卡' ? kindOk_(d) : '' });
     lines.forEach(function (l) { var n = cp_(l); n.出貨單ID = sid; put_('訂單明細', l._r, n); });
     log_('客人 ' + o0.姓名, '建立出貨單', sid, pay + (method ? ',' + method : '') + (c.pick ? ',購物金 -' + c.pick : '') + ',應付 ' + c.total + ':' + lines.map(function (l) { return l.品名 + '×' + l.數量; }).join('、'));
     Object.keys(oids).forEach(function (oid) { syncOrderStatus_(oid, '客人'); });
@@ -2503,8 +2510,8 @@ function shipFlex_(s, alt, shipImg) {
     body.push({ type: 'box', layout: 'vertical', backgroundColor: PO_.zebra, paddingAll: '12px', margin: 'md', cornerRadius: '6px', contents: [
       flexRow_('🚚 ' + md + ' 已出貨', co, { lc: PO_.ink, rc: PO_.mute, margin: 'none' }),
       T(no ? no.replace(/(.{4})(?=.)/g, '$1 ') : '(尚未提供物流單號)', { size: no ? 'xxl' : 'sm', weight: 'bold', color: PO_.ink, adjustMode: 'shrink-to-fit', margin: 'sm' })] });
-    body.push(poGrid_([['收件人', String(s.姓名 || '')], ['電話', String(s.電話 || '')], ['付款方式', String(s.付款方式 || '')], ['運送方式', String(s.配送方式 || '')],
-      ['訂單編號', String(s.訂單ID || '').split(',').join('、')], ['建立時間', String(s.建立時間 || '').slice(0, 16)], ['配送 / 收件資訊', String(s.收件資訊 || '') + (String(s.付款方式) === '賣貨便' ? '\n(賣貨便以實際下單超商為主)' : '')]]));
+    body.push(poGrid_([['收件人', String(s.姓名 || '')], ['電話', String(s.電話 || '')], ['付款方式', payLabel_(s.付款方式)], ['運送方式', String(s.配送方式 || '')],
+      ['訂單編號', String(s.訂單ID || '').split(',').join('、')], ['建立時間', String(s.建立時間 || '').slice(0, 16)], ['配送 / 收件資訊', String(s.收件資訊 || '') + (String(s.付款方式) === '賣貨便' && !logiOn_() ? '\n(賣貨便以實際下單超商為主)' : '')]]));
     body.push(poTable_(ls.slice(0, 20).map(function (l) { return { name: String(l.品名), spec: String(l.規格 || ''), qty: l.數量, sub: Number(l.小計 || 0) }; })));
     if (ls.length > 20) body.push(T('…其他 ' + (ls.length - 20) + ' 項', { size: 'xxs', color: PO_.mute, margin: 'sm' }));
     var sum = [['共 ' + ls.length + ' 項 / ' + qty + ' 件', ''], ['商品合計', money_(s.商品金額)]];
