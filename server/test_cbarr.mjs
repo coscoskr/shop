@@ -83,7 +83,7 @@ ok(a.pushes.filter(f => /message\/push/.test(f.url)).length === 2, 'customers no
 sent.length = 0;
 order('O4', '2026-11-04 10:00:00', 'U4'); line('O4', 'P072', '蝴蝶結貓耳毛帽', '灰', 1);
 Object.assign(L('O3', 'P072'), { vendor: '酷柏', cost: 800, cost_tax_incl: 'N', source: '韓國', vendor_payment_id: 'V001' }); // 已記錄廠商付款:成本不能動
-r = await post({ type: 'arrival', batch: 'b2', items: [Object.assign({}, GREY, { specid: 23234, spec: '標準', qty: 4, price: 1060, lots: [[1, 1055], [3, 1060]] })] });
+r = await post({ type: 'arrival', batch: 'b2', items: [Object.assign({}, GREY, { specid: 23234, spec: '標準', qty: 4, price: 1060, lots: [[1, 1055, 'w1'], [3, 1060, 'w2']] })] });
 ok(r.body.auto === 2 && r.body.stock === 2 && r.body.pending === 0 && aiCalls === 1, 'known item: auto applied, surplus to stock ' + JSON.stringify(r.body));
 ok(L('O3', 'P072').arrival_status === '已到貨' && L('O3', 'P072').arrived_by === '酷柏到貨', 'O3 arrived automatically');
 ok(DB['庫存進貨'].length === 1 && Number(DB['庫存進貨'][0].qty) === 2 && DB['庫存進貨'][0].spec === '灰' && Number(DB['庫存進貨'][0].cost) === 1060, 'surplus 2 → 庫存進貨 with cost');
@@ -127,4 +127,21 @@ a = run((I) => I.arrText_('UADMIN', '酷柏 到貨通知:蝴蝶結貓耳毛帽 �
 ok(a.r && /^🔄 這看起來是酷柏的到貨通知/.test(a.r.reply), 'forwarded 酷柏 text answered without AI');
 a = run((I) => I.arrText_('UADMIN', 'JNB 到貨:擴香 ×1'));
 ok(a.r && a.r.ai && !a.r.reply, 'other vendor text still goes to AI');
+// 9) 成本更正:酷柏到貨後才算出實際成本 → 已入帳的訂單品項、庫存進貨、商品成本跟著改;已記錄付款的不動
+r = await post({ type: 'cost', items: [{ wid: 'w2', cost: 1100 }, { wid: 'w1', cost: 1000 }, { wid: 'zz', cost: 5 }] });
+ok(r.status === 200 && r.body.updated === 2 && r.body.paid === 1 && r.body.miss === 1, 'cost correction result ' + JSON.stringify(r.body));
+ok(Number(L('O4', 'P072').cost) === 1100 && Number(L('O3', 'P072').cost) === 800 && Number(DB['庫存進貨'][0].cost) === 1100 && Number(INN('P072').cost) === 1100, 'cost correction: line + stock-in + product cost updated, paid line kept');
+r = await post({ type: 'cost', items: [{ wid: 'w2', cost: 1100 }] });
+ok(r.body.updated === 0, 'same correction again changes nothing');
+// 10) 還沒確認對應的品項:成本更正也會帶到之後的入帳
+run((I) => I.arrText_('UADMIN', '酷柏清除'));
+order('O5', '2026-11-05 10:00:00', 'U5'); line('O5', 'P008', 'Hello Kitty聯名款擴香3入禮盒組', '', 1);
+aiReply = { items: [{ ref: 1, pid: 'P008', spec: '' }] };
+r = await post({ type: 'arrival', batch: 'b5', items: [{ proid: 8000, specid: 5, title: '【韓國】Hetras 擴香禮盒(新包裝)', spec: '標準', qty: 1, price: 500, lots: [[1, 500, 'w9']], single: 1 }] });
+ok(r.body.pending === 1 && run((I) => I.arrPend_().length).r === 1, 'new item waits for confirmation');
+r = await post({ type: 'cost', items: [{ wid: 'w9', cost: 550 }] });
+a = run((I) => I.arrText_('UADMIN', '確認'));
+ok(L('O5', 'P008').arrival_status === '已到貨' && Number(L('O5', 'P008').cost) === 550, 'correction before confirmation is used when confirmed: cost ' + L('O5', 'P008').cost);
+r = await post({ type: 'cost', items: [{ wid: 'w9', cost: 560 }] });
+ok(r.body.updated === 1 && Number(L('O5', 'P008').cost) === 560, 'and still linked afterwards');
 console.log(fails ? fails + ' FAILED' : 'ALL PASSED');

@@ -2781,7 +2781,7 @@ function arrPlan_(items, opt) {
     var k = pid + '|' + sp;
     if (!agg[k]) { agg[k] = { pid: pid, spec: sp, qty: 0, price: '', name: String(p.名稱) }; order.push(k); }
     agg[k].qty += q;
-    if (it.lots) agg[k].lots = (agg[k].lots || []).concat(it.lots.map(function (x) { return [Number(x[0]), Number(x[1])]; })); // 酷柏:這批貨每件的實際進價(依酷柏下單先後)
+    if (it.lots) agg[k].lots = (agg[k].lots || []).concat(it.lots.map(function (x) { return [Number(x[0]), Number(x[1]), String(x[2] || '')]; })); // 酷柏:這批貨每件的成本與批發單編號(依酷柏下單先後)
     if (it.price !== null && it.price !== undefined && it.price !== '' && Number(it.price) > 0) agg[k].price = Number(it.price);
   });
   var plan = { assign: [], surplus: [], unk: unk, skip: [], cb: (opt && opt.cb) || [], cost: {} }, msg = [];
@@ -2797,11 +2797,11 @@ function arrPlan_(items, opt) {
     });
     cand.forEach(function (l) {
       var q = Number(l.數量), o = ords[String(l.訂單ID)], who = buyerName_(o, mem);
-      if (q <= left) { left -= q; taken[l.訂單ID + '|' + l.商品ID] = 1; plan.assign.push({ oid: String(l.訂單ID), pid: String(l.商品ID), name: a.name, spec: a.spec, qty: q, who: who, cost: a.lots ? cbTake_(a.lots, q) : '' }); got.push('  ✔ ' + l.訂單ID + ' ' + who + ' ×' + q); }
+      if (q <= left) { var tk = a.lots ? cbTake_(a.lots, q) : null; left -= q; taken[l.訂單ID + '|' + l.商品ID] = 1; plan.assign.push({ oid: String(l.訂單ID), pid: String(l.商品ID), name: a.name, spec: a.spec, qty: q, who: who, cost: tk ? tk.cost : '', cw: tk ? tk.parts : [] }); got.push('  ✔ ' + l.訂單ID + ' ' + who + ' ×' + q); }
       else plan.skip.push(a.name + (a.spec ? '(' + a.spec + ')' : '') + ' ' + l.訂單ID + ' ' + who + ' 要 ' + q + ' 件,到貨數不夠分,先略過');
     });
     if (left > 0 && plan.skip.some(function (x) { return x.indexOf(a.name) === 0; })) got.push('  ❓ 還剩 ' + left + ' 件沒分配(有客人的數量大於剩餘,不能拆單),先不轉庫存,請到後台處理');
-    else if (left > 0) { plan.surplus.push({ pid: a.pid, spec: a.spec, qty: left, price: a.lots && a.lots.length ? cbTake_(a.lots, left) : a.price, name: a.name }); got.push('  ➕ 現貨庫存 ×' + left); }
+    else if (left > 0) { var ts = a.lots && a.lots.length ? cbTake_(a.lots, left) : null; plan.surplus.push({ pid: a.pid, spec: a.spec, qty: left, price: ts && ts.cost !== '' ? ts.cost : a.price, cw: ts ? ts.parts : [], name: a.name }); got.push('  ➕ 現貨庫存 ×' + left); }
     msg.push('・' + a.name + (a.spec ? '(' + a.spec + ')' : '') + ' 到 ' + a.qty + ' 件' + (a.price !== '' ? ',進價 ' + a.price : '') + '\n' + (got.join('\n') || '  (沒有待到貨的訂單)'));
   });
   var head = (opt && opt.head) || '📦 到貨預覽';
@@ -2825,7 +2825,7 @@ function arrApply_(plans, why) {
       var l = rows_('訂單明細').filter(function (x) { return String(x.訂單ID) === a.oid && String(x.商品ID) === a.pid; })[0];
       if (!l || ['已到貨', '已出貨'].indexOf(String(l.到貨狀態)) >= 0 || l.出貨單ID) { miss.push(a.oid + ' ' + a.name); return; }
       var n = cp_(l); n.到貨狀態 = '已到貨'; n.可出貨 = 'Y'; n.到貨操作人 = WHO; n.到貨時間 = now_(); ordOk_(n, WHO);
-      var cc = cbCost_(n, l, a.cost, meta || (meta = lineMeta_(true)));
+      var cc = cbCost_(n, l, a.cost, meta || (meta = lineMeta_(true))); cbLink_(a.oid + '|' + a.pid, a.cw);
       put_('訂單明細', l._r, n);
       log_(WHO, '到貨', a.oid + ' ' + a.name, '到貨:' + l.到貨狀態 + '→已到貨(' + WHY + ')' + cc);
       (arrived[a.oid] = arrived[a.oid] || []).push(a.name); nAs++;
@@ -2838,7 +2838,7 @@ function arrApply_(plans, why) {
       var row = { '訂單ID': id, '商品ID': s.pid, '品名': String(p.名稱), '規格': s.spec, '數量': s.qty, '到貨狀態': '已到貨', '廠商': String(inn.廠商 || ''),
         '成本': s.price !== '' ? s.price : (inn.成本 === undefined ? '' : inn.成本), '成本含稅': inn.成本含稅 || 'N', '貨源': String(inn.貨源 || ''),
         '廠商付款ID': '', '到貨操作人': WHO, '到貨時間': now_(), '日期': today_(), '建立人': WHO, '出貨單ID': '' };
-      put_('庫存進貨', 0, row); stockMove_(row, s.qty);
+      put_('庫存進貨', 0, row); stockMove_(row, s.qty); cbLink_('K|' + id, s.cw);
       log_(WHO, '新增庫存進貨', id + ' ' + p.名稱, s.qty + ' 件' + (s.spec ? ',規格 ' + s.spec : '') + ',已到貨(' + WHY + ',庫存 +' + s.qty + ')');
       nSur += s.qty;
     });
@@ -2859,20 +2859,81 @@ function arrApply_(plans, why) {
    配對後傳預覽給到貨管理員,回「確認」才入帳,同時記住對照,之後同品項就全自動。
    管理員 LINE 指令:「酷柏」重新配對待對應品項;「酷柏清除」清掉待對應(已在後台手動處理時用)。 */
 var CB_MAP_ = '酷柏對照 ', CB_PEND_ = '酷柏待對應';
-/** 酷柏送來的進價批次 [[件數, 單價]…](依酷柏下單先後);沒有就用單一進價 */
+/** 酷柏送來的成本批次 [[件數, 成本, 酷柏批發單編號]…](依酷柏下單先後);沒有就用單一成本 */
 function cbLots_(it) {
   var out = [];
-  (Array.isArray(it && it.lots) ? it.lots : []).slice(0, 60).forEach(function (x) { var q = Math.floor(Number(x && x[0])), p = Number(x && x[1]); if (q >= 1 && p > 0) out.push([q, p]); });
-  if (!out.length && it && Number(it.price) > 0 && Math.floor(Number(it.qty)) >= 1) out.push([Math.floor(Number(it.qty)), Number(it.price)]);
+  (Array.isArray(it && it.lots) ? it.lots : []).slice(0, 300).forEach(function (x) { var q = Math.floor(Number(x && x[0])), p = Number(x && x[1]); if (q >= 1 && p > 0) out.push([q, p, String((x && x[2]) || '')]); });
+  if (!out.length && it && Number(it.price) > 0 && Math.floor(Number(it.qty)) >= 1) out.push([Math.floor(Number(it.qty)), Number(it.price), '']);
   return out;
 }
-/** 從進價批次依序取 q 件,回傳這 q 件的平均單價(沒有批次回 '') */
+/** 從成本批次依序取 q 件,回傳 {cost: 這 q 件的平均成本(沒有批次回 ''), parts: [[酷柏批發單編號, 件數, 成本]…]} */
 function cbTake_(lots, q) {
-  var sum = 0, got = 0;
-  while (got < q && lots && lots.length) { var t = Math.min(q - got, lots[0][0]); sum += t * lots[0][1]; got += t; lots[0][0] -= t; if (lots[0][0] <= 0) lots.shift(); }
-  return got ? Math.round(sum / got * 100) / 100 : '';
+  var sum = 0, got = 0, parts = [];
+  while (got < q && lots && lots.length) {
+    var t = Math.min(q - got, lots[0][0]); sum += t * lots[0][1]; got += t;
+    if (lots[0][2]) parts.push([String(lots[0][2]), t, lots[0][1]]);
+    lots[0][0] -= t; if (lots[0][0] <= 0) lots.shift();
+  }
+  return { cost: got ? Math.round(sum / got * 100) / 100 : '', parts: parts };
 }
-/** 成本同步:把酷柏的實際進價寫進這筆訂單品項(已記錄廠商付款的不動;廠商、貨源、含稅沿用原本的設定)。回傳要接在操作紀錄後面的文字 */
+var CB_TTL_ = 15552000; // 180 天:記住每筆訂單品項用到酷柏哪幾筆批發單,酷柏之後更正成本時才找得到
+/** 記下這筆訂單品項(或庫存進貨 'K|編號')用到的酷柏批發單 */
+function cbLink_(lk, parts) {
+  if (!parts || !parts.length) return;
+  var c = CacheService.getScriptCache();
+  c.put('cbl_' + lk, JSON.stringify(parts), CB_TTL_);
+  parts.forEach(function (p) {
+    var k = 'cbw_' + p[0], a; try { a = JSON.parse(c.get(k) || '[]'); } catch (e) { a = []; }
+    if (a.indexOf(lk) < 0) { a.push(lk); c.put(k, JSON.stringify(a), CB_TTL_); }
+  });
+}
+function cbAvg_(parts) { var q = 0, sum = 0; (parts || []).forEach(function (p) { q += Number(p[1]); sum += Number(p[1]) * Number(p[2]); }); return q ? Math.round(sum / q * 100) / 100 : ''; }
+/** 酷柏更正成本(到貨後才算出實際成本):更新已入帳的訂單品項、庫存進貨與商品成本;還沒入帳(待對應/待確認)的也一起改。已記錄廠商付款的不動 */
+function cbCostIn_(d) {
+  var c = CacheService.getScriptCache(), nw = {}, touched = {}, res = { ok: true, updated: 0, paid: 0, miss: 0 };
+  ((d && d.items) || []).slice(0, 1000).forEach(function (it) { var w = String((it && it.wid) || ''), v = Number(it && it.cost); if (w && v > 0) nw[w] = v; });
+  Object.keys(nw).forEach(function (w) {
+    var ks; try { ks = JSON.parse(c.get('cbw_' + w) || '[]'); } catch (e) { ks = []; }
+    if (!ks.length) { res.miss++; return; }
+    ks.forEach(function (lk) {
+      var parts = touched[lk]; if (!parts) { try { parts = JSON.parse(c.get('cbl_' + lk) || '[]'); } catch (e) { parts = []; } }
+      var ch = false; parts.forEach(function (p) { if (String(p[0]) === w && Number(p[2]) !== nw[w]) { p[2] = nw[w]; ch = true; } });
+      if (ch) touched[lk] = parts;
+    });
+  });
+  var meta = lineMeta_(true), pc = {};
+  Object.keys(touched).forEach(function (lk) {
+    var avg = cbAvg_(touched[lk]); if (!(avg > 0)) return;
+    c.put('cbl_' + lk, JSON.stringify(touched[lk]), CB_TTL_);
+    if (lk.indexOf('K|') === 0) {
+      var k = rows_('庫存進貨').filter(function (r) { return String(r.訂單ID) === lk.slice(2); })[0]; if (!k) return;
+      if (k.廠商付款ID) { res.paid++; return; }
+      if (String(k.成本) !== String(avg)) { var kn = cp_(k); kn.成本 = avg; put_('庫存進貨', k._r, kn); log_('酷柏到貨', '同步成本', lk.slice(2) + ' ' + k.品名, '成本:' + k.成本 + '→' + avg + '(酷柏更正成本)'); res.updated++; pc[String(k.商品ID)] = avg; }
+      return;
+    }
+    var i = lk.indexOf('|'), oid = lk.slice(0, i), pid = lk.slice(i + 1);
+    var l = rows_('訂單明細').filter(function (x) { return String(x.訂單ID) === oid && String(x.商品ID) === pid; })[0]; if (!l) return;
+    if (l.廠商付款ID) { res.paid++; return; }
+    var n = cp_(l), tx = cbCost_(n, l, avg, meta);
+    if (tx) { put_('訂單明細', l._r, n); log_('酷柏到貨', '同步成本', oid + ' ' + l.品名, tx.slice(1).replace('酷柏實際進價', '酷柏更正成本')); res.updated++; pc[bp_(pid)] = avg; }
+  });
+  cbInnCost_(pc);
+  // 還沒入帳的:待對應清單與待確認的預覽裡的成本也改掉,之後確認時就是新成本
+  var pe = cbPend_(), pch = false;
+  pe.forEach(function (x) { (x.lots || []).forEach(function (t) { if (t[2] && nw[String(t[2])] && Number(t[1]) !== nw[String(t[2])]) { t[1] = nw[String(t[2])]; pch = true; } }); });
+  if (pch) cbPendSave_(pe);
+  var pl = arrPend_(), lch = false;
+  pl.forEach(function (p) {
+    (p.assign || []).concat(p.surplus || []).forEach(function (a) {
+      var ch = false; (a.cw || []).forEach(function (t) { if (nw[String(t[0])] && Number(t[2]) !== nw[String(t[0])]) { t[2] = nw[String(t[0])]; ch = true; } });
+      if (ch) { var v = cbAvg_(a.cw); if (a.cost !== undefined) a.cost = v; else a.price = v; lch = true; }
+    });
+  });
+  if (lch) arrSave_(pl);
+  if (res.updated || res.paid) log_('酷柏到貨', '收到成本更正', '', '更新 ' + res.updated + ' 筆、已記錄付款略過 ' + res.paid + ' 筆');
+  return res;
+}
+/** 成本同步:把酷柏的成本寫進這筆訂單品項(已記錄廠商付款的不動;廠商、貨源、含稅沿用原本的設定)。回傳要接在操作紀錄後面的文字 */
 function cbCost_(n, l, cost, meta) {
   if (cost === '' || cost === undefined || cost === null || !(Number(cost) > 0) || l.廠商付款ID) return '';
   var m = meta(l);
@@ -2923,7 +2984,7 @@ function cbPendAdd_(items) {
     var k = cbPk_(it), q = Math.floor(Number(it.qty));
     if (ix[k] === undefined) { ix[k] = a.length; a.push({ proid: String(it.proid), specid: String(it.specid || ''), title: t_(it.title, 120), spec: t_(it.spec, 80), single: it.single ? 1 : 0, qty: 0, price: '' }); }
     var x = a[ix[k]]; x.qty += q; if (Number(it.price) > 0) x.price = Number(it.price);
-    x.lots = (x.lots || []).concat(cbLots_(it)).slice(0, 60);
+    x.lots = (x.lots || []).concat(cbLots_(it)).slice(0, 300);
   });
   cbPendSave_(a);
 }

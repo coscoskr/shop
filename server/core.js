@@ -361,7 +361,7 @@ export async function handleCoolbau({ rawBody, signature, db, env }) {
     const props = Object.assign({}, env.props || {}, dbProps);
     if (!envSecret || props.COOLBAU_ARR_SECRET !== envSecret) { bad = await cbAuth(props.COOLBAU_ARR_SECRET, rawBody, signature, d); if (bad) return; }
     const rt = createRuntime({ H: code.H, tableData, kv, props, fetchMap: {} });
-    out = withRt(rt, () => (d.type === 'poke' ? { ok: true, poke: true, added: 0, pending: code.INTERNAL.cbPend_().length } : code.INTERNAL.cbArrIn_(d)));
+    out = withRt(rt, () => (d.type === 'poke' ? { ok: true, poke: true, added: 0, pending: code.INTERNAL.cbPend_().length } : d.type === 'cost' ? code.INTERNAL.cbCostIn_(d) : code.INTERNAL.cbArrIn_(d)));
     await tx.commit(rt.collectOps(), rt.kvOps);
     rt.fetchQueue.forEach((f) => after.push({ type: 'fetch', f }));
     rt.mailQueue.forEach((m) => after.push({ type: 'mail', m }));
