@@ -1,7 +1,7 @@
 // 請求處理核心:一次呼叫 = 一個資料庫交易(取得鎖 → 讀資料 → 執行原本的商業邏輯 → 寫回)
 import * as code from './code.js';
 import { createRuntime } from './adapter.js';
-import { ecpayCfg, ecpayIssue } from './ecpay.js';
+import { ecpayCfg, ecpayIssue, payCfg, payFields, payVerify } from './ecpay.js';
 
 // 在記憶體裡「同步」執行商業邏輯前,先把服務物件掛到全域,並重置模組內的快取
 function withRt(rt, fn) {
@@ -16,6 +16,15 @@ const LINE_FRIEND_URL = 'https://api.line.me/friendship/v1/status';
 
 // 需要非同步(網路、檔案)的功能,在這裡處理;其餘全部交給原本的函式
 const SPECIAL = {
+  // 信用卡:組綠界全方位金流付款表單(前端送出到綠界)
+  async memberPayStart({ rt, args, props, env }) {
+    const [tk, sid] = args;
+    const info = withRt(rt, () => code.INTERNAL.payPrep_(tk, sid));
+    const cfg = payCfg(props);
+    const back = /^https:\/\//.test(info.url) ? info.url + (info.url.indexOf('?') >= 0 ? '&' : '?') + 's=' + encodeURIComponent(info.sid) : '';
+    return payFields(cfg, { sid: info.sid, total: info.total, items: info.items, returnUrl: env.SUPABASE_URL + '/functions/v1/api?ecpay=pay', backUrl: back });
+  },
+
   // 批次開立電子發票(綠界):先整理資料 → 逐張向綠界開立 → 把發票號碼寫回出貨單
   async adminIssueInvoice({ rt, args, props }) {
     const [tk, ids] = args;
@@ -279,3 +288,23 @@ async function runArrivalJob(job, { db, env }) {
 }
 
 // 管理員在 LINE 回「確認」時入帳(上面 arrText_ 已在交易內完成),這裡不用再做事
+
+/** 綠界付款結果通知(ReturnURL,表單格式):驗證檢查碼後更新出貨單,回應 1|OK */
+export async function handleEcpayPay({ rawBody, db, env }) {
+  const p = Object.fromEntries(new URLSearchParams(rawBody));
+  let out = '0|ERR';
+  await db.withTx(async (tx) => {
+    const { tableData, kv, props: dbProps } = await tx.loadAll();
+    const props = Object.assign({}, env.props || {}, dbProps);
+    const cfg = payCfg(props);
+    if (String(p.MerchantID) !== cfg.mid || !(await payVerify(cfg, p))) { console.error('ecpay pay: bad mac', p.MerchantTradeNo); out = '0|CheckMacValue Error'; await tx.commit([], []); return; }
+    const rt = createRuntime({ H: code.H, tableData, kv, props, fetchMap: {} });
+    let r = '';
+    try { r = withRt(rt, () => code.INTERNAL.payDone_(p, cfg.test)); }
+    catch (e) { console.error('payDone error', e); out = '0|ERR'; await tx.commit([], []); return; } // 不寫入,讓綠界稍後重送
+    await tx.commit(rt.collectOps(), rt.kvOps);
+    out = '1|OK';
+    console.log('ecpay pay', p.CustomField1, p.RtnCode, r);
+  });
+  return out;
+}

@@ -45,3 +45,30 @@ export async function ecpayIssue(cfg, data, fetchFn) {
   } catch (e) { /* 查不到就回報原本的錯誤 */ }
   return { ok: false, msg: err ? err.message : (r && r.RtnMsg ? r.RtnMsg + '(' + r.RtnCode + ')' : '開立失敗') };
 }
+
+/* ---------- 全方位金流(信用卡) ---------- */
+const PAY_STAGE = { mid: '3002607', key: 'pwFHCqoQZGmho4w6', iv: 'EkRm7iFT261dpevs', action: 'https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5', test: true };
+/** props 有 ECPAY_PAY_LIVE=1 且填了 ECPAY_PAY_MID/KEY/IV 才用正式環境 */
+export function payCfg(props) {
+  props = props || {};
+  if (String(props.ECPAY_PAY_LIVE || '') === '1' && props.ECPAY_PAY_MID && props.ECPAY_PAY_KEY && props.ECPAY_PAY_IV)
+    return { mid: String(props.ECPAY_PAY_MID).trim(), key: String(props.ECPAY_PAY_KEY).trim(), iv: String(props.ECPAY_PAY_IV).trim(), action: 'https://payment.ecpay.com.tw/Cashier/AioCheckOut/V5', test: false };
+  return Object.assign({}, PAY_STAGE);
+}
+// 綠界 CheckMacValue:參數依名稱排序 → 前後加 HashKey/HashIV → .NET 式 urlencode → 小寫 → SHA256 → 大寫
+export async function payMac(cfg, params) {
+  const keys = Object.keys(params).filter((k) => k !== 'CheckMacValue').sort((a, b) => { const x = a.toLowerCase(), y = b.toLowerCase(); return x < y ? -1 : x > y ? 1 : 0; });
+  const raw = 'HashKey=' + cfg.key + '&' + keys.map((k) => k + '=' + params[k]).join('&') + '&HashIV=' + cfg.iv;
+  const enc = encodeURIComponent(raw).replace(/%20/g, '+').replace(/~/g, '%7e').replace(/'/g, '%27').toLowerCase();
+  const h = new Uint8Array(await crypto.subtle.digest('SHA-256', te.encode(enc)));
+  return Array.from(h).map((b) => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+}
+export async function payVerify(cfg, params) { return !!params.CheckMacValue && (await payMac(cfg, params)) === String(params.CheckMacValue).toUpperCase(); }
+function twNow() { const d = new Date(Date.now() + 8 * 3600 * 1000), p = (n) => String(n).padStart(2, '0'); return d.getUTCFullYear() + '/' + p(d.getUTCMonth() + 1) + '/' + p(d.getUTCDate()) + ' ' + p(d.getUTCHours()) + ':' + p(d.getUTCMinutes()) + ':' + p(d.getUTCSeconds()); }
+export async function payFields(cfg, o) {
+  const f = { MerchantID: cfg.mid, MerchantTradeNo: (String(o.sid).replace(/[^A-Za-z0-9]/g, '') + 'C' + Date.now().toString(36).toUpperCase()).slice(-20), MerchantTradeDate: twNow(), PaymentType: 'aio',
+    TotalAmount: String(o.total), TradeDesc: 'coscos', ItemName: o.items, ReturnURL: o.returnUrl, ChoosePayment: 'Credit', EncryptType: '1', CustomField1: String(o.sid), NeedExtraPaidInfo: 'N' };
+  if (o.backUrl) f.ClientBackURL = o.backUrl;
+  f.CheckMacValue = await payMac(cfg, f);
+  return { action: cfg.action, fields: f, test: cfg.test };
+}

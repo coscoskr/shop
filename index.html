@@ -674,8 +674,7 @@ function l5Form(o, btn, cls) {
 }
 function memAct(o) {
   if (o.pay === '刷卡' && o.st === '待刷卡')
-    return o.link ? '<p><a class="btn a" style="display:inline-block;text-decoration:none;line-height:28px" href="' + esc(o.link) + '" target="_blank" rel="noopener">前往刷卡付款</a></p>'
-                  : '<p class="tg">付款連結準備好後會通知你,也可以稍後回到這裡查看。</p>';
+    return '<p><button class="btn a" data-a="pay" data-id="' + esc(o.id) + '">💳 前往刷卡付款 ' + money(o.total) + '</button></p><p class="ds">將前往綠界安全付款頁,付款完成後回到這裡,狀態會自動更新為「已刷卡待出貨」。</p><p class="er" id="paye"></p>';
   if (o.pay === '匯款' && o.st === '已匯款待查帳')
     return '<p class="tg">已收到你回報的匯款後五碼 <b>' + esc(o.last5) + '</b>,我們查帳確認後會安排出貨。</p><p class="ds" style="max-height:none;margin-bottom:0">後五碼打錯了?可重新回報:</p>' + l5Form(o, '更新', 'l');
   if (o.pay === '匯款' && o.st === '待匯款')
@@ -715,7 +714,7 @@ function shipForm() {
     '<div id="mcvs"><label>超商<select name="cvs"><option>7-11</option><option>全家</option></select></label><label>取貨門市(店名或店號)<input name="store" maxlength="60"></label><small class="ds" id="mfh" hidden style="color:var(--acc)">賣貨便只能寄到 7-11 門市,請填 7-11 的店名或店號(不能填全家或地址)</small></div>' +
     '<div id="mhome" hidden><label>收件地址<input name="addr" maxlength="150" value="' + esc((MD.me && MD.me.addr) || '') + '"></label></div>' +
     (bal > 0 ? '<label>使用購物金(餘額 ' + money(bal) + ')<input name="credit" type="number" min="0" step="1" value="0" inputmode="numeric"></label><small class="ds" id="crh"></small>' + credNote() : '') +
-    '<fieldset><legend>付款方式</legend><label><input type="radio" name="pay" value="匯款" checked> 匯款(先轉帳,確認收款後出貨)</label><label><input type="radio" name="pay" value="賣貨便"> 賣貨便(貨到付款,僅店到店)</label><label><input type="radio" name="pay" value="付現金"> 付現金(僅自取)</label><label style="color:var(--mute)"><input type="radio" name="pay" value="刷卡" disabled> 信用卡(籌備中)</label></fieldset>' +
+    '<fieldset><legend>付款方式</legend><label><input type="radio" name="pay" value="匯款" checked> 匯款(先轉帳,確認收款後出貨)</label><label><input type="radio" name="pay" value="賣貨便"> 賣貨便(貨到付款,僅店到店)</label><label><input type="radio" name="pay" value="付現金"> 付現金(僅自取)</label><label><input type="radio" name="pay" value="刷卡"> 信用卡(線上刷卡,付款後出貨)</label></fieldset>' +
     '<label>備註<textarea name="note" rows="2" maxlength="200"></textarea></label>' +
     '<p id="sfe" class="tg" role="alert"></p><button class="btn a">確認出貨</button> <button type="button" class="btn l" data-a="mb">返回</button></form>';
 }
@@ -791,7 +790,8 @@ document.addEventListener('click', function (e) {
     var v = b.dataset.v || '', ok = function () { b.textContent = '已複製'; b.classList.add('ok'); setTimeout(function () { b.textContent = '複製'; b.classList.remove('ok'); }, 1500); };
     var fb = function () { var t = document.createElement('textarea'); t.value = v; t.style.position = 'fixed'; t.style.opacity = '0'; document.body.appendChild(t); t.select(); try { document.execCommand('copy'); ok(); } catch (x) {} document.body.removeChild(t); };
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(v).then(ok, fb); else fb();
-  } else if (b.dataset.a === 'lgd') goLogin();
+  } else if (b.dataset.a === 'pay') goPay(b.dataset.id);
+  else if (b.dataset.a === 'lgd') goLogin();
   else if (b.dataset.a === 'lo') show('<h2>確定要登出嗎?</h2><p class="ds">登出後將無法使用會員優惠與購物金,可隨時再用 LINE 登入。</p><p><button class="btn l" data-a="x">取消</button> <button class="btn a" data-a="lo2">確定登出</button></p>');
   else if (b.dataset.a === 'lo2') { LT = ''; mt = ''; MD = null; MSEL = {}; MTAB = 'o'; QT = null; useCr = false; try { localStorage.removeItem('lt'); } catch (x) {} $('#dlg').close(); setLg(); }
 });
@@ -814,10 +814,19 @@ document.addEventListener('submit', function (e) {
   var f = e.target; if (f.id !== 'sf') return; e.preventDefault();
   var items = Object.keys(MSEL).map(function (k) { return { oid: k.split('|')[0], pid: k.split('|')[1] }; });
   $('#sfe').textContent = '';
-  google.script.run.withSuccessHandler(function (d) { MD = d; MSEL = {}; MTAB = 's'; show(shipDetail(d.ships.filter(function (z) { return z.id === d.sid; })[0])); })
+  google.script.run.withSuccessHandler(function (d) { MD = d; MSEL = {}; MTAB = 's'; var ns = d.ships.filter(function (z) { return z.id === d.sid; })[0]; show(shipDetail(ns)); if (ns && ns.pay === '刷卡' && ns.st === '待刷卡') goPay(ns.id); })
     .withFailureHandler(function (er) { $('#sfe').textContent = er.message; }).memberCreateShip(mt, items, { pay: f.pay.value, method: f.method.value, rname: f.rname.value, cvs: f.cvs.value, store: f.store.value, addr: f.addr.value, credit: f.credit ? Number(f.credit.value) || 0 : 0, note: f.note.value, phone: f.phone.value });
 });
 
+/* 信用卡:向後端取得綠界付款表單,送出到綠界付款頁 */
+function goPay(sid) {
+  var e = $('#paye'); if (e) e.textContent = '正在前往付款頁…';
+  google.script.run.withSuccessHandler(function (r) {
+    var f = document.createElement('form'); f.method = 'POST'; f.action = r.action; f.target = '_top';
+    Object.keys(r.fields).forEach(function (k) { var i = document.createElement('input'); i.type = 'hidden'; i.name = k; i.value = r.fields[k]; f.appendChild(i); });
+    document.body.appendChild(f); f.submit();
+  }).withFailureHandler(function (er) { var e2 = $('#paye'); if (e2) e2.textContent = er.message; else alert(er.message); }).memberPayStart(mt, sid);
+}
 /* LIFF:從 LINE 內開啟網站時自動登入(只需按一次「允許」) */
 function liffBoot() {
   var id = D && D.line && D.line.liff; if (!id || LT || window.__liff) return; window.__liff = 1;

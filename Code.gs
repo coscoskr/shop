@@ -2006,6 +2006,37 @@ function memberShipQuote(tk, items, d) {
   }
   catch (e) { return { ok: false, msg: e.message }; }
 }
+/* ---------- 信用卡(綠界全方位金流):實際組表單與驗證在 server/core.js ---------- */
+/** 客人按「前往刷卡付款」:確認是自己的、刷卡、待刷卡的出貨單,回傳金額與品名 */
+function payPrep_(tk, sid) {
+  var ctx = mem_(tk); sid = String(sid || '');
+  var s = rows_('出貨單').filter(function (x) { return String(x.出貨單ID) === sid; })[0];
+  if (!s || !mine_(ctx, s)) throw new Error('找不到出貨單');
+  if (String(s.付款方式) !== '刷卡') throw new Error('這張出貨單的付款方式不是信用卡');
+  if (String(s.狀態) !== '待刷卡') throw new Error('這張出貨單已付款或已處理(' + s.狀態 + ')');
+  var total = Math.round(Number(s.總額) || 0); if (total <= 0) throw new Error('應付金額為 0,不需要刷卡');
+  var names = rows_('訂單明細').filter(function (l) { return String(l.出貨單ID) === sid; }).map(function (l) { return String(l.品名).replace(/[#&<>'~]/g, ' ') + ' x' + l.數量; });
+  if (Number(s.運費) > 0) names.push('運費 x1');
+  return { sid: sid, total: total, items: (names.join('#') || '商品一批').slice(0, 380), url: appUrl_() };
+}
+/** 綠界付款結果通知(已驗證檢查碼):付款成功 → 待刷卡 改 已刷卡待出貨 */
+function payDone_(p, test) {
+  var sid = String(p.CustomField1 || ''), out = '';
+  lk_(function () {
+    var s = rows_('出貨單').filter(function (x) { return String(x.出貨單ID) === sid; })[0];
+    if (!s) { out = 'no ship'; return; }
+    if (String(p.RtnCode) !== '1') { log_('綠界', '刷卡失敗', sid, String(p.RtnMsg || '') + ' ' + (p.TradeNo || '')); out = 'fail'; return; }
+    if (!test && String(p.SimulatePaid) === '1') { log_('綠界', '模擬付款(略過)', sid, String(p.TradeNo || '')); out = 'sim'; return; }
+    if (Number(p.TradeAmt) !== Math.round(Number(s.總額))) { log_('綠界', '刷卡金額不符', sid, '應付 ' + s.總額 + ',實收 ' + p.TradeAmt + ' 交易 ' + p.TradeNo); major_('綠界', '刷卡金額不符', sid, '應付 ' + s.總額 + ' 實收 ' + p.TradeAmt, p); out = 'amount'; return; }
+    if (String(s.狀態) !== '待刷卡') { out = 'dup'; return; }
+    var n = cp_(s); n.狀態 = '已刷卡待出貨'; n.匯款日期 = String(p.PaymentDate || '').slice(0, 10).replace(/\//g, '-'); put_('出貨單', s._r, n);
+    log_('綠界', '刷卡成功', sid, (test ? '(測試環境)' : '') + '金額 ' + p.TradeAmt + ' 綠界交易 ' + p.TradeNo + ' 卡號末四碼 ' + (p.card4no || ''));
+    String(s.訂單ID).split(',').forEach(function (oid) { syncOrderStatus_(oid, '綠界'); });
+    awardCredits_(sid, '綠界');
+    out = 'ok';
+  });
+  return out;
+}
 /** 收件人必須填本名(超商取貨要核對證件):中文 2~6 字,或英文姓名 */
 function realName_(v) {
   var rn = t_(v, 30).replace(/\s+/g, ' ').trim(), err = '收件人請填寫本名(與證件相同,取貨時需核對),例如:王小明';
@@ -2020,7 +2051,6 @@ function memberCreateShip(tk, items, d) {
   var ctx = mem_(tk); d = d || {};
   var pay = d.pay, ship = t_(d.ship, 200), phone = t_(d.phone, 20), method = d.method ? String(d.method) : '';
   if (!PAY[pay]) throw new Error('請選擇付款方式');
-  if (pay === '刷卡') throw new Error('信用卡付款籌備中,目前請選擇匯款或賣貨便');
   if (pay === '賣貨便' && method === '自取') throw new Error('賣貨便無法自取,請選擇匯款或付現金');
   if (pay === '賣貨便' && (d.method || d.cvs)) method = '店到店';
   if (pay === '付現金' && method !== '自取') throw new Error('付現金只能選擇自取');
