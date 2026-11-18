@@ -24,7 +24,7 @@ h1{font-size:18px;margin:0;white-space:nowrap;letter-spacing:.5px}
 .sw{position:relative;flex:1;max-width:460px;margin-left:auto}
 .lgb,.btn.lgb,#lga{background:#06C755;border:1px solid #06C755;color:#fff;border-radius:6px;font-weight:600}.lgb:hover,#lga:hover{background:#05b34c;color:#fff}
 .ot{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);font-size:14px}.ot>div{display:flex;justify-content:space-between;padding:2px 0}.ot .dc{color:var(--acc)}.ot .tt{font-weight:700;font-size:15px;padding-top:4px}
-#tst{position:fixed;left:50%;top:46%;transform:translate(-50%,-50%) scale(.6);opacity:0;pointer-events:none;z-index:99998;background:linear-gradient(135deg,#ffe27a,#ffbf1f 55%,#ffa800);color:#5a3a00;padding:14px 18px 14px 22px;border-radius:999px;font-size:16px;font-weight:800;letter-spacing:.5px;line-height:1.3;display:flex;gap:12px;align-items:center;white-space:nowrap;box-shadow:0 10px 30px rgba(190,120,0,.35),inset 0 1px 0 rgba(255,255,255,.7);border:2px solid #fff3c2;transition:opacity .2s,transform .3s cubic-bezier(.34,1.56,.64,1)}#tst.on{opacity:1;transform:translate(-50%,-50%) scale(1);pointer-events:auto}#tst button{background:#5a3a00;color:#ffe27a;border:0;border-radius:999px;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer;min-height:0;line-height:1.3}.cosum{margin:6px 0;padding:8px 10px;background:#faf3f0;border-radius:10px;font-size:14px}#cdw{position:fixed;inset:0;z-index:99999;background:rgba(75,59,55,.45);display:flex;align-items:center;justify-content:center;padding:24px}#cdw .cdb{background:#fff;border-radius:18px;padding:22px 20px;max-width:320px;width:100%;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.25)}#cdw .cdb p{margin:0 0 10px}#cdw .cdb b{font-size:17px;color:var(--acc)}
+#tst{position:fixed;left:50%;top:46%;transform:translate(-50%,-50%) scale(.6);opacity:0;pointer-events:none;z-index:99998;background:linear-gradient(135deg,#ffe27a,#ffbf1f 55%,#ffa800);color:#5a3a00;padding:14px 18px 14px 22px;border-radius:999px;font-size:16px;font-weight:800;letter-spacing:.5px;line-height:1.3;display:flex;gap:12px;align-items:center;white-space:nowrap;box-shadow:0 10px 30px rgba(190,120,0,.35),inset 0 1px 0 rgba(255,255,255,.7);border:2px solid #fff3c2;transition:opacity .2s,transform .3s cubic-bezier(.34,1.56,.64,1)}#tst.on{opacity:1;transform:translate(-50%,-50%) scale(1);pointer-events:auto}#tst button{background:#5a3a00;color:#ffe27a;border:0;border-radius:999px;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer;min-height:0;line-height:1.3}.cosum{margin:6px 0;padding:8px 10px;background:#faf3f0;border-radius:10px;font-size:14px}#cdw,#wbox{position:fixed;inset:0;z-index:99999;background:rgba(75,59,55,.45);display:flex;align-items:center;justify-content:center;padding:24px}#cdw .cdb,#wbox .cdb{background:#fff;border-radius:18px;padding:22px 20px;max-width:320px;width:100%;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.25)}#cdw .cdb p,#wbox .cdb p{margin:0 0 10px}#cdw .cdb b{font-size:17px;color:var(--acc)}
 .cd{margin:12px 0;padding:12px 14px;background:var(--soft);border:2px dashed var(--pink);border-radius:16px}.cd .cdt{font-size:15px;font-weight:700;color:var(--acc);margin-bottom:8px}.cd .cdr{display:flex;gap:8px}.cd input{flex:1;min-width:0;height:44px;padding:0 14px;border:1.5px solid var(--pink);border-radius:999px;background:#fff;font-size:16px;letter-spacing:.5px}.cd input:focus{outline:none;border-color:var(--acc)}.cd .btn{flex:none;height:44px;min-height:0;padding:0 20px;font-size:15px;line-height:1;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center}.cd .cdh{margin-top:6px;font-size:12px;color:var(--mute)}
 .sw{min-width:0}.sw input{width:100%;padding:9px 14px;border:1px solid var(--line);border-radius:999px;background:#fff}
 #sg{position:absolute;left:0;right:0;top:100%;background:#fff;border:1px solid var(--line);display:none;z-index:6}
@@ -528,6 +528,22 @@ function sumBox(sub, discs, total, ids) {
     discs.map(function (d) { return '<div class="dsc"><span>' + esc(d[0]) + '</span><span>−' + money(d[1]) + '</span></div>'; }).join('') +
     '<div class="tot"><span>訂單合計</span><span>' + money(total) + '</span></div><small class="ds">運費與付款方式在商品到貨、要出貨時再選擇</small></div>';
 }
+/* 錯誤/提醒一律跳視窗,不讓客人以為按了沒反應 */
+function warn(msg, el) {
+  var old = $('#wbox'); if (old) old.remove();
+  var d = document.createElement('div'); d.id = 'wbox'; d.setAttribute('role', 'alertdialog'); d.setAttribute('aria-modal', 'true');
+  d.innerHTML = '<div class="cdb"><p><b>請確認</b></p><p class="ds" style="max-height:none;white-space:pre-line">' + esc(msg) + '</p><button type="button" class="btn a" id="wok">我知道了</button></div>';
+  (($('#dlg') && $('#dlg').open) ? $('#dlg') : document.body).appendChild(d);
+  var b = $('#wok'); b.focus(); b.onclick = function () { d.remove(); if (el) { try { el.scrollIntoView({ block: 'center' }); el.focus(); } catch (x) {} } };
+}
+var INVT = 0, INVF = null;
+document.addEventListener('invalid', function (e) {
+  var el = e.target; e.preventDefault(); if (INVF) return; INVF = el;
+  clearTimeout(INVT); INVT = setTimeout(function () {
+    var lb = INVF.closest('label'), name = lb ? lb.childNodes[0].textContent.trim() : (INVF.placeholder || '這個欄位');
+    warn((INVF.validity.valueMissing ? '請填寫「' + name + '」' : '「' + name + '」格式不正確' + (INVF.validationMessage ? ':' + INVF.validationMessage : '')), INVF); INVF = null;
+  }, 0);
+}, true);
 function cdWarn() {
   if ($('#cdw')) return;
   var d = document.createElement('div'); d.id = 'cdw'; d.setAttribute('role', 'alertdialog'); d.setAttribute('aria-modal', 'true');
@@ -849,21 +865,21 @@ document.addEventListener('submit', function (e) {
   if (f.id === 'mf' || f.id === 'rf' || f.id === 'pf') e.preventDefault();
   if (f.id === 'pf') {
     $('#pfe').textContent = '儲存中…';
-    google.script.run.withSuccessHandler(function (me) { MD.me = me; $('#pfe').textContent = '已儲存 ✓'; }).withFailureHandler(function (er) { $('#pfe').textContent = er.message; }).memberSaveProfile(mt, { name: f.name.value, phone: f.phone.value, email: f.email.value, addr: f.addr.value });
+    google.script.run.withSuccessHandler(function (me) { MD.me = me; $('#pfe').textContent = '已儲存 ✓'; }).withFailureHandler(function (er) { $('#pfe').textContent = er.message; warn(er.message); }).memberSaveProfile(mt, { name: f.name.value, phone: f.phone.value, email: f.email.value, addr: f.addr.value });
     return;
   }
   if (f.id === 'mf') {
     $('#me').textContent = '';
     google.script.run.withSuccessHandler(function (r) {
-      if (!r.ok) { $('#me').textContent = r.msg; return; }
+      if (!r.ok) { $('#me').textContent = r.msg; warn(r.msg); return; }
       mt = r.token; memLoad(function () { show(memList()); });
-    }).withFailureHandler(function (er) { $('#me').textContent = er.message; }).memberLogin(f.phone.value, f.oid.value);
+    }).withFailureHandler(function (er) { $('#me').textContent = er.message; warn(er.message); }).memberLogin(f.phone.value, f.oid.value);
   } else if (f.id === 'rf') {
     $('#re').textContent = ''; var id = f.dataset.id;
-    if (!/^\d{5}$/.test(f.l5.value.trim())) { $('#re').textContent = '請輸入 5 位數字(匯款帳號後五碼)'; return; }
+    if (!/^\d{5}$/.test(f.l5.value.trim())) { $('#re').textContent = '請輸入 5 位數字(匯款帳號後五碼)'; warn('請輸入 5 位數字(匯款帳號後五碼)', f.l5); return; }
     google.script.run.withSuccessHandler(function (d) {
       MD = d; show(shipDetail(d.ships.filter(function (z) { return z.id === id; })[0]));
-    }).withFailureHandler(function (er) { $('#re').textContent = er.message; }).memberReportPay(mt, id, f.l5.value);
+    }).withFailureHandler(function (er) { $('#re').textContent = er.message; warn(er.message); }).memberReportPay(mt, id, f.l5.value);
   }
 });
 document.addEventListener('click', function (e) {
@@ -895,6 +911,9 @@ document.addEventListener('input', function (e) { if (e.target.name === 'l5') e.
 document.addEventListener('change', function (e) { if (e.target.id === 'ucr') { useCr = e.target.checked; refreshQuote(); } });
 document.addEventListener('submit', function (e) {
   var f = e.target; if (f.id !== 'sf') return; e.preventDefault();
+  var mv0 = f.method.value;
+  if (mv0 === '店到店' && f.cvsid && !f.cvsid.value) { warn('請先按「選擇門市」,從超商地圖選取取貨門市', $('[data-a="map"]')); return; }
+  if (!f.querySelector('input[name="pay"]:checked')) { warn('請選擇付款方式'); return; }
   var items = Object.keys(MSEL).map(function (k) { return { oid: k.split('|')[0], pid: k.split('|')[1] }; });
   $('#sfe').textContent = '';
   if (!SNONCE) SNONCE = nonce_();
@@ -982,7 +1001,7 @@ function goPay(sid, kind) {
     document.body.appendChild(f);
     var bb = $('#busy'); if (bb) { bb.firstElementChild.innerHTML = '即將前往綠界安全付款頁面<br><small style="font-weight:400">' + esc(PAYK[kind] || '線上付款') + ' · 請勿關閉或重新整理</small>'; bb.classList.add('on'); }
     setTimeout(function () { f.submit(); }, 900);
-  }).withFailureHandler(function (er) { var e2 = $('#paye'); if (e2) e2.textContent = er.message; else alert(er.message); }).memberPayStart(mt, sid, kind || 'Credit');
+  }).withFailureHandler(function (er) { var e2 = $('#paye'); if (e2) e2.textContent = er.message; warn(er.message); }).memberPayStart(mt, sid, kind || 'Credit');
 }
 /* LIFF:從 LINE 內開啟網站時自動登入(只需按一次「允許」) */
 function liffBoot() {
