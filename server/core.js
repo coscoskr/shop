@@ -57,7 +57,14 @@ const SPECIAL = {
   async adminLogiPrint({ rt, args, props }) {
     const [tk, sid] = args;
     const o = withRt(rt, () => code.INTERNAL.logiPrintPrep_(tk, sid));
-    return logiPrintFields(logiCfg(props), o);
+    const f = logiPrintFields(logiCfg(props), o);
+    // 診斷:伺服器端先試打一次綠界列印頁,記錄回應(方便排查空白頁)
+    try {
+      const r = await fetch(f.action, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'text/html' }, body: new URLSearchParams(f.fields).toString(), redirect: 'manual' });
+      const t = await r.text();
+      console.log('logi print probe', sid, r.status, r.headers.get('location') || '', t.replace(/\s+/g, ' ').slice(0, 1500));
+    } catch (e) { console.log('logi print probe error', String(e)); }
+    return f;
   },
 
   // 批次開立電子發票(綠界):先整理資料 → 逐張向綠界開立 → 把發票號碼寫回出貨單

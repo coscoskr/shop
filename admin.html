@@ -990,21 +990,20 @@ document.addEventListener('click', function (e) {
     }); return;
   }
   if (a === 'lgp') {
-    // 瀏覽器只允許「點擊當下」開新分頁:先開好空白分頁,等後端回傳後再把寄件單送進去(否則會被當成彈出視窗擋掉,看起來沒反應)
-    var wn = 'ecpr' + Date.now(), w = null;
-    try { w = window.open('', wn); if (w) w.document.write('<p style="font:16px sans-serif;padding:20px">寄件單載入中,請稍候…</p>'); } catch (e0) { w = null; }
+    // 瀏覽器只允許「點擊當下」開新分頁:先開好空白分頁,後端回傳後在「新分頁裡」直接送出表單到綠界(不靠跨視窗 target,避免卡在載入中)
+    var w = null;
+    try { w = window.open('', '_blank'); if (w) w.document.write('<meta charset="utf-8"><p style="font:16px sans-serif;padding:20px">寄件單載入中,請稍候…</p>'); } catch (e0) { w = null; }
     call('adminLogiPrint', T, id).then(function (r) {
-      var go = function (tg) {
-        var fm = document.createElement('form'); fm.method = 'POST'; fm.action = r.action; fm.target = tg;
-        Object.keys(r.fields).forEach(function (k) { var i = document.createElement('input'); i.type = 'hidden'; i.name = k; i.value = r.fields[k]; fm.appendChild(i); });
-        document.body.appendChild(fm); fm.submit(); fm.remove();
-      };
-      if (w && !w.closed) { go(wn); return; }
+      var page = '<!doctype html><meta charset="utf-8"><title>列印寄件單</title><body style="font:16px sans-serif;padding:20px"><p>正在連到綠界開啟寄件單…</p><form method="post" action="' + esc(r.action) + '">' +
+        Object.keys(r.fields).map(function (k) { return '<input type="hidden" name="' + esc(k) + '" value="' + esc(r.fields[k]) + '">'; }).join('') +
+        '<p style="color:#666">超過 10 秒沒有出現寄件單,請按 <button type="submit">重新開啟</button></p></form><script>document.forms[0].submit();<\/script></body>';
+      if (w && !w.closed) { w.document.open(); w.document.write(page); w.document.close(); return; }
       // 新分頁被瀏覽器擋住:改成讓使用者再按一次按鈕開啟
       var d = $('#dq'); d.oncancel = null; d.dataset.mine = ''; d.dataset.tok = '';
       d.innerHTML = '<p style="margin-top:0">寄件單已準備好,請按下方按鈕開啟。<br><span class="m">(瀏覽器擋住了自動開啟的新分頁)</span></p><p style="margin-bottom:0"><button class="btn a" id="dqy">開啟寄件單</button> <button class="btn l" id="dqn">關閉</button></p>';
       if (!d.open) d.showModal();
-      $('#dqy').onclick = function () { d.close(); go('_blank'); }; $('#dqn').onclick = function () { d.close(); };
+      $('#dqy').onclick = function () { d.close(); var w2 = window.open('', '_blank'); if (w2) { w2.document.open(); w2.document.write(page); w2.document.close(); } else tell('瀏覽器擋住了新分頁,請在網址列右側允許此網站開啟彈出式視窗後再試一次'); };
+      $('#dqn').onclick = function () { d.close(); };
     }).catch(function (er) { if (w && !w.closed) w.close(); tell(er.message); }); return;
   }
   if (a === 'shadj') {
