@@ -714,8 +714,12 @@ function memList() {
   if (MTAB === 'o') {
     if (!os.length) h += '<p>目前沒有訂單。</p>';
     else {
-      h += '<p class="ds">已到貨的商品可以勾選(灰色的是還沒到貨),按「確定出貨」後會建立出貨單,再進行付款與出貨。</p>';
-      os.forEach(function (o) {
+      // 已經成立出貨單的品項不再列在訂單明細(到「出貨單」查看)
+      var osOpen = os.map(function (o) { var its = o.items.filter(function (i) { return !i.sid; }); return its.length ? Object.assign({}, o, { items: its, part: its.length !== o.items.length }) : null; }).filter(Boolean);
+      var nShip = os.reduce(function (t, o) { return t + o.items.filter(function (i) { return !!i.sid; }).length; }, 0);
+      h += osOpen.length ? '<p class="ds">已到貨的商品可以勾選(灰色的是還沒到貨),按「確定出貨」後會建立出貨單,再進行付款與出貨。' + (nShip ? '已成立出貨單的商品請到「出貨單」查看。' : '') + '</p>'
+        : '<p>目前沒有待出貨的商品。</p><p class="ds">已成立出貨單的商品請到「出貨單」查看。</p>';
+      osOpen.forEach(function (o) {
         h += '<div class="oc" data-oid="' + esc(o.id) + '" style="cursor:default' + (o.id === HL_O ? ';outline:2px solid var(--acc);outline-offset:2px' : '') + '"><div class="ln" style="border:0;padding:0"><b>' + esc(o.at.slice(0, 10)) + ' 訂購 <span class="ds">' + esc(o.id) + '</span></b><span class="chip">' + esc(o.st) + '</span></div>' +
           o.items.map(function (i) {
             var can = i.arr === '已到貨' && !i.sid, k = o.id + '|' + i.pid, spc = sp(i.pid);
@@ -723,17 +727,17 @@ function memList() {
               '<div><div class="t">' + esc(i.name) + (spc ? ' <span class="s">(' + esc(spc) + ')</span>' : '') + '</div><div class="s">' + i.qty + ' 件 × ' + money(i.unit) + ' · ' +
               (i.sid ? '<a href="#" data-a="sd" data-id="' + esc(i.sid) + '">已出貨 ' + esc(i.sid) + '</a>' : i.arr === '已到貨' ? '<b>已到貨</b>' : '<span class="tg">待到貨' + (i.eta === '排隊中' ? '(暫不確定,排隊中)' : i.eta ? '(預計' + esc(md(i.eta)) + '左右)' : '') + '</span>') + '</div></div>' +
               '<div class="p">' + money(i.sub) + '</div></div>';
-          }).join('') + ((o.disc > 0 || o.cred > 0) ? '<div class="ot"><div><span>商品金額</span><span>' + money(o.sub) + '</span></div>' +
+          }).join('') + ((o.disc > 0 || o.cred > 0) && !o.part ? '<div class="ot"><div><span>商品金額</span><span>' + money(o.sub) + '</span></div>' +
             (o.disc > 0 ? '<div class="dc"><span>折扣' + (o.code ? '(' + esc(o.code) + ')' : o.dname ? '(' + esc(o.dname) + ')' : '') + '</span><span>− ' + money(o.disc) + '</span></div>' : '') +
             (o.cred > 0 ? '<div class="dc"><span>購物金折抵</span><span>− ' + money(o.cred) + '</span></div>' : '') +
             '<div class="tt"><span>訂單金額</span><span>' + money(o.total) + '</span></div></div>' : '') + '</div>';
       });
-      h += '<div class="stk"><button class="btn a" data-a="sgo" id="sgo"' + (selCount() ? '' : ' disabled') + '>確定出貨(' + selCount() + ')</button></div>';
+      if (osOpen.length) h += '<div class="stk"><button class="btn a" data-a="sgo" id="sgo"' + (selCount() ? '' : ' disabled') + '>確定出貨(' + selCount() + ')</button></div>';
     }
   } else if (MTAB === 's') {
     h += MD.ships.length ? MD.ships.map(function (s) {
       return '<button class="oc" data-a="sd" data-id="' + esc(s.id) + '"><div class="ln" style="border:0;padding:0"><b>' + esc(s.id) + '</b><span class="chip">' + esc(s.st) + '</span></div>' +
-        '<small>' + esc(s.pay) + ',應付 ' + money(s.total) + '</small><br><small>' + esc(s.it) + '</small></button>';
+        '<small>' + esc(s.pay === '賣貨便' && logiOn() ? '超商取貨付款' : s.pay === '刷卡' ? (PAYK[s.kind] || '信用卡') : s.pay) + ',應付 ' + money(s.total) + '</small><br><small>' + esc(s.it) + '</small></button>';
     }).join('') : '<p class="ds">在「訂單明細」勾選已到貨的商品並按「確定出貨」後,出貨單會顯示在這裡。</p>';
   } else {
     var m = MD.me, f = MD.orders[0] || {};
