@@ -898,10 +898,11 @@ document.addEventListener('submit', function (e) {
   $('#sfe').textContent = '';
   if (!SNONCE) SNONCE = nonce_();
   google.script.run.withSuccessHandler(function (d) { SNONCE = ''; MD = d; MSEL = {}; MTAB = 's'; var ns = d.ships.filter(function (z) { return z.id === d.sid; })[0]; show(shipDetail(ns)); })
-    .withFailureHandler(function (er) { $('#sfe').textContent = er.message; }).memberCreateShip(mt, items, { pay: f.pay.value, method: f.method.value, rname: f.rname.value, cvs: f.cvs.value, store: f.store.value, addr: f.addr.value, credit: f.credit ? Number(f.credit.value) || 0 : 0, note: f.note.value, phone: f.phone.value, paytest: payOn(), nonce: SNONCE, kind: payKind(f), cvsid: f.cvsid ? f.cvsid.value : '' });
+    .withFailureHandler(function (er) { $('#sfe').textContent = er.message; }).memberCreateShip(mt, items, { pay: f.pay.value, method: f.method.value, rname: f.rname.value, cvs: f.cvs.value, store: f.store.value, addr: f.addr.value, credit: f.credit ? Number(f.credit.value) || 0 : 0, note: f.note.value, phone: f.phone.value, paytest: testOn(), nonce: SNONCE, kind: payKind(f), cvsid: f.cvsid ? f.cvsid.value : '' });
 });
 
-function payOn() { try { if (/[?&]paytest=1/.test(location.search)) sessionStorage.setItem('paytest', '1'); return !!(window.D && D.payLive) || sessionStorage.getItem('paytest') === '1'; } catch (e) { return false; } }
+function testOn() { try { if (/[?&]paytest=1/.test(location.search)) sessionStorage.setItem('paytest', '1'); return sessionStorage.getItem('paytest') === '1'; } catch (e) { return false; } }
+function payOn() { return !!(window.D && D.payLive) || testOn(); }
 payOn();
 var ICO = (function () {
   var w = function (p) { return '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + p + '</svg>'; };
@@ -932,9 +933,9 @@ function payCards() {
     (logiOn() ? c('賣貨便', '', ICO.store, '超商取貨付款', '7-11/全家門市取貨時付款') : c('賣貨便', '', ICO.store, '賣貨便', '7-11 取貨付款,僅店到店')) +
     c('付現金', '', ICO.cash, '付現金', '到店自取時當面付款');
 }
-function instOn() { return !!(window.D && D.instLive) || payOn(); }
-function bnplOn() { return !!(window.D && D.bnplLive) || payOn(); }
-function logiOn() { return !!(window.D && D.logiLive) || payOn(); }
+function instOn() { return !!(window.D && D.instLive) || testOn(); }
+function bnplOn() { return !!(window.D && D.bnplLive) || testOn(); }
+function logiOn() { return !!(window.D && D.logiLive) || testOn(); }
 /* 超商地圖:先把填到一半的出貨單存起來,選完門市回來再接著填 */
 function goMap() {
   var f = $('#sf'); if (!f) return;
