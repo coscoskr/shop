@@ -31,6 +31,7 @@ h1{font-size:18px;margin:0;white-space:nowrap;letter-spacing:.5px}
 #sg div{padding:8px 12px;cursor:pointer}#sg div:hover{background:var(--soft)}
 .btn{border:1px solid var(--ink);background:var(--ink);color:#fff;padding:8px 16px;border-radius:999px;cursor:pointer}
 .btn.l{background:none;color:var(--ink)}
+.payc.lk{opacity:.4;pointer-events:none}
 .sgl{font-size:13px;color:var(--mute);margin:10px 0 6px}.sg{display:flex;flex-wrap:wrap;gap:8px}.sgb{border:1px solid var(--line);background:#fff;color:var(--ink);padding:8px 14px;border-radius:6px;cursor:pointer;font-size:15px;min-width:56px}.sgb.on{border-color:var(--acc);color:var(--acc);box-shadow:inset 0 0 0 1px var(--acc)}.sgb:disabled{opacity:.35;text-decoration:line-through;cursor:not-allowed}.btn.a{background:var(--acc);border-color:var(--acc)}
 :focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 #notice{background:#fde8e4;color:#8a2c1c;padding:9px 16px;font-size:14px;font-weight:700;text-align:center}
@@ -772,9 +773,9 @@ function l5Form(o, btn, cls) {
 function canChangePay(o) { var f = FL0[o.pay] || []; return f[0] === o.st && !o.last5 && !o.inv && !o.lgid; }
 var FL0 = { '刷卡': ['待刷卡'], '匯款': ['待匯款'], '賣貨便': ['待出貨'], '付現金': ['待自取'] };
 function payChangeHtml(o) {
-  return '<h2>更改付款方式</h2><p class="ds">出貨單 ' + esc(o.id) + '(' + esc({ '店到店': '超商店到店', '宅配': '宅配到府', '自取': '到店自取' }[o.method] || o.method || '') + ')</p>' +
+  return '<h2>更改付款方式</h2><p class="ds">出貨單 ' + esc(o.id) + '(' + esc(o.pay === '賣貨便' && !logiOn() ? '賣貨便' : { '店到店': '超商店到店', '宅配': '宅配到府', '自取': '到店自取' }[o.method] || o.method || '') + ')</p>' +
     '<form id="cpf" data-id="' + esc(o.id) + '" data-m="' + esc(o.method || '') + '"><fieldset class="payf"><legend>選擇新的付款方式</legend><div class="payg">' + payCards() + '</div></fieldset>' +
-    '<p class="ds">更改後應付金額會重新計算(賣貨便與店到店運費不同)。</p><div class="cta"><button class="btn a">確定更改</button><button type="button" class="btn l" data-a="sd" data-id="' + esc(o.id) + '">← 返回出貨單</button></div></form>';
+    '<p class="ds">更改後應付金額會重新計算(賣貨便與店到店運費不同)。' + (logiOn() ? '' : '<br>選賣貨便付款,配送方式會一起改成賣貨便(只能 7-11);原本是賣貨便改成其他付款方式,配送方式會改成超商店到店。') + '</p><div class="cta"><button class="btn a">確定更改</button><button type="button" class="btn l" data-a="sd" data-id="' + esc(o.id) + '">← 返回出貨單</button></div></form>';
 }
 function cpInit(o) {
   var f = $('#cpf'); if (!f) return; var mv = f.dataset.m;
@@ -828,23 +829,32 @@ function shipForm() {
     picked.map(function (i) { var spc = sp(i.pid); return '<tr><td>' + esc(i.name) + (spc ? '<br><small>' + esc(spc) + '</small>' : '') + '</td><td class="n">' + i.qty + '</td><td class="n">' + i.unit + '</td><td class="n">' + i.sub + '</td></tr>'; }).join('') + '</tbody></table>' +
     '<div id="sq" class="ds" style="margin-top:8px">計算金額中…</div></div>' +
     '<form id="sf"><fieldset class="payf"><legend>配送方式' + (MD.free ? ' <small class="ds" style="font-weight:400">滿 ' + money(MD.free) + ' 免運</small>' : '') + '</legend><div class="payg">' +
-      shipCard('店到店', ICO.store, '超商店到店', '7-11/全家門市取貨 · ' + money(MD.feeCvs), true) + shipCard('宅配', ICO.truck, '宅配到府', '送到指定地址 · ' + money(MD.fee)) + shipCard('自取', ICO.home, '到店自取', '台中門市自取 · 免運') + '</div></fieldset>' +
+      shipCard('店到店', ICO.store, '超商店到店', '7-11/全家門市取貨 · ' + money(MD.feeCvs), true) + (logiOn() ? '' : shipCard('賣貨便', ICO.store, '賣貨便', '7-11 取貨付款(付款方式會自動選賣貨便)')) + shipCard('宅配', ICO.truck, '宅配到府', '送到指定地址 · ' + money(MD.fee)) + shipCard('自取', ICO.home, '到店自取', '台中門市自取 · 免運') + '</div></fieldset>' +
     '<label>收件人姓名(請填本名)<input name="rname" required maxlength="30" placeholder="與證件相同,例如:王小明" value="' + esc((MD.me && MD.me.pname) || o0.nm || '') + '"><small class="ds" style="color:var(--acc)">超商取貨需核對證件,請填寫本名,不可填暱稱</small></label>' +
     '<label>聯絡電話<input name="phone" required inputmode="tel" value="' + esc((MD.me && MD.me.phone) || o0.ph || '') + '"></label>' +
     (true ? '<div id="mcvs"><label>超商<select name="cvs"><option>7-11</option><option>全家</option></select></label><input type="hidden" name="store"><input type="hidden" name="cvsid"><div class="cvsp"><div id="cvsn" class="ds">尚未選擇門市</div><button type="button" class="btn l" data-a="map">選擇門市(開啟超商地圖)</button></div><small class="ds" id="mfh" hidden></small></div>'
       : '<div id="mcvs"><label>超商<select name="cvs"><option>7-11</option><option>全家</option></select></label><label>取貨門市(店名或店號)<input name="store" maxlength="60"></label><small class="ds" id="mfh" hidden style="color:var(--acc)">賣貨便只能寄到 7-11 門市,請填 7-11 的店名或店號(不能填全家或地址)</small></div>') +
     '<div id="mhome" hidden><label>收件地址<input name="addr" maxlength="150" value="' + esc((MD.me && MD.me.addr) || '') + '"></label></div>' +
     (bal > 0 ? '<label>使用購物金(餘額 ' + money(bal) + ')<input name="credit" type="number" min="0" step="1" value="0" inputmode="numeric"></label><small class="ds" id="crh"></small>' + credNote() : '') +
-    '<fieldset class="payf"><legend>付款方式</legend><div class="payg">' + payCards() + '</div></fieldset>' +
+    '<fieldset class="payf"><legend>付款方式</legend><small class="ds" id="mhh" hidden style="color:var(--acc);display:block;margin-bottom:6px">配送方式選了賣貨便,付款方式固定為賣貨便(要改請先換配送方式)</small><div class="payg">' + payCards() + '</div></fieldset>' +
     '<label>備註<textarea name="note" rows="2" maxlength="200"></textarea></label>' +
     '<p id="sfe" class="tg" role="alert"></p><button class="btn a">確認出貨</button> <button type="button" class="btn l" data-a="mb">返回</button></form>';
 }
 function sfState(ch) {
   var f = $('#sf'); if (!f) return {};
   // 依配送方式只顯示可用的付款方式:超商取貨付款只限店到店,付現金只限自取
-  var mv = f.method.value, okPay = function (v) { return v === '賣貨便' ? mv === '店到店' : v === '付現金' ? mv === '自取' : true; };
-  [].forEach.call(f.querySelectorAll('input[name="pay"]'), function (r) { var lb = r.closest('.payc'), ok = okPay(r.value); if (lb) lb.hidden = !ok; if (!ok && r.checked) { r.checked = false; var bk = f.querySelector('input[name="pay"][value="匯款"]'); if (bk) bk.checked = true; } });
-  var cv = f.method.value === '店到店', hm = f.method.value === '宅配';
+  // 賣貨便:配送方式和付款方式其中一個選賣貨便,另一個就鎖定賣貨便(綠界物流上線後改回「超商取貨付款+店到店」)
+  var MH = !logiOn() && !!f.querySelector('input[name="method"][value="賣貨便"]'), pr0 = f.querySelector('input[name="pay"]:checked');
+  if (MH && ch === 'pay' && pr0 && pr0.value === '賣貨便') f.method.value = '賣貨便';
+  if (MH && ch === 'method' && f.method.value !== '賣貨便' && pr0 && pr0.value === '賣貨便') { pr0.checked = false; var bk0 = f.querySelector('input[name="pay"][value="匯款"]'); if (bk0) bk0.checked = true; }
+  var mv = f.method.value, mh = MH && mv === '賣貨便';
+  var okPay = function (v) { return mh ? v === '賣貨便' : v === '付現金' ? mv === '自取' : v === '賣貨便' ? (MH ? mv !== '自取' : mv === '店到店') : true; };
+  [].forEach.call(f.querySelectorAll('input[name="pay"]'), function (r) { var lb = r.closest('.payc'), ok = okPay(r.value);
+    if (mh) { if (lb) { lb.hidden = false; lb.classList.toggle('lk', !ok); } r.disabled = !ok || r.hasAttribute('data-off'); if (r.value === '賣貨便') r.checked = true; return; }
+    if (lb) { lb.hidden = !ok; lb.classList.remove('lk'); } r.disabled = r.hasAttribute('data-off');
+    if (!ok && r.checked) { r.checked = false; var bk = f.querySelector('input[name="pay"][value="匯款"]'); if (bk) bk.checked = true; } });
+  var ph = $('#mhh'); if (ph) ph.hidden = !mh;
+  var cv = mv === '店到店' || mh, hm = mv === '宅配';
   $('#mcvs').hidden = !cv; $('#mhome').hidden = !hm;
   f.store.required = false; f.addr.required = hm;
   if (ch === 'cvs' && f.cvsid) { f.cvsid.value = ''; f.store.value = ''; $('#cvsn').textContent = '尚未選擇門市'; }
@@ -852,7 +862,7 @@ function sfState(ch) {
   if (mf && f.cvs.value !== '7-11') { f.cvs.value = '7-11'; if (f.cvsid) { f.cvsid.value = ''; f.store.value = ''; var cn0 = $('#cvsn'); if (cn0) cn0.textContent = '尚未選擇門市(賣貨便只能選 7-11)'; } } if (fo) fo.disabled = mf;
   f.store.placeholder = mf ? '賣貨便只能寄 7-11,請填 7-11 店名或店號' : '';
   var mh = $('#mfh'); if (mh) { mh.hidden = !mf; mh.textContent = '賣貨便只能寄 7-11 門市'; mh.style.color = 'var(--acc)'; }
-  return { method: f.method.value, pay: f.pay.value, credit: f.credit ? Number(f.credit.value) || 0 : 0 };
+  return { method: mh ? '店到店' : f.method.value, pay: f.pay.value, credit: f.credit ? Number(f.credit.value) || 0 : 0 };
 }
 var SQT = 0;
 function sfQuote(ch) {
@@ -945,13 +955,13 @@ document.addEventListener('submit', function (e) {
 document.addEventListener('submit', function (e) {
   var f = e.target; if (f.id !== 'sf') return; e.preventDefault();
   var mv0 = f.method.value;
-  if (mv0 === '店到店' && f.cvsid && !f.cvsid.value) { warn('請先按「選擇門市」,從超商地圖選取取貨門市', $('[data-a="map"]')); return; }
+  if ((mv0 === '店到店' || mv0 === '賣貨便') && f.cvsid && !f.cvsid.value) { warn('請先按「選擇門市」,從超商地圖選取取貨門市', $('[data-a="map"]')); return; }
   if (!f.querySelector('input[name="pay"]:checked')) { warn('請選擇付款方式'); return; }
   var items = Object.keys(MSEL).map(function (k) { return { oid: k.split('|')[0], pid: k.split('|')[1] }; });
   $('#sfe').textContent = '';
   if (!SNONCE) SNONCE = nonce_();
   google.script.run.withSuccessHandler(function (d) { SNONCE = ''; MD = d; MSEL = {}; MTAB = 's'; var ns = d.ships.filter(function (z) { return z.id === d.sid; })[0]; show(shipDetail(ns)); })
-    .withFailureHandler(function (er) { showErr('#sfe', er.message); }).memberCreateShip(mt, items, { pay: f.pay.value, method: f.method.value, rname: f.rname.value, cvs: f.cvs.value, store: f.store.value, addr: f.addr.value, credit: f.credit ? Number(f.credit.value) || 0 : 0, note: f.note.value, phone: f.phone.value, paytest: testOn(), nonce: SNONCE, kind: payKind(f), cvsid: f.cvsid ? f.cvsid.value : '' });
+    .withFailureHandler(function (er) { showErr('#sfe', er.message); }).memberCreateShip(mt, items, { pay: f.pay.value, method: mv0 === '賣貨便' ? '店到店' : mv0, rname: f.rname.value, cvs: f.cvs.value, store: f.store.value, addr: f.addr.value, credit: f.credit ? Number(f.credit.value) || 0 : 0, note: f.note.value, phone: f.phone.value, paytest: testOn(), nonce: SNONCE, kind: payKind(f), cvsid: f.cvsid ? f.cvsid.value : '' });
 });
 
 /* 錯誤訊息:顯示在表單下方並捲到看得到的位置,避免按了沒反應的錯覺 */
@@ -978,7 +988,7 @@ var ICO = (function () {
 var PAYK = { Credit: '信用卡一次付清', Installment: '信用卡分期', BNPL: '無卡分期' };
 function payCards() {
   var on = payOn(), c = function (v, k, ic, t, d, chk, off) {
-    return '<label class="payc' + (off ? ' off' : '') + '"><input type="radio" name="pay" value="' + v + '"' + (k ? ' data-k="' + k + '"' : '') + (chk ? ' checked' : '') + (off ? ' disabled' : '') + '><span class="ic">' + ic + '</span><span><b>' + t + '</b><small>' + d + '</small></span></label>';
+    return '<label class="payc' + (off ? ' off' : '') + '"><input type="radio" name="pay" value="' + v + '"' + (k ? ' data-k="' + k + '"' : '') + (chk ? ' checked' : '') + (off ? ' disabled data-off' : '') + '><span class="ic">' + ic + '</span><span><b>' + t + '</b><small>' + d + '</small></span></label>';
   };
   var ins = instOn(), bn2 = bnplOn();
   return c('匯款', '', ICO.bank, '銀行匯款', '轉帳後回報後五碼,確認收款即出貨', true) +
@@ -1017,7 +1027,7 @@ function resumeDraft() {
     ['method', 'rname', 'phone', 'addr', 'note'].forEach(function (k) { if (f[k] && v[k] != null) f[k].value = v[k]; });
     if (f.credit && v.credit) f.credit.value = v.credit;
     var rr = [].slice.call(f.querySelectorAll('input[name="pay"]')).filter(function (x) { return x.value === v.pay && (x.dataset.k || '') === (v.kind || ''); })[0]; if (rr && !rr.disabled) rr.checked = true;
-    f.method.value = '店到店'; f.cvs.value = pick.t; f.cvsid.value = pick.id; f.store.value = pick.n;
+    f.method.value = v.method === '賣貨便' && !logiOn() ? '賣貨便' : '店到店'; f.cvs.value = pick.t; f.cvsid.value = pick.id; f.store.value = pick.n;
     $('#cvsn').innerHTML = '<b>' + esc(pick.t + ' ' + pick.n) + '</b>(店號 ' + esc(pick.id) + ')<br><small>' + esc(pick.a) + '</small>';
     sfQuote();
   });
