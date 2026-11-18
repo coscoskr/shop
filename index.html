@@ -77,7 +77,7 @@ fieldset label{display:inline-block;margin:2px 10px 2px 0}
 .payc:has(input:checked){border-color:var(--acc);background:var(--soft);box-shadow:0 0 0 2px rgba(169,91,77,.15)}
 .payc:has(input:checked)::after{content:'✓';position:absolute;top:6px;right:8px;color:var(--acc);font-weight:700}
 .payc:has(input:focus-visible){outline:2px solid var(--acc);outline-offset:2px}
-.payc.off{opacity:.45;cursor:not-allowed}
+.payc[hidden]{display:none!important}.payc.off{opacity:.45;cursor:not-allowed}
 .paynow{border:1.5px solid var(--pink);background:var(--soft);border-radius:12px;padding:14px;margin:10px 0}
 .paynow a{color:var(--acc)}
 .it{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff;margin:8px 0}
@@ -799,8 +799,9 @@ function shipForm() {
 }
 function sfState(ch) {
   var f = $('#sf'); if (!f) return {};
-  if (ch === 'method') { if (f.method.value !== '自取' && f.pay.value === '付現金') f.pay.value = '匯款'; if (f.method.value === '自取' && f.pay.value === '賣貨便') f.pay.value = '匯款'; }
-  else if (ch === 'pay') { if (f.pay.value === '賣貨便') f.method.value = '店到店'; else if (f.pay.value === '付現金') f.method.value = '自取'; }
+  // 依配送方式只顯示可用的付款方式:超商取貨付款只限店到店,付現金只限自取
+  var mv = f.method.value, okPay = function (v) { return v === '賣貨便' ? mv === '店到店' : v === '付現金' ? mv === '自取' : true; };
+  [].forEach.call(f.querySelectorAll('input[name="pay"]'), function (r) { var lb = r.closest('.payc'), ok = okPay(r.value); if (lb) lb.hidden = !ok; if (!ok && r.checked) { r.checked = false; var bk = f.querySelector('input[name="pay"][value="匯款"]'); if (bk) bk.checked = true; } });
   var cv = f.method.value === '店到店', hm = f.method.value === '宅配';
   $('#mcvs').hidden = !cv; $('#mhome').hidden = !hm;
   f.store.required = cv && !logiOn(); f.addr.required = hm;
