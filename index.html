@@ -763,7 +763,26 @@ function bankHtml(txt) {
 function l5Form(o, btn, cls) {
   return '<form id="rf" class="l5f" novalidate data-id="' + esc(o.id) + '"><label>匯款帳號後五碼<input name="l5" required inputmode="numeric" maxlength="5" minlength="5" pattern="\\d{5}" autocomplete="off" placeholder="00000" value="' + esc(o.last5) + '"></label><button class="btn ' + cls + '">' + btn + '</button></form><p id="re" class="tg" role="alert" style="margin:4px 0 0"></p>';
 }
+/* 客人更改付款方式(只限還沒付款的出貨單) */
+function canChangePay(o) { var f = FL0[o.pay] || []; return f[0] === o.st && !o.last5 && !o.inv && !o.lgid; }
+var FL0 = { '刷卡': ['待刷卡'], '匯款': ['待匯款'], '賣貨便': ['待出貨'], '付現金': ['待自取'] };
+function payChangeHtml(o) {
+  return '<h2>更改付款方式</h2><p class="ds">出貨單 ' + esc(o.id) + '(' + esc({ '店到店': '超商店到店', '宅配': '宅配到府', '自取': '到店自取' }[o.method] || o.method || '') + ')</p>' +
+    '<form id="cpf" data-id="' + esc(o.id) + '" data-m="' + esc(o.method || '') + '"><fieldset class="payf"><legend>選擇新的付款方式</legend><div class="payg">' + payCards() + '</div></fieldset>' +
+    '<p class="ds">更改後應付金額會重新計算(賣貨便與店到店運費不同)。</p><div class="cta"><button class="btn a">確定更改</button><button type="button" class="btn l" data-a="sd" data-id="' + esc(o.id) + '">← 返回出貨單</button></div></form>';
+}
+function cpInit(o) {
+  var f = $('#cpf'); if (!f) return; var mv = f.dataset.m;
+  [].forEach.call(f.querySelectorAll('input[name="pay"]'), function (r) {
+    var ok = r.value === '賣貨便' ? mv === '店到店' : r.value === '付現金' ? mv === '自取' : true, lb = r.closest('.payc');
+    if (lb) lb.hidden = !ok; r.checked = r.value === o.pay && (r.dataset.k || '') === (o.pay === '刷卡' ? (o.kind || 'Credit') : '');
+  });
+}
 function memAct(o) {
+  var chg = canChangePay(o) ? '<p style="margin:6px 0 0"><button type="button" class="btn l" data-a="cpay" data-id="' + esc(o.id) + '">更改付款方式</button></p>' : '';
+  return memAct0(o) + chg;
+}
+function memAct0(o) {
   if (o.pay === '刷卡' && o.st === '待刷卡')
     { var k0 = PAYK[o.kind] ? o.kind : 'Credit', alt = Object.keys(PAYK).filter(function (k) { return k !== k0 && (k === 'Credit' ? payOn() : k === 'Installment' ? instOn() : bnplOn()); });
       return '<div class="paynow"><p style="margin:0 0 8px"><b>應付 ' + money(o.total) + '</b> · ' + esc(PAYK[k0]) + '</p><button class="btn a" data-a="pay" data-k="' + k0 + '" data-id="' + esc(o.id) + '">前往付款</button>' +
@@ -889,6 +908,7 @@ document.addEventListener('click', function (e) {
     var fb = function () { var t = document.createElement('textarea'); t.value = v; t.style.position = 'fixed'; t.style.opacity = '0'; document.body.appendChild(t); t.select(); try { document.execCommand('copy'); ok(); } catch (x) {} document.body.removeChild(t); };
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(v).then(ok, fb); else fb();
   } else if (b.dataset.a === 'pay') goPay(b.dataset.id, b.dataset.k);
+  else if (b.dataset.a === 'cpay') { var co = (MD.ships || []).filter(function (z) { return z.id === b.dataset.id; })[0]; if (co) { show(payChangeHtml(co)); cpInit(co); } }
   else if (b.dataset.a === 'map') goMap();
   else if (b.dataset.a === 'lgd') goLogin();
   else if (b.dataset.a === 'lo') show('<h2>確定要登出嗎?</h2><p class="ds">登出後將無法使用會員優惠與購物金,可隨時再用 LINE 登入。</p><p><button class="btn l" data-a="x">取消</button> <button class="btn a" data-a="lo2">確定登出</button></p>');
@@ -909,6 +929,13 @@ document.addEventListener('change', function (e) {
 });
 document.addEventListener('input', function (e) { if (e.target.name === 'l5') e.target.value = e.target.value.replace(/\D/g, '').slice(0, 5); });
 document.addEventListener('change', function (e) { if (e.target.id === 'ucr') { useCr = e.target.checked; refreshQuote(); } });
+document.addEventListener('submit', function (e) {
+  var f = e.target; if (f.id !== 'cpf') return; e.preventDefault();
+  var r = f.querySelector('input[name="pay"]:checked'); if (!r) { warn('請選擇付款方式'); return; }
+  var id = f.dataset.id;
+  google.script.run.withSuccessHandler(function (d) { MD = d; var z = (d.ships || []).filter(function (x) { return x.id === id; })[0]; if (z) show(shipDetail(z)); toast('已更改付款方式'); })
+    .withFailureHandler(function (er) { warn(er.message); }).memberChangePay(mt, id, { pay: r.value, kind: r.dataset.k || '', paytest: testOn() });
+});
 document.addEventListener('submit', function (e) {
   var f = e.target; if (f.id !== 'sf') return; e.preventDefault();
   var mv0 = f.method.value;

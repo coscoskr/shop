@@ -946,6 +946,37 @@ function memberSaveProfile(tk, d) {
   });
   return meInfo_(ctx.lid);
 }
+/** 客人更改付款方式:只限還沒付款/還沒處理的出貨單;運費、應付、狀態跟著重算 */
+function memberChangePay(tk, sid, d) {
+  var ctx = mem_(tk); d = d || {}; sid = String(sid || '');
+  var pay = String(d.pay || ''), out = '';
+  if (!PAY[pay]) throw new Error('請選擇付款方式');
+  lk_(function () {
+    var s = rows_('出貨單').filter(function (x) { return String(x.出貨單ID) === sid && mine_(ctx, x); })[0];
+    if (!s) throw new Error('找不到出貨單');
+    var f0 = FLOW[s.付款方式] || [];
+    if (String(s.匯款後五碼 || '')) throw new Error('這張出貨單已經回報匯款,不能再改付款方式,請聯繫客服');
+    if (f0.indexOf(String(s.狀態)) !== 0) throw new Error('這張出貨單已經付款或開始處理(' + s.狀態 + '),不能再改付款方式,請聯繫客服');
+    if (String(s.發票號碼 || '') || String(s.綠界物流ID || '')) throw new Error('這張出貨單已經在處理中,不能再改付款方式,請聯繫客服');
+    var m = String(s.配送方式 || ''), c = cvsOf_(s);
+    if (pay === '賣貨便' && m !== '店到店') throw new Error((logiOn_(d) ? '超商取貨付款' : '賣貨便') + '只能搭配超商店到店');
+    if (pay === '賣貨便' && !logiOn_(d) && c && c.cvs !== '7-11') throw new Error('賣貨便只能寄 7-11,你的取貨門市是 ' + c.cvs + ',請改選其他付款方式');
+    if (pay === '付現金' && m !== '自取') throw new Error('付現金只能搭配到店自取');
+    if (pay === '刷卡' && prop_('ECPAY_PAY_LIVE') !== '1' && !d.paytest) throw new Error('線上付款即將開放,請選擇其他付款方式');
+    var kind = pay === '刷卡' ? kindOk_(d) : '';
+    var n = cp_(s), oldPay = String(s.付款方式), oldFee = Number(s.運費) || 0;
+    if (oldPay === pay && String(s.付款類型 || '') === kind) { out = 'same'; return; }
+    n.付款方式 = pay; n.付款類型 = kind; n.狀態 = PAY[pay]; n.收款帳號 = pay === '匯款' ? String(settings_().匯款資訊 || '') : '';
+    if ((oldPay === '賣貨便') !== (pay === '賣貨便')) n.運費 = feeFor_(m, pay, Number(s.商品金額) - Number(s.優惠折抵 || 0)); // 賣貨便運費和店到店不同
+    n.總額 = Math.max(0, Number(s.商品金額) - Number(s.優惠折抵 || 0) - Number(s.購物金折抵 || 0)) + Number(n.運費 || 0);
+    put_('出貨單', s._r, n);
+    log_('客人 ' + s.姓名, '更改付款方式', sid, oldPay + (s.付款類型 ? '(' + s.付款類型 + ')' : '') + '→' + pay + (kind ? '(' + kind + ')' : '') + (Number(n.運費) !== oldFee ? ',運費 ' + oldFee + '→' + n.運費 : '') + ',應付 ' + n.總額);
+    String(s.訂單ID).split(',').forEach(function (oid) { syncOrderStatus_(oid, '客人'); });
+    var lid = String(s['LINE ID'] || '');
+    if (pay === '賣貨便' && lid && !logiOn_(d)) { var mt = String(settings_().賣貨便成立通知內容 === undefined ? defSet_('賣貨便成立通知內容') : settings_().賣貨便成立通知內容 || '').trim(); if (mt) pushLine_(lid, mt.split('{出貨單號}').join(sid)); }
+  });
+  var r = memberOrders(tk); r.sid = sid; return r;
+}
 function memberReportPay(tk, sid, last5) {
   var ctx = mem_(tk), l5 = String(last5 || '').trim();
   if (!/^\d{5}$/.test(l5)) throw new Error('請輸入 5 位數字');
