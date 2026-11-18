@@ -28,7 +28,8 @@ const SPECIAL = {
   // 客人選門市:回傳綠界超商地圖表單
   async memberMapStart({ args, props, env }) {
     const [cvs, cod, mobile] = args;
-    return logiMapFields(logiCfg(props), { sub: cvs === '全家' ? 'FAMIC2C' : 'UNIMARTC2C', cod: !!cod, mobile: !!mobile, reply: env.SUPABASE_URL + '/functions/v1/api?ecpay=map' });
+    const mc = logiCfg(props), mcfg = (!mc.test || !props.ECPAY_PAY_MID) ? mc : Object.assign({}, mc, { mid: String(props.ECPAY_PAY_MID).trim(), host: 'https://logistics.ecpay.com.tw', test: false }); // 選門市一律用正式地圖(不需金鑰)
+    return logiMapFields(mcfg, { sub: cvs === '全家' ? 'FAMIC2C' : 'UNIMARTC2C', cod: !!cod, mobile: !!mobile, reply: env.SUPABASE_URL + '/functions/v1/api?ecpay=map' });
   },
   // 後台:建立綠界超商物流單
   async adminLogiCreate({ rt, args, props, env }) {

@@ -806,7 +806,7 @@ function shipForm() {
       shipCard('店到店', ICO.store, '超商店到店', '7-11/全家門市取貨 · ' + money(MD.feeCvs), true) + shipCard('宅配', ICO.truck, '宅配到府', '送到指定地址 · ' + money(MD.fee)) + shipCard('自取', ICO.home, '到店自取', '台中門市自取 · 免運') + '</div></fieldset>' +
     '<label>收件人姓名(請填本名)<input name="rname" required maxlength="30" placeholder="與證件相同,例如:王小明" value="' + esc((MD.me && MD.me.pname) || o0.nm || '') + '"><small class="ds" style="color:var(--acc)">超商取貨需核對證件,請填寫本名,不可填暱稱</small></label>' +
     '<label>聯絡電話<input name="phone" required inputmode="tel" value="' + esc((MD.me && MD.me.phone) || o0.ph || '') + '"></label>' +
-    (logiOn() ? '<div id="mcvs"><label>超商<select name="cvs"><option>7-11</option><option>全家</option></select></label><input type="hidden" name="store"><input type="hidden" name="cvsid"><div class="cvsp"><div id="cvsn" class="ds">尚未選擇門市</div><button type="button" class="btn l" data-a="map">選擇門市(開啟超商地圖)</button></div><small class="ds" id="mfh" hidden></small></div>'
+    (true ? '<div id="mcvs"><label>超商<select name="cvs"><option>7-11</option><option>全家</option></select></label><input type="hidden" name="store"><input type="hidden" name="cvsid"><div class="cvsp"><div id="cvsn" class="ds">尚未選擇門市</div><button type="button" class="btn l" data-a="map">選擇門市(開啟超商地圖)</button></div><small class="ds" id="mfh" hidden></small></div>'
       : '<div id="mcvs"><label>超商<select name="cvs"><option>7-11</option><option>全家</option></select></label><label>取貨門市(店名或店號)<input name="store" maxlength="60"></label><small class="ds" id="mfh" hidden style="color:var(--acc)">賣貨便只能寄到 7-11 門市,請填 7-11 的店名或店號(不能填全家或地址)</small></div>') +
     '<div id="mhome" hidden><label>收件地址<input name="addr" maxlength="150" value="' + esc((MD.me && MD.me.addr) || '') + '"></label></div>' +
     (bal > 0 ? '<label>使用購物金(餘額 ' + money(bal) + ')<input name="credit" type="number" min="0" step="1" value="0" inputmode="numeric"></label><small class="ds" id="crh"></small>' + credNote() : '') +
@@ -821,12 +821,12 @@ function sfState(ch) {
   [].forEach.call(f.querySelectorAll('input[name="pay"]'), function (r) { var lb = r.closest('.payc'), ok = okPay(r.value); if (lb) lb.hidden = !ok; if (!ok && r.checked) { r.checked = false; var bk = f.querySelector('input[name="pay"][value="匯款"]'); if (bk) bk.checked = true; } });
   var cv = f.method.value === '店到店', hm = f.method.value === '宅配';
   $('#mcvs').hidden = !cv; $('#mhome').hidden = !hm;
-  f.store.required = cv && !logiOn(); f.addr.required = hm;
+  f.store.required = false; f.addr.required = hm;
   if (ch === 'cvs' && f.cvsid) { f.cvsid.value = ''; f.store.value = ''; $('#cvsn').textContent = '尚未選擇門市'; }
   var mf = f.pay.value === '賣貨便' && !logiOn(), fo = f.cvs.querySelector('option[value="全家"],option:nth-child(2)');
-  if (mf) f.cvs.value = '7-11'; if (fo) fo.disabled = mf;
+  if (mf && f.cvs.value !== '7-11') { f.cvs.value = '7-11'; if (f.cvsid) { f.cvsid.value = ''; f.store.value = ''; var cn0 = $('#cvsn'); if (cn0) cn0.textContent = '尚未選擇門市(賣貨便只能選 7-11)'; } } if (fo) fo.disabled = mf;
   f.store.placeholder = mf ? '賣貨便只能寄 7-11,請填 7-11 店名或店號' : '';
-  var mh = $('#mfh'); if (mh) mh.hidden = !mf;
+  var mh = $('#mfh'); if (mh) { mh.hidden = !mf; mh.textContent = '賣貨便只能寄 7-11 門市'; mh.style.color = 'var(--acc)'; }
   return { method: f.method.value, pay: f.pay.value, credit: f.credit ? Number(f.credit.value) || 0 : 0 };
 }
 var SQT = 0;

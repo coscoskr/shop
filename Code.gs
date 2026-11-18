@@ -2197,8 +2197,10 @@ function memberCreateShip0_(tk, items, d) {
     if (method === '店到店') {
       var cvs = t_(d.cvs, 20), store = t_(d.store, 60);
       if (['7-11', '全家'].indexOf(cvs) < 0) throw new Error('超商僅提供 7-11 或全家'); if (!store) throw new Error('請填寫取貨門市(店名或店號)');
-      if (logiOn_(d)) { // 綠界物流:門市一定要從地圖選(要有店號)
-        var cid = t_(d.cvsid, 20); if (!/^[A-Za-z0-9]{3,10}$/.test(cid)) throw new Error('請按「選擇門市」從超商地圖選取門市');
+      var cid = t_(d.cvsid, 20);
+      if (cid || logiOn_(d)) { // 門市從超商地圖選(要有店號)
+        if (!/^[A-Za-z0-9]{3,10}$/.test(cid)) throw new Error('請按「選擇門市」從超商地圖選取門市');
+        if (pay === '賣貨便' && !logiOn_(d) && cvs !== '7-11') throw new Error('賣貨便只能寄到 7-11 門市,請改選 7-11 門市');
         store = store.replace(/\(店號[^)]*\)/g, '').trim() + '(店號 ' + cid + ')';
       } else {
       if (pay === '賣貨便' && cvs !== '7-11') throw new Error('賣貨便只能寄到 7-11 門市,請改選 7-11 並填寫 7-11 的門市');
