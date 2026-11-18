@@ -1693,7 +1693,7 @@ function invSave_(tk, prep, results, test) {
       var lid = String(s['LINE ID'] || '');
       if (!test && lid) {
         var st = settings_(), tpl = String(st.發票開立通知內容 === undefined ? defSet_('發票開立通知內容') : st.發票開立通知內容 || '').trim();
-        if (tpl) pushLine_(lid, tpl.split('{出貨單號}').join(r.sid).split('{發票號碼}').join(r.no).split('{發票日期}').join(String(r.date || '').slice(0, 10)).split('{金額}').join(String(s.總額)).split('{姓名}').join(String(s.姓名 || '')).split('{連結}').join(appUrl_()));
+        if (tpl) { var itx = tpl.split('{出貨單號}').join(r.sid).split('{發票號碼}').join(r.no).split('{發票日期}').join(String(r.date || '').slice(0, 10)).split('{金額}').join(String(s.總額)).split('{姓名}').join(String(s.姓名 || '')).split('{連結}').join(appUrl_()); pushLine_(lid, itx, null, invFlex_(s, r, itx)); }
       }
       log_(prep.acc, '開立發票', r.sid, (test ? '(測試環境)' : '') + r.no + ' 隨機碼 ' + (r.rand || '') + ' 金額 ' + s.總額 + (r.recovered ? '(查回先前已開立)' : ''));
     });
@@ -2330,6 +2330,23 @@ function shipFlex_(s, alt, shipImg) {
     var b = { type: 'bubble', size: 'giga', header: poHead_('訂購單', 'PURCHASE ORDER', sid), body: { type: 'box', layout: 'vertical', paddingTop: '4px', contents: body } };
     if (foot.length) b.footer = { type: 'box', layout: 'vertical', spacing: 'sm', contents: foot };
     return { type: 'flex', altText: String(alt || '出貨通知').slice(0, 390), contents: b };
+  } catch (e) { return null; }
+}
+/** 發票開立通知卡片(LINE Flex):粉色標題列樣式 */
+function invFlex_(s, inv, alt) {
+  try {
+    var T = flexT_, sid = String(s.出貨單ID), no = String(inv.no || ''), d = String(inv.date || '').slice(0, 10);
+    var ph = nz_(s.電話), car = /^09\d{8}$/.test(ph) ? '手機 ' + ph.slice(0, 4) + '***' + ph.slice(7) : '綠界載具';
+    var b = { type: 'bubble', size: 'mega',
+      header: flexHead_('🧾 電子發票已開立', sid),
+      hero: flexHero_('發票號碼', no.replace(/^([A-Z]{2})(\d+)$/, '$1-$2')),
+      body: { type: 'box', layout: 'vertical', backgroundColor: BR_.paper, paddingAll: '16px', contents: [
+        flexRow_('開立日期', d, { margin: 'none' }), flexRow_('隨機碼', String(inv.rand || '—')), flexRow_('發票載具', '綠界載具(' + car + ')'),
+        { type: 'separator', margin: 'md', color: BR_.line },
+        flexRow_('發票金額', money_(s.總額), { bold: true, size: 'lg', margin: 'md' }),
+        T('發票已存在綠界載具,可歸戶到財政部手機條碼,用「統一發票兌獎」App 自動對獎', { size: 'xxs', color: BR_.mute, wrap: true, margin: 'md' })] } };
+    var base = appUrl_(); if (/^https:\/\//.test(base)) b.footer = { type: 'box', layout: 'vertical', backgroundColor: BR_.paper, contents: [flexBtn_('', { type: 'uri', label: '到會員專區查看', uri: base + (base.indexOf('?') >= 0 ? '&' : '?') + 's=' + encodeURIComponent(sid) }, true)] };
+    return { type: 'flex', altText: String(alt || '電子發票已開立').slice(0, 390), contents: b };
   } catch (e) { return null; }
 }
 var LINE_ERR_ = '';
