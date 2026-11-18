@@ -2189,7 +2189,8 @@ function memberCreateShip0_(tk, items, d) {
   if (!PAY[pay]) throw new Error('請選擇付款方式');
   if (pay === '刷卡' && prop_('ECPAY_PAY_LIVE') !== '1' && !d.paytest) throw new Error('線上付款即將開放,目前請選擇匯款或賣貨便');
   if (pay === '賣貨便' && method === '自取') throw new Error('賣貨便無法自取,請選擇匯款或付現金');
-  if (pay === '賣貨便' && (d.method || d.cvs)) method = '店到店';
+  if (pay === '賣貨便' && method && method !== '店到店') throw new Error('超商取貨付款只能搭配超商店到店');
+  if (pay === '賣貨便' && !method && d.cvs) method = '店到店';
   if (pay === '付現金' && method !== '自取') throw new Error('付現金只能選擇自取');
   if (method) {
     if (['店到店', '宅配', '自取'].indexOf(method) < 0) throw new Error('請選擇配送方式');
@@ -2288,7 +2289,7 @@ function adminCreateShipFor(tk, items, d) {
   var rc = shipRecv_(d), method = rc.method, ship = rc.ship;
   if (pay === '付現金' && method !== '自取') throw new Error('付現金只能選擇自取');
   if (pay === '賣貨便' && method === '自取') throw new Error('賣貨便無法自取,請選擇匯款或付現金');
-  if (pay === '賣貨便') method = '店到店';
+  if (pay === '賣貨便' && method !== '店到店') throw new Error('超商取貨付款只能搭配超商店到店');
   if (!/^[0-9+\-\s]{8,20}$/.test(phone)) throw new Error('請填寫正確的聯絡電話');
   var sid, total = 0, name = '', msg = '', oidsOut = '', itemsTxt = '', lidOut = '';
   lk_(function () {
