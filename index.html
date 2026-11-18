@@ -80,6 +80,7 @@ fieldset label{display:inline-block;margin:2px 10px 2px 0}
 .payc[hidden]{display:none!important}.payc.off{opacity:.45;cursor:not-allowed}
 .paynow{border:1.5px solid var(--pink);background:var(--soft);border-radius:12px;padding:14px;margin:10px 0}
 .paynow a{color:var(--acc)}
+.mact{margin:12px 0 18px}.mact>*:last-child{margin-bottom:0}.cpw{margin-top:12px;padding-top:12px;border-top:1px dashed var(--line)}.cpw .btn{font-size:13px!important;padding:6px 14px!important}
 .it{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff;margin:8px 0}
 .ih,.ir{display:grid;grid-template-columns:1fr 84px 96px 84px;gap:8px;align-items:center;padding:10px 12px}
 .ih{background:var(--soft);font-size:12px;color:var(--mute);font-weight:700}.ih span:not(:first-child){text-align:right}.ih span:nth-child(3){text-align:center}
@@ -783,8 +784,9 @@ function cpInit(o) {
   });
 }
 function memAct(o) {
-  var chg = canChangePay(o) ? '<p style="margin:6px 0 0"><button type="button" class="btn l" data-a="cpay" data-id="' + esc(o.id) + '">更改付款方式</button></p>' : '';
-  return memAct0(o) + chg;
+  var chg = canChangePay(o) ? '<div class="cpw"><button type="button" class="btn l" data-a="cpay" data-id="' + esc(o.id) + '">更改付款方式</button></div>' : '';
+  var main = memAct0(o);
+  return (main || chg) ? '<div class="mact">' + main + chg + '</div>' : '';
 }
 function memAct0(o) {
   if (o.pay === '刷卡' && o.st === '待刷卡')
