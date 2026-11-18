@@ -770,7 +770,7 @@ function l5Form(o, btn, cls) {
   return '<form id="rf" class="l5f" novalidate data-id="' + esc(o.id) + '"><label>匯款帳號後五碼<input name="l5" required inputmode="numeric" maxlength="5" minlength="5" pattern="\\d{5}" autocomplete="off" placeholder="00000" value="' + esc(o.last5) + '"></label><button class="btn ' + cls + '">' + btn + '</button></form><p id="re" class="tg" role="alert" style="margin:4px 0 0"></p>';
 }
 /* 客人更改付款方式(只限還沒付款的出貨單) */
-function canChangePay(o) { var f = FL0[o.pay] || []; return f[0] === o.st && !o.last5 && !o.inv && !o.lgid; }
+function canChangePay(o) { var f = FL0[o.pay] || []; return f[0] === o.st && !o.last5 && !o.inv && !o.lgid && !(o.pay === '賣貨便' && /門市在賣貨便下單時填寫/.test(o.ship || '')); }
 var FL0 = { '刷卡': ['待刷卡'], '匯款': ['待匯款'], '賣貨便': ['待出貨'], '付現金': ['待自取'] };
 function payChangeHtml(o) {
   return '<h2>更改付款方式</h2><p class="ds">出貨單 ' + esc(o.id) + '(' + esc(o.pay === '賣貨便' && !logiOn() ? '賣貨便' : { '店到店': '超商店到店', '宅配': '宅配到府', '自取': '到店自取' }[o.method] || o.method || '') + ')</p>' +
@@ -834,6 +834,7 @@ function shipForm() {
     '<label>聯絡電話<input name="phone" required inputmode="tel" value="' + esc((MD.me && MD.me.phone) || o0.ph || '') + '"></label>' +
     (true ? '<div id="mcvs"><label>超商<select name="cvs"><option>7-11</option><option>全家</option></select></label><input type="hidden" name="store"><input type="hidden" name="cvsid"><div class="cvsp"><div id="cvsn" class="ds">尚未選擇門市</div><button type="button" class="btn l" data-a="map">選擇門市(開啟超商地圖)</button></div><small class="ds" id="mfh" hidden></small></div>'
       : '<div id="mcvs"><label>超商<select name="cvs"><option>7-11</option><option>全家</option></select></label><label>取貨門市(店名或店號)<input name="store" maxlength="60"></label><small class="ds" id="mfh" hidden style="color:var(--acc)">賣貨便只能寄到 7-11 門市,請填 7-11 的店名或店號(不能填全家或地址)</small></div>') +
+    '<p id="mhs" class="ds" hidden style="background:var(--soft);padding:10px 12px;border-radius:10px;margin:8px 0">賣貨便不用選門市:出貨單成立後,我們會傳賣貨便下單連結給你,取貨門市在賣貨便下單時填寫即可。</p>' +
     '<div id="mhome" hidden><label>收件地址<input name="addr" maxlength="150" value="' + esc((MD.me && MD.me.addr) || '') + '"></label></div>' +
     (bal > 0 ? '<label>使用購物金(餘額 ' + money(bal) + ')<input name="credit" type="number" min="0" step="1" value="0" inputmode="numeric"></label><small class="ds" id="crh"></small>' + credNote() : '') +
     '<fieldset class="payf"><legend>付款方式</legend><small class="ds" id="mhh" hidden style="color:var(--acc);display:block;margin-bottom:6px">配送方式選了賣貨便,付款方式固定為賣貨便(要改請先換配送方式)</small><div class="payg">' + payCards() + '</div></fieldset>' +
@@ -854,8 +855,8 @@ function sfState(ch) {
     if (lb) { lb.hidden = !ok; lb.classList.remove('lk'); } r.disabled = r.hasAttribute('data-off');
     if (!ok && r.checked) { r.checked = false; var bk = f.querySelector('input[name="pay"][value="匯款"]'); if (bk) bk.checked = true; } });
   var ph = $('#mhh'); if (ph) ph.hidden = !mh;
-  var cv = mv === '店到店' || mh, hm = mv === '宅配';
-  $('#mcvs').hidden = !cv; $('#mhome').hidden = !hm;
+  var cv = mv === '店到店', hm = mv === '宅配';
+  $('#mcvs').hidden = !cv; var mhs = $('#mhs'); if (mhs) mhs.hidden = !mh; $('#mhome').hidden = !hm;
   f.store.required = false; f.addr.required = hm;
   if (ch === 'cvs' && f.cvsid) { f.cvsid.value = ''; f.store.value = ''; $('#cvsn').textContent = '尚未選擇門市'; }
   var mf = f.pay.value === '賣貨便' && !logiOn(), fo = f.cvs.querySelector('option[value="全家"],option:nth-child(2)');
@@ -955,7 +956,7 @@ document.addEventListener('submit', function (e) {
 document.addEventListener('submit', function (e) {
   var f = e.target; if (f.id !== 'sf') return; e.preventDefault();
   var mv0 = f.method.value;
-  if ((mv0 === '店到店' || mv0 === '賣貨便') && f.cvsid && !f.cvsid.value) { warn('請先按「選擇門市」,從超商地圖選取取貨門市', $('[data-a="map"]')); return; }
+  if (mv0 === '店到店' && f.cvsid && !f.cvsid.value) { warn('請先按「選擇門市」,從超商地圖選取取貨門市', $('[data-a="map"]')); return; }
   if (!f.querySelector('input[name="pay"]:checked')) { warn('請選擇付款方式'); return; }
   var items = Object.keys(MSEL).map(function (k) { return { oid: k.split('|')[0], pid: k.split('|')[1] }; });
   $('#sfe').textContent = '';

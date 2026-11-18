@@ -28,4 +28,13 @@ r = await call('memberChangePay', 'T1', 'S1', { pay: '付現金' }); ok(!r.ok, '
 r = await call('memberChangePay', 'T1', 'S1', { pay: '匯款' }); ok(r.ok && S().status === '待匯款' && Number(S().total) === 1060, 'back to 匯款 ' + S().total);
 r = await call('memberChangePay', 'T1', 'S1', { pay: '刷卡', kind: 'Installment' }); ok(!r.ok, 'installment gated: ' + r.error);
 S().remit_last5 = '12345'; r = await call('memberChangePay', 'T1', 'S1', { pay: '賣貨便' }); ok(!r.ok, 'locked after report: ' + r.error);
+// 賣貨便不用選門市
+DB['訂單'].push({ order_id: 'O2', ordered_at: '2026-11-18 10:00:00', name: '王', phone: '0912345678', status: '處理中', subtotal: 500, shipping: 0, total: 500, line_id: 'U1' });
+DB['出貨單'].push({ ship_id: 'S2', order_id: 'O2', status: '待出貨', name: '王', phone: '0912345678', pay_method: '賣貨便', receiver: '【店到店】7-11 ' + '(門市在賣貨便下單時填寫)' + '｜收件人 王小明', ship_method: '店到店', subtotal: 500, promo_discount: 0, credit_used: 0, shipping: 38, total: 538, line_id: 'U1' });
+r = await call('memberChangePay', 'T1', 'S2', { pay: '匯款' }); ok(!r.ok && /沒有選超商門市/.test(r.error), 'no-store 賣貨便 cannot switch: ' + r.error);
+{ const rt = createRuntime({ H: code.H, tableData: Object.fromEntries(Object.keys(TABLES).map(n => [n, []])), kv: KV, props: {}, fetchMap: {} }); Object.assign(globalThis, rt.globals); code.__reset();
+  let m = ''; try { code.INTERNAL.memberCreateShip0_('T1', [], { pay: '賣貨便', method: '店到店', rname: '王小明', phone: '0912345678' }); } catch (e) { m = e.message; }
+  ok(!/門市/.test(m), '賣貨便 create without store passes store check (stops later at: ' + m + ')');
+  m = ''; try { code.INTERNAL.memberCreateShip0_('T1', [], { pay: '匯款', method: '店到店', rname: '王小明', phone: '0912345678', cvs: '7-11' }); } catch (e) { m = e.message; }
+  ok(/門市/.test(m), '匯款 店到店 still needs store: ' + m); }
 console.log(fails ? fails + ' FAILED' : 'ALL PASSED');

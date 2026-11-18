@@ -5,6 +5,7 @@ var CATS_DEFAULT = ['活動中商品', '明星商品', '精品/錢包', '精品/
 function catHit_(pcats, vs) {
   return pcats.some(function (c) { return vs.some(function (v) { return c === v || c.indexOf(v + '/') === 0; }); });
 }
+var MH_STORE = '(門市在賣貨便下單時填寫)';
 var PAY = { '刷卡': '待刷卡', '匯款': '待匯款', '賣貨便': '待出貨', '付現金': '待自取' };
 var H = {
   '商品': ['商品ID', '名稱', '類別', '銷售型態', '單價', '數量', '到貨日期', '說明', '階梯價', '圖片', '上架', '規格', '品牌'],
@@ -962,6 +963,7 @@ function memberChangePay(tk, sid, d) {
     if (pay === '賣貨便' && m !== '店到店') throw new Error((logiOn_(d) ? '超商取貨付款' : '賣貨便') + '只能搭配超商店到店');
     if (pay === '賣貨便' && !logiOn_(d) && c && c.cvs !== '7-11') throw new Error('賣貨便只能寄 7-11,你的取貨門市是 ' + c.cvs + ',請改選其他付款方式');
     if (pay === '付現金' && m !== '自取') throw new Error('付現金只能搭配到店自取');
+    if (pay !== '賣貨便' && c && c.store.indexOf(MH_STORE) >= 0) throw new Error('這張賣貨便出貨單沒有選超商門市,不能改成其他付款方式,請聯繫客服');
     if (pay === '刷卡' && prop_('ECPAY_PAY_LIVE') !== '1' && !d.paytest) throw new Error('線上付款即將開放,請選擇其他付款方式');
     var kind = pay === '刷卡' ? kindOk_(d) : '';
     var n = cp_(s), oldPay = String(s.付款方式), oldFee = Number(s.運費) || 0;
@@ -2225,7 +2227,10 @@ function memberCreateShip0_(tk, items, d) {
   if (method) {
     if (['店到店', '宅配', '自取'].indexOf(method) < 0) throw new Error('請選擇配送方式');
     var rn = realName_(d.rname);
-    if (method === '店到店') {
+    if (method === '店到店' && pay === '賣貨便' && !logiOn_(d)) {
+      // 賣貨便:客人不用選門市,門市在賣貨便下單時自己填
+      ship = '【店到店】7-11 ' + MH_STORE + '｜收件人 ' + rn;
+    } else if (method === '店到店') {
       var cvs = t_(d.cvs, 20), store = t_(d.store, 60);
       if (['7-11', '全家'].indexOf(cvs) < 0) throw new Error('超商僅提供 7-11 或全家'); if (!store) throw new Error('請填寫取貨門市(店名或店號)');
       var cid = t_(d.cvsid, 20);
