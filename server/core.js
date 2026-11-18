@@ -58,12 +58,6 @@ const SPECIAL = {
     const [tk, sid] = args;
     const o = withRt(rt, () => code.INTERNAL.logiPrintPrep_(tk, sid));
     const f = logiPrintFields(logiCfg(props), o);
-    // 診斷:伺服器端先試打一次綠界列印頁,記錄回應(方便排查空白頁)
-    try {
-      const r = await fetch(f.action, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'text/html' }, body: new URLSearchParams(f.fields).toString(), redirect: 'manual' });
-      const t = await r.text();
-      console.log('logi print probe', sid, r.status, r.headers.get('location') || '', t.replace(/\s+/g, ' ').slice(0, 1500));
-    } catch (e) { console.log('logi print probe error', String(e)); }
     return f;
   },
 
