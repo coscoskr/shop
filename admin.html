@@ -515,7 +515,7 @@ document.addEventListener('click', function (e) { var b = e.target.closest && e.
 var SPL = [];
 function drawSpecs() {
   var b = $('#spl'); if (!b) return;
-  b.innerHTML = SPL.map(function (x, i) { return '<div style="display:flex;gap:6px;margin:4px 0;align-items:center"><input class="spi" data-i="' + i + '" value="' + esc(x.n) + '" maxlength="30" placeholder="規格:黑色 / M" style="flex:1;min-width:0"><input class="spq" data-i="' + i + '" type="number" min="0" step="1" value="' + esc(x.q) + '" placeholder="數量" style="width:84px" aria-label="此規格數量"><button type="button" class="btn l s" data-a="sprm" data-i="' + i + '">移除</button></div>'; }).join('') || '<span class="m">沒有規格</span>';
+  b.innerHTML = SPL.map(function (x, i) { return '<div style="display:flex;gap:6px;margin:4px 0;align-items:center"><input class="spi" data-i="' + i + '" value="' + esc(x.n) + '" maxlength="60" placeholder="規格:黑色 / M" style="flex:1;min-width:0"><input class="spq" data-i="' + i + '" type="number" min="0" step="1" value="' + esc(x.q) + '" placeholder="數量" style="width:84px" aria-label="此規格數量"><button type="button" class="btn l s" data-a="sprm" data-i="' + i + '">移除</button></div>'; }).join('') || '<span class="m">沒有規格</span>';
   syncStock();
 }
 /* 顏色×尺寸:規格名稱用「顏色 / 尺寸」存(中間是空白/空白),前台會拆成兩排按鈕 */
@@ -529,7 +529,13 @@ function spgDraw() {
 function spgClean(x) { return String(x).replace(/[|=]/g, '').replace(/\s+\/\s+/g, '/').trim(); }
 function spgAdd(k) {
   var inp = $(k === 'c' ? '#spgc' : '#spgs'); if (!inp) return;
-  String(inp.value).split(/[,，、\n]/).forEach(function (x) { x = spgClean(x); if (x && SPG[k].indexOf(x) < 0) SPG[k].push(x); });
+  String(inp.value).split(/[,，、\n]/).forEach(function (x) {
+    x = spgClean(x); if (!x) return;
+    /* EU35/EU36/EU37 這種同字頭連在一起的,自動拆成多個尺寸;US6/23.5cm 這種不拆 */
+    var ps = x.split('/').map(function (y) { return y.trim(); }), pre = function (y) { return (y.match(/^[^\d]*/) || [''])[0].toUpperCase(); };
+    if (ps.length > 1 && ps.every(function (y) { return y && pre(y) === pre(ps[0]); })) ps.forEach(function (y) { if (SPG[k].indexOf(y) < 0) SPG[k].push(y); });
+    else if (SPG[k].indexOf(x) < 0) SPG[k].push(x);
+  });
   inp.value = ''; inp.focus(); spgDraw();
 }
 function spgGen() {
