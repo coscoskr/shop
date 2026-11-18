@@ -2740,6 +2740,7 @@ function arrText_(uid, text) {
     return { reply: cn ? '已清除 ' + cn + ' 項待對應的酷柏到貨(這些沒有入帳,請確認已在後台手動處理)。' : '目前沒有待對應的酷柏到貨。' };
   }
   if (/^(確認|確定|ok|OK|Ok)$/.test(text)) return { reply: arrApply_() };
+  if (cbOn_() && /酷柏|coolbau/i.test(text) && /到貨|到货|入庫|已到/.test(text)) return { reply: '🔄 這看起來是酷柏的到貨通知。酷柏到貨現在會自動同步入帳並通知客人,不需要再轉傳,這次沒有做任何變更。\n(其他廠商的到貨通知照常轉傳即可)' };
   if (/^取消$/.test(text)) { var n = arrPend_().length; arrSave_([]); return { reply: n ? '已取消,沒有任何變更。' : '目前沒有待確認的到貨。' }; }
   return { ai: true };
 }
@@ -2766,10 +2767,14 @@ function arrPlan_(items, opt) {
   pend.forEach(function (pl) { pl.assign.forEach(function (a) { taken[a.oid + '|' + a.pid] = 1; }); });
   rows_('訂單').forEach(function (o) { ords[String(o.訂單ID)] = o; });
   rows_('會員').forEach(function (m) { mem[String(m['LINE ID'])] = m; });
-  var agg = {}, order = [], unk = [];
+  var agg = {}, order = [], unk = [], cbSkip = [];
+  // 酷柏到貨已自動同步:手動轉傳的到貨通知裡,廠商是酷柏的品項一律略過,避免同一批貨入帳兩次
+  var cbOn = !opt && cbOn_(), vend = {};
+  if (cbOn) rows_('商品_內部').forEach(function (r) { vend[String(r.商品ID)] = String(r.廠商 || ''); });
   (items || []).forEach(function (it) {
     var pid = String(it.pid || ''), p = prods[pid], q = Math.floor(Number(it.qty)), tx = String(it.text || it.name || '?').slice(0, 40);
     if (!p || !(q >= 1)) { unk.push(tx); return; }
+    if (cbOn && vend[pid] === '酷柏') { cbSkip.push(String(p.名稱) + (it.spec ? '(' + String(it.spec).trim() + ')' : '') + ' ×' + q); return; }
     var sl = specs_(p), sp = String(it.spec || '').trim();
     if (sl.length && sl.indexOf(sp) < 0) { unk.push(tx + '(規格對不上)'); return; }
     if (!sl.length) sp = '';
@@ -2798,11 +2803,14 @@ function arrPlan_(items, opt) {
     msg.push('・' + a.name + (a.spec ? '(' + a.spec + ')' : '') + ' 到 ' + a.qty + ' 件' + (a.price !== '' ? ',進價 ' + a.price : '') + '\n' + (got.join('\n') || '  (沒有待到貨的訂單)'));
   });
   var head = (opt && opt.head) || '📦 到貨預覽';
-  if (!plan.assign.length && !plan.surplus.length) return head + '\n看不出可入帳的品項。' + (unk.length ? '\n對不上商品:' + unk.join('、') : '') + '\n請再傳清楚一點的通知,或到後台手動處理。';
+  var cbNote = cbSkip.length ? '\n🔄 以下是酷柏的商品,酷柏到貨現在會自動同步入帳,不需要轉傳,這次沒有處理:\n・' + cbSkip.join('\n・') : '';
+  if (cbSkip.length && !order.length && !unk.length) return '🔄 這是酷柏的到貨,現在酷柏到貨會自動同步入帳並通知客人,不需要再轉傳,這次沒有做任何變更。\n・' + cbSkip.join('\n・');
+  if (!plan.assign.length && !plan.surplus.length) return head + '\n看不出可入帳的品項。' + cbNote + (unk.length ? '\n對不上商品:' + unk.join('、') : '') + '\n請再傳清楚一點的通知,或到後台手動處理。';
   if (opt && opt.auto) opt.plan = plan; else { pend.push(plan); arrSave_(pend); }
   var t = head + (pend.length > 1 && !(opt && opt.auto) ? '(第 ' + pend.length + ' 則,待確認共 ' + pend.length + ' 則)' : '') + '\n' + msg.join('\n');
   if (plan.skip.length) t += '\n⚠️ ' + plan.skip.join('\n⚠️ ');
   if (unk.length) t += '\n⚠️ 對不上商品(不處理):' + unk.join('、');
+  t += cbNote;
   return t + (opt && opt.auto ? '' : '\n\n回「確認」入帳並通知客人;回「取消」放棄。');
 }
 /** 套用所有待確認的到貨計畫(plans 有給時只套用指定的計畫,不動待確認清單) */
@@ -2870,6 +2878,7 @@ function cbMapGet_(it, st, prods) {
   return null;
 }
 function cbMapPut_(m) { cbKeys_(m).forEach(function (k) { setSet_(CB_MAP_ + k, String(m.pid) + '|' + String(m.cspec || '')); }); }
+function cbOn_() { return String(prop_('COOLBAU_ARR_SECRET') || '').length >= 16; }
 function cbPend_() { try { var a = JSON.parse(String(settings_()[CB_PEND_] || '[]')); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
 function cbPendSave_(a) { setSet_(CB_PEND_, JSON.stringify((a || []).slice(0, 150))); }
 function cbPendAdd_(items) {

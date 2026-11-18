@@ -103,4 +103,20 @@ a = run((I) => I.arrPlan_([{ pid: 'P008', spec: '', qty: 1, price: null, text: '
 ok(/^📦 到貨預覽/.test(a.r) && /回「確認」入帳/.test(a.r) && run((I) => I.arrPend_().length).r === 1, 'manual forward: preview saved');
 a = run((I) => I.arrText_('UADMIN', '確認'));
 ok(/客訂到貨 1 筆/.test(a.r.reply) && L('O3', 'P008').arrival_status === '已到貨' && L('O3', 'P008').arrived_by === '到貨助理' && run((I) => I.arrPend_().length).r === 0, 'manual forward: confirm applies as before');
+// 9) 啟用酷柏自動同步後:手動轉傳的到貨裡,酷柏的商品一律略過(避免重複入帳),其他廠商照常
+PROPS.COOLBAU_ARR_SECRET = SECRET;
+DB['商品_內部'].push({ product_id: 'P072', vendor: '酷柏', cost: 900, cost_tax_incl: 'N', source: '', locked: 'N' });
+DB['商品_內部'].push({ product_id: 'P008', vendor: 'JNB', cost: 800, cost_tax_incl: 'N', source: '', locked: 'N' });
+const stk0 = DB['庫存進貨'].length;
+a = run((I) => I.arrPlan_([{ pid: 'P072', spec: '灰', qty: 5, price: null, text: '毛帽' }]));
+ok(/^🔄 這是酷柏的到貨/.test(a.r) && run((I) => I.arrPend_().length).r === 0, 'manual forward of 酷柏 only: blocked, nothing saved');
+line('O2', 'P008', 'Hello Kitty聯名款擴香3入禮盒組', '', 1);
+a = run((I) => I.arrPlan_([{ pid: 'P072', spec: '灰', qty: 5, price: null, text: '毛帽' }, { pid: 'P008', spec: '', qty: 1, price: null, text: '擴香' }]));
+ok(/^📦 到貨預覽/.test(a.r) && /酷柏的商品/.test(a.r) && /蝴蝶結貓耳毛帽/.test(a.r) && run((I) => I.arrPend_()[0].assign.every((x) => x.pid === 'P008')).r, 'mixed forward: 酷柏 skipped, other vendor planned');
+a = run((I) => I.arrText_('UADMIN', '確認'));
+ok(DB['庫存進貨'].length === stk0 && L('O2', 'P008').arrival_status === '已到貨', 'mixed forward: only other vendor applied, no 酷柏 stock added');
+a = run((I) => I.arrText_('UADMIN', '酷柏 到貨通知:蝴蝶結貓耳毛帽 灰 ×5 已到貨'));
+ok(a.r && /^🔄 這看起來是酷柏的到貨通知/.test(a.r.reply), 'forwarded 酷柏 text answered without AI');
+a = run((I) => I.arrText_('UADMIN', 'JNB 到貨:擴香 ×1'));
+ok(a.r && a.r.ai && !a.r.reply, 'other vendor text still goes to AI');
 console.log(fails ? fails + ' FAILED' : 'ALL PASSED');
