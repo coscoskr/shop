@@ -1502,18 +1502,29 @@ function adminUpdateShip(tk, sid, d) {
       if (!PAY[d.pay] || d.pay === '刷卡') throw new Error('付款方式不正確');
       var f0 = FLOW[payNew] || [];
       if (f0.indexOf(String(s.狀態)) !== 0) throw new Error('出貨單已經開始處理(' + s.狀態 + '),不能改付款方式');
-      if (d.pay === '付現金' && String(s.配送方式) !== '自取') throw new Error('付現金只能用在自取');
-      if (d.pay === '賣貨便' && String(s.配送方式) !== '店到店') throw new Error('賣貨便只能用在店到店');
+      var mNew0 = d.method ? String(d.method) : String(s.配送方式);
+      if (d.pay === '付現金' && mNew0 !== '自取') throw new Error('付現金只能用在自取');
+      if (d.pay === '賣貨便' && mNew0 !== '店到店') throw new Error('賣貨便只能用在店到店');
       payNew = String(d.pay); payChanged = true; d.st = PAY[payNew];
     }
     var f = FLOW[payNew] || [];
     if (f.indexOf(d.st) < 0) throw new Error('此付款方式沒有「' + d.st + '」這個狀態');
     var fee = Number(d.fee);
     if (d.fee === '' || !(fee >= 0)) throw new Error('運費不正確');
-    var ship = t_(d.ship, 200); if (!ship) throw new Error('請填寫收件資訊');
+    var ship = t_(d.ship, 200), mNew = String(s.配送方式 || '');
+    if (d.method) { // 結構化修改:配送方式+收件人+門市/地址
+      var rc = adminRecv_(d); ship = rc.ship; mNew = rc.method;
+      if (mNew !== String(s.配送方式 || '') && f.indexOf(d.st) >= si_(payNew) && String(s.配送方式 || '')) throw new Error('已出貨的出貨單不能改配送方式');
+      if (payNew === '付現金' && mNew !== '自取') throw new Error('付現金只能用在自取,請先改付款方式');
+      if (payNew === '賣貨便' && mNew !== '店到店') throw new Error('賣貨便只能用在店到店,請先改付款方式');
+      if (payNew === '賣貨便' && rc.cvs !== '7-11') throw new Error('賣貨便只能寄 7-11');
+      if (mNew !== String(s.配送方式 || '') && fee === Number(s.運費)) fee = feeFor_(mNew, payNew, Number(s.商品金額) - Number(s.優惠折抵 || 0)); // 改了配送方式但沒動運費 → 依設定重算
+    }
+    if (!ship) throw new Error('請填寫收件資訊');
     var link = t_(d.link, 500); if (link && !/^https:\/\//.test(link)) throw new Error('付款連結需以 https:// 開頭');
     var n = cp_(s);
     n.付款方式 = payNew; n.狀態 = d.st; if (payChanged && payNew === '匯款') n.收款帳號 = String(settings_().匯款資訊 || ''); n.物流 = t_(d.co, 30); n.物流單號 = t_(d.no, 40); n.付款連結 = link; if (d.last5 !== undefined) n.匯款後五碼 = t_(d.last5, 5); if (d.rdate !== undefined) { var rd = String(d.rdate || ''); if (rd && !/^\d{4}-\d{2}-\d{2}$/.test(rd)) throw new Error('匯款日期格式不正確'); n.匯款日期 = rd; } n.收件資訊 = ship; n.備註 = t_(d.note, 200); n.電話 = t_(d.phone, 20) || s.電話;
+    n.配送方式 = mNew; n.收件資訊 = ship;
     n.運費 = fee; n.總額 = Math.max(0, Number(s.商品金額) - Number(s.優惠折抵 || 0) - Number(s.購物金折抵 || 0)) + fee;
     if (d.img !== undefined) { var im = t_(d.img, 500); if (im && !/^https:\/\//.test(im)) throw new Error('出貨單圖片網址不正確'); n.出貨單圖片 = im; }
     var shippedNow = f.indexOf(d.st) >= si_(payNew);
@@ -2166,6 +2177,26 @@ function shipRecv_(d) {
     ship = '【宅配】' + addr + '｜收件人 ' + rn;
   }
   return { method: method, ship: ship };
+}
+/** 後台改收件資訊(收件人不強制本名檢查,只要有填) */
+function adminRecv_(d) {
+  var method = String(d.method || ''), rn = t_(d.rname, 30);
+  if (['店到店', '宅配', '自取'].indexOf(method) < 0) throw new Error('請選擇配送方式');
+  if (!rn) throw new Error('請填寫收件人');
+  if (method === '自取') return { method: method, ship: '【自取】取貨人 ' + rn };
+  if (method === '店到店') {
+    var cvs = t_(d.cvs, 20), store = t_(d.store, 60);
+    if (['7-11', '全家'].indexOf(cvs) < 0) throw new Error('超商請選 7-11 或全家'); if (!store) throw new Error('請填寫取貨門市');
+    return { method: method, cvs: cvs, ship: '【店到店】' + cvs + ' ' + store + '｜收件人 ' + rn };
+  }
+  var addr = t_(d.addr, 150); if (!addr) throw new Error('請填寫收件地址');
+  return { method: method, ship: '【宅配】' + addr + '｜收件人 ' + rn };
+}
+/** 依設定算運費(滿額免運) */
+function feeFor_(m, pay, net) {
+  var st = settings_(), free = Number(st.免運門檻) || 0;
+  var base = m === '自取' ? 0 : pay === '賣貨便' ? (st.賣貨便運費 === undefined || String(st.賣貨便運費) === '' ? 38 : Number(st.賣貨便運費) || 0) : m === '店到店' ? Number(st.店到店運費) || 0 : m === '宅配' ? Number(st.宅配運費) || 0 : 0;
+  return (free > 0 && net >= free) ? 0 : base;
 }
 function adminShipQuote(tk, items, d) {
   me_(tk); d = d || {};
