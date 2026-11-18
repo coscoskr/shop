@@ -1759,9 +1759,9 @@ function stockPage() {
 }
 function drawStock() {
   var P2 = SK.products;
-  $('#v').innerHTML = '<h2 style="margin-top:0">庫存表</h2><p class="m">一批貨到了,一部分是客人訂的、一部分是要放庫存:客訂在「訂單明細」,庫存部分在這裡新增「庫存進貨」。兩種都會出現在「訂單明細」(庫存的訂購人顯示【庫存】),可以一起勾選做廠商付款。庫存進貨改成「已到貨」時才會增加商品數量。</p>' +
+  $('#v').innerHTML = '<h2 style="margin-top:0">庫存表</h2><p class="m">一批貨到了,一部分是客人訂的、一部分是要放庫存:客訂在「訂單明細」,庫存部分在這裡新增「庫存進貨」。兩種都會出現在「訂單明細」(庫存的訂購人顯示【庫存】),可以一起勾選做廠商付款。庫存進貨改成「已到貨」時才會增加商品數量;<b>預購商品</b>則變成該商品的「現貨」(前台會顯示現貨件數,客人下單時該規格的現貨夠這筆的數量就直接用現貨、可出貨,不夠就整筆照預購)。</p>' +
     '<table><thead><tr><th>商品</th><th>型態</th><th>目前數量</th><th>待到貨(客訂)</th><th>待到貨(庫存進貨)</th><th>預設廠商</th><th>成本</th></tr></thead><tbody>' +
-    P2.map(function (p) { return '<tr><td style="white-space:normal">' + esc(p.name) + ' <span class="m">' + esc(p.id) + '</span></td><td>' + esc(p.type) + '</td><td>' + (p.stock === '' ? '無限' : nf(p.stock)) + '</td><td>' + nf(p.waitOrders) + '</td><td>' + nf(p.waitStock) + '</td><td>' + esc(p.vendor) + '</td><td>' + (p.cost === '' ? '' : nf(p.cost)) + '</td></tr>'; }).join('') + '</tbody></table>' +
+    P2.map(function (p) { return '<tr><td style="white-space:normal">' + esc(p.name) + ' <span class="m">' + esc(p.id) + '</span></td><td>' + esc(p.type) + '</td><td>' + (p.stock === '' ? '無限' : nf(p.stock)) + (p.ready ? '<br><b style="color:#1b7a36">現貨 ' + Object.keys(p.ready).map(function (k) { return esc(k || '') + (k ? '×' : '') + nf(p.ready[k]); }).join('、') + '</b>' : '') + '</td><td>' + nf(p.waitOrders) + '</td><td>' + nf(p.waitStock) + '</td><td>' + esc(p.vendor) + '</td><td>' + (p.cost === '' ? '' : nf(p.cost)) + '</td></tr>'; }).join('') + '</tbody></table>' +
     '<h3 style="margin-top:22px">新增庫存進貨</h3><form id="skf" style="max-width:760px"><div class="g"><label>商品<select name="pid" id="skp">' + P2.map(function (p) { return '<option value="' + esc(p.id) + '">' + esc(p.name) + '</option>'; }).join('') + '</select></label>' +
     '<label>規格<select name="spec" id="sks"></select></label>' + fld('數量', 'qty', '', 'number') + '<label>廠商<select name="vendor">' + vopt('', '(用商品預設)') + '</select></label>' + fld('單件成本(空白=用商品預設)', 'cost', '', 'number') + fld('貨源(空白=用商品預設)', 'src', '') + '</div>' +
     '<label class="ck"><input type="checkbox" name="arrived"> 已到貨(直接增加商品數量)</label><p class="er" id="ske" role="alert"></p><button class="btn a">新增</button></form>' +

@@ -235,7 +235,10 @@ function baseQty(id, except) { var n = 0; for (var k in cart) if (bp(k) === id &
 function room(p) { return maxQ(p) - baseQty(p.id); }
 function specRoom(p, sp) { var q = sp && p.specQty ? p.specQty[sp] : null; return q == null ? 99 : q - (cart[p.id + '~' + sp] || 0); }
 function maxQ(p) { return p.stock === null ? 99 : Math.min(99, p.stock); }
-function tag(p) { return p.type === '預購' ? '預購' + (p.arrival === '排隊中' ? ',暫不確定,排隊中' : p.arrival ? ',預計' + md(p.arrival) + '左右' : '') : '現貨'; }
+/* 預購商品的現貨件數(到貨時多出來的數量):sp 有給=該規格,沒給=全部規格合計 */
+function rdyN(p, sp) { var r = p && p.ready, n = 0; if (!r) return 0; if (sp !== undefined) return r[sp] || 0; for (var k in r) n += r[k]; return n; }
+function rdyNote(n) { return n ? '有現貨 <b>' + n + '</b> 件:一次購買 ' + n + ' 件以內可直接出貨,超過則整筆為預購' : ''; }
+function tag(p) { return p.type === '預購' ? (rdyN(p) ? '有現貨 ' + rdyN(p) + ' 件・其餘' : '') + '預購' + (p.arrival === '排隊中' ? ',暫不確定,排隊中' : p.arrival ? ',預計' + md(p.arrival) + '左右' : '') : '現貨'; }
 
 function promoChip() { var c = $('#pchip'), f = $('#fab'); c.style.bottom = ((f && !f.hidden ? f.offsetHeight : 0) + 28) + 'px'; }
 function promo(t) {
@@ -512,7 +515,7 @@ function detail(p) {
   return '<div class="tb">' + (!LT && D.line && D.line.on ? '<button type="button" class="lgb" data-a="lgd">LINE 登入</button>' : '') + '<button type="button" class="xb" data-a="x" aria-label="關閉">✕</button></div><h2>' + bn(p) + '</h2>' + (p.imgs && p.imgs.length ? '<img class="big" id="bigimg" src="' + esc(p.imgs[0]) + '" alt="" referrerpolicy="no-referrer">' + (p.imgs.length > 1 ? '<div class="th">' + p.imgs.map(function (u, k) { return '<img src="' + esc(u) + '" referrerpolicy="no-referrer" alt="商品圖片 ' + (k + 1) + '" data-a="bigimg" data-u="' + esc(u) + '" class="' + (k ? '' : 'on') + '">'; }).join('') + '</div>' : '') : '') +
     '<p><span class="pr">' + money(p.price) + '</span> <span class="tg">' + tag(p) + '</span></p>' + (t ? '<p class="tg">' + t + '</p>' : '') +
     '<p class="ds">' + esc(p.desc) + '</p>' +
-    (p.stock === 0 ? '<p>這項商品已售完。</p><p><button class="btn l shb" data-a="shr">分享給朋友</button></p>' : (p.specs && p.specs.length ? '<input type="hidden" id="spsel" value=""><div id="spw">' + specPick(p) + '</div><p id="spn" class="m" style="margin:4px 0">請選擇規格查看剩餘數量</p>' : (p.stock !== null ? '<p class="m" style="margin:4px 0">剩餘數量:<b>' + p.stock + '</b> 件</p>' : '')) + '<p id="dte" class="tg" role="alert"></p><div class="r"><button class="btn l" data-a="dn">−</button><b id="qn">1</b><button class="btn l" data-a="up">+</button><button class="btn a" data-a="add">加入購物車</button><button type="button" class="btn l shb" data-a="shr">分享給朋友</button></div>') +
+    (p.stock === 0 ? '<p>這項商品已售完。</p><p><button class="btn l shb" data-a="shr">分享給朋友</button></p>' : (p.specs && p.specs.length ? '<input type="hidden" id="spsel" value=""><div id="spw">' + specPick(p) + '</div><p id="spn" class="m" style="margin:4px 0">請選擇規格查看剩餘數量</p>' : (p.stock !== null ? '<p class="m" style="margin:4px 0">剩餘數量:<b>' + p.stock + '</b> 件</p>' : '') + (rdyN(p, '') ? '<p class="m" style="margin:4px 0">' + rdyNote(rdyN(p, '')) + '</p>' : '')) + '<p id="dte" class="tg" role="alert"></p><div class="r"><button class="btn l" data-a="dn">−</button><b id="qn">1</b><button class="btn l" data-a="up">+</button><button class="btn a" data-a="add">加入購物車</button><button type="button" class="btn l shb" data-a="shr">分享給朋友</button></div>') +
     '';
 }
 /* 購物車/下單:商品明細列(品牌、品名、規格、單價、數量、小計) */
@@ -942,7 +945,7 @@ document.addEventListener('change', function (e) {
   if (e.target.id !== 'spsel') return;
   var n = $('#spn'), v = e.target.value, q = cur && cur.specQty ? cur.specQty[v] : null;
   var lim0 = v ? specRoom(cur, v) : 99; if (v && dq > Math.max(lim0, 1)) { dq = Math.max(lim0, 1); var qn = $('#qn'); if (qn) qn.textContent = dq; }
-  if (n) n.innerHTML = !v ? '請選擇規格查看剩餘數量' : (q == null ? (cur.stock === null ? '庫存充足' : '剩餘數量:<b>' + cur.stock + '</b> 件') : q === 0 ? '此規格已售完' : '剩餘數量:<b>' + q + '</b> 件');
+  if (n) n.innerHTML = !v ? '請選擇規格查看剩餘數量' : rdyN(cur, v) && q !== 0 ? rdyNote(rdyN(cur, v)) : (q == null ? (cur.stock === null ? '庫存充足' : '剩餘數量:<b>' + cur.stock + '</b> 件') : q === 0 ? '此規格已售完' : '剩餘數量:<b>' + q + '</b> 件');
 });
 document.addEventListener('input', function (e) { if (e.target.name === 'l5') e.target.value = e.target.value.replace(/\D/g, '').slice(0, 5); });
 document.addEventListener('change', function (e) { if (e.target.id === 'ucr') { useCr = e.target.checked; refreshQuote(); } });
