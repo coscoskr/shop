@@ -68,6 +68,18 @@ form label{display:block;margin:10px 0;font-size:14px}
 form input:not([type=radio]),form textarea{display:block;width:100%;padding:8px;border:1px solid var(--line);border-radius:2px;background:#fff}
 fieldset{border:1px solid var(--line);border-radius:2px;margin:10px 0}
 fieldset label{display:inline-block;margin:2px 10px 2px 0}
+.payf{border:0;padding:0;margin:12px 0}.payf legend{font-weight:700;margin-bottom:6px;padding:0}
+.payg{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.payc{position:relative;display:flex!important;gap:10px;align-items:flex-start;border:1.5px solid var(--line);border-radius:12px;padding:12px 10px;margin:0!important;background:#fff;cursor:pointer;transition:border-color .15s,background .15s}
+.payc input{position:absolute;opacity:0;pointer-events:none}
+.payc .ic{font-size:22px;line-height:1}.payc b{display:block;font-size:14px;color:var(--ink)}.payc small{display:block;color:var(--mute);font-size:12px;line-height:1.4;margin-top:2px}
+.payc:has(input:checked){border-color:var(--acc);background:var(--soft);box-shadow:0 0 0 2px rgba(169,91,77,.15)}
+.payc:has(input:checked)::after{content:'✓';position:absolute;top:6px;right:8px;color:var(--acc);font-weight:700}
+.payc:has(input:focus-visible){outline:2px solid var(--acc);outline-offset:2px}
+.payc.off{opacity:.45;cursor:not-allowed}
+.paynow{border:1.5px solid var(--pink);background:var(--soft);border-radius:12px;padding:14px;margin:10px 0}
+.paynow a{color:var(--acc)}
+@media (max-width:340px){.payg{grid-template-columns:1fr}}
 #cb{position:relative}#cn{position:absolute;top:-6px;right:-6px;background:var(--acc);color:#fff;border-radius:10px;font-size:12px;padding:0 6px}
 main{grid-template-columns:repeat(2,1fr);gap:20px 12px;padding:0 12px 24px}
 header{padding:10px 12px;flex-wrap:wrap}
@@ -677,7 +689,10 @@ function l5Form(o, btn, cls) {
 }
 function memAct(o) {
   if (o.pay === '刷卡' && o.st === '待刷卡')
-    return '<p><button class="btn a" data-a="pay" data-k="Credit" data-id="' + esc(o.id) + '">💳 信用卡付款 ' + money(o.total) + '</button> <button class="btn l" data-a="pay" data-k="BNPL" data-id="' + esc(o.id) + '">📱 無卡分期</button></p><p class="ds">將前往綠界安全付款頁。無卡分期免信用卡,需線上申請審核,分期利息依分期公司規定由您負擔。付款完成後回到這裡,狀態會自動更新。</p><p class="er" id="paye"></p>';
+    { var k0 = PAYK[o.kind] ? o.kind : 'Credit', alt = Object.keys(PAYK).filter(function (k) { return k !== k0; });
+      return '<div class="paynow"><p style="margin:0 0 8px"><b>應付 ' + money(o.total) + '</b> · ' + esc(PAYK[k0]) + '</p><button class="btn a" data-a="pay" data-k="' + k0 + '" data-id="' + esc(o.id) + '">🔒 前往付款</button>' +
+        '<p class="ds" style="margin:10px 0 0">想換方式:' + alt.map(function (k) { return '<a href="#" data-a="pay" data-k="' + k + '" data-id="' + esc(o.id) + '">' + PAYK[k] + '</a>'; }).join(' · ') + '</p>' +
+        '<p class="ds" style="margin:6px 0 0">將前往綠界安全付款頁,付款完成回到這裡狀態會自動更新。' + (k0 === 'BNPL' ? '無卡分期需線上申請審核,分期利息依分期公司規定由您負擔。' : '') + '</p><p class="er" id="paye"></p></div>'; }
   if (o.pay === '匯款' && o.st === '已匯款待查帳')
     return '<p class="tg">已收到你回報的匯款後五碼 <b>' + esc(o.last5) + '</b>,我們查帳確認後會安排出貨。</p><p class="ds" style="max-height:none;margin-bottom:0">後五碼打錯了?可重新回報:</p>' + l5Form(o, '更新', 'l');
   if (o.pay === '匯款' && o.st === '待匯款')
@@ -717,7 +732,7 @@ function shipForm() {
     '<div id="mcvs"><label>超商<select name="cvs"><option>7-11</option><option>全家</option></select></label><label>取貨門市(店名或店號)<input name="store" maxlength="60"></label><small class="ds" id="mfh" hidden style="color:var(--acc)">賣貨便只能寄到 7-11 門市,請填 7-11 的店名或店號(不能填全家或地址)</small></div>' +
     '<div id="mhome" hidden><label>收件地址<input name="addr" maxlength="150" value="' + esc((MD.me && MD.me.addr) || '') + '"></label></div>' +
     (bal > 0 ? '<label>使用購物金(餘額 ' + money(bal) + ')<input name="credit" type="number" min="0" step="1" value="0" inputmode="numeric"></label><small class="ds" id="crh"></small>' + credNote() : '') +
-    '<fieldset><legend>付款方式</legend><label><input type="radio" name="pay" value="匯款" checked> 匯款(先轉帳,確認收款後出貨)</label><label><input type="radio" name="pay" value="賣貨便"> 賣貨便(貨到付款,僅店到店)</label><label><input type="radio" name="pay" value="付現金"> 付現金(僅自取)</label>' + (payOn() ? '<label><input type="radio" name="pay" value="刷卡"> 線上付款:信用卡/無卡分期(付款後出貨)</label>' : '<label style="color:var(--mute)"><input type="radio" name="pay" value="刷卡" disabled> 信用卡/無卡分期(即將開放)</label>') + '</fieldset>' +
+    '<fieldset class="payf"><legend>付款方式</legend><div class="payg">' + payCards() + '</div></fieldset>' +
     '<label>備註<textarea name="note" rows="2" maxlength="200"></textarea></label>' +
     '<p id="sfe" class="tg" role="alert"></p><button class="btn a">確認出貨</button> <button type="button" class="btn l" data-a="mb">返回</button></form>';
 }
@@ -819,18 +834,34 @@ document.addEventListener('submit', function (e) {
   $('#sfe').textContent = '';
   if (!SNONCE) SNONCE = nonce_();
   google.script.run.withSuccessHandler(function (d) { SNONCE = ''; MD = d; MSEL = {}; MTAB = 's'; var ns = d.ships.filter(function (z) { return z.id === d.sid; })[0]; show(shipDetail(ns)); })
-    .withFailureHandler(function (er) { $('#sfe').textContent = er.message; }).memberCreateShip(mt, items, { pay: f.pay.value, method: f.method.value, rname: f.rname.value, cvs: f.cvs.value, store: f.store.value, addr: f.addr.value, credit: f.credit ? Number(f.credit.value) || 0 : 0, note: f.note.value, phone: f.phone.value, paytest: payOn(), nonce: SNONCE });
+    .withFailureHandler(function (er) { $('#sfe').textContent = er.message; }).memberCreateShip(mt, items, { pay: f.pay.value, method: f.method.value, rname: f.rname.value, cvs: f.cvs.value, store: f.store.value, addr: f.addr.value, credit: f.credit ? Number(f.credit.value) || 0 : 0, note: f.note.value, phone: f.phone.value, paytest: payOn(), nonce: SNONCE, kind: payKind(f) });
 });
 
 function payOn() { try { if (/[?&]paytest=1/.test(location.search)) sessionStorage.setItem('paytest', '1'); return !!(window.D && D.payLive) || sessionStorage.getItem('paytest') === '1'; } catch (e) { return false; } }
 payOn();
+/* 付款方式卡片 */
+var PAYK = { Credit: '信用卡一次付清', Installment: '信用卡分期', BNPL: '無卡分期' };
+function payCards() {
+  var on = payOn(), c = function (v, k, ic, t, d, chk, off) {
+    return '<label class="payc' + (off ? ' off' : '') + '"><input type="radio" name="pay" value="' + v + '"' + (k ? ' data-k="' + k + '"' : '') + (chk ? ' checked' : '') + (off ? ' disabled' : '') + '><span class="ic">' + ic + '</span><span><b>' + t + '</b><small>' + d + '</small></span></label>';
+  };
+  return c('匯款', '', '🏦', '銀行匯款', '轉帳後回報後五碼,確認收款即出貨', true) +
+    c('刷卡', 'Credit', '💳', '信用卡一次付清', on ? '線上刷卡,付款完成自動確認' : '即將開放', false, !on) +
+    c('刷卡', 'Installment', '🗓️', '信用卡分期', on ? '3～24 期,依發卡銀行核准' : '即將開放', false, !on) +
+    c('刷卡', 'BNPL', '📱', '無卡分期', on ? '免信用卡,線上申請審核' : '即將開放', false, !on) +
+    c('賣貨便', '', '🏪', '賣貨便', '7-11 取貨付款,僅店到店') +
+    c('付現金', '', '💵', '付現金', '到店自取時當面付款');
+}
+function payKind(f) { var r = f.querySelector('input[name="pay"]:checked'); return (r && r.dataset.k) || ''; }
 /* 信用卡:向後端取得綠界付款表單,送出到綠界付款頁 */
 function goPay(sid, kind) {
-  var e = $('#paye'); if (e) e.textContent = '正在前往付款頁…';
+  var e = $('#paye'); if (e) e.textContent = '';
   google.script.run.withSuccessHandler(function (r) {
     var f = document.createElement('form'); f.method = 'POST'; f.action = r.action; f.target = '_top';
     Object.keys(r.fields).forEach(function (k) { var i = document.createElement('input'); i.type = 'hidden'; i.name = k; i.value = r.fields[k]; f.appendChild(i); });
-    document.body.appendChild(f); f.submit();
+    document.body.appendChild(f);
+    var bb = $('#busy'); if (bb) { bb.firstElementChild.innerHTML = '🔒 即將前往綠界安全付款頁面<br><small style="font-weight:400">' + esc(PAYK[kind] || '線上付款') + ' · 請勿關閉或重新整理</small>'; bb.classList.add('on'); }
+    setTimeout(function () { f.submit(); }, 900);
   }).withFailureHandler(function (er) { var e2 = $('#paye'); if (e2) e2.textContent = er.message; else alert(er.message); }).memberPayStart(mt, sid, kind || 'Credit');
 }
 /* LIFF:從 LINE 內開啟網站時自動登入(只需按一次「允許」) */

@@ -21,7 +21,7 @@ var H = {
   '固定支出': ['固定ID', '名稱', '金額', '備註', '啟用'],
   '人事': ['人員ID', '姓名', '薪資', '勞保', '健保', '勞退', '其他', '備註', '啟用'],
   '廠商付款': ['付款ID', '付款日期', '廠商', '金額', '匯款備註', '品項數', '應付成本', '品項', '建立人', '建立時間', '圖片'],
-  '出貨單': ['出貨單ID', '訂單ID', '狀態', '物流', '物流單號', '品項', '建立時間', '出貨時間', 'LINE ID', '姓名', '電話', '付款方式', '收件資訊', '備註', '商品金額', '優惠折抵', '購物金折抵', '運費', '總額', '付款連結', '匯款後五碼', '會員等級', '折抵明細', '配送方式', '購物金明細', '匯款日期', '收款帳號', '列印時間', '出貨單圖片', '發票號碼', '發票日期'],
+  '出貨單': ['出貨單ID', '訂單ID', '狀態', '物流', '物流單號', '品項', '建立時間', '出貨時間', 'LINE ID', '姓名', '電話', '付款方式', '收件資訊', '備註', '商品金額', '優惠折抵', '購物金折抵', '運費', '總額', '付款連結', '匯款後五碼', '會員等級', '折抵明細', '配送方式', '購物金明細', '匯款日期', '收款帳號', '列印時間', '出貨單圖片', '發票號碼', '發票日期', '付款類型'],
   '會員': ['LINE ID', '暱稱', '頭像', '等級', '加入時間', '最近登入', '已加好友', '備註', '姓名', '電話', 'Email', '收件地址'],
   '購物金': ['序號', 'LINE ID', '發放時間', '金額', '剩餘', '到期日', '來源', '備註', '操作人', '訂單ID', '活動ID'],
   '等級': ['等級', '折扣率', '適用類別'],
@@ -916,7 +916,7 @@ function memberLogin(phone, oid) {
 }
 function shipObj_(r) {
   return { id: String(r.出貨單ID), oids: String(r.訂單ID).split(','), st: String(r.狀態), pay: String(r.付款方式), co: String(r.物流 || ''), no: String(r.物流單號 || ''), it: String(r.品項 || ''),
-    cr: String(r.建立時間 || ''), at: String(r.出貨時間 || ''), name: String(r.姓名 || ''), phone: String(r.電話 || ''), ship: String(r.收件資訊 || ''), note: String(r.備註 || ''), inv: String(r.發票號碼 || ''), invd: String(r.發票日期 || ''),
+    cr: String(r.建立時間 || ''), at: String(r.出貨時間 || ''), name: String(r.姓名 || ''), phone: String(r.電話 || ''), ship: String(r.收件資訊 || ''), note: String(r.備註 || ''), inv: String(r.發票號碼 || ''), invd: String(r.發票日期 || ''), kind: String(r.付款類型 || ''),
     sub: Number(r.商品金額), disc: Number(r.優惠折抵), cred: Number(r.購物金折抵), fee: Number(r.運費), total: Number(r.總額),
     link: /^https:\/\//.test(String(r.付款連結)) ? String(r.付款連結) : '', last5: String(r.匯款後五碼 || ''), rdate: String(r.匯款日期 || ''), bank: String(r.收款帳號 || ''), pr: String(r.列印時間 || ''), img: String(r.出貨單圖片 || ''), method: String(r.配送方式 || ''), trk: shortTrack_(r) };
 }
@@ -2064,7 +2064,7 @@ function payPrep_(tk, sid) {
   var total = Math.round(Number(s.總額) || 0); if (total <= 0) throw new Error('應付金額為 0,不需要刷卡');
   var names = rows_('訂單明細').filter(function (l) { return String(l.出貨單ID) === sid; }).map(function (l) { return String(l.品名).replace(/[#&<>'~]/g, ' ') + ' x' + l.數量; });
   if (Number(s.運費) > 0) names.push('運費 x1');
-  return { sid: sid, total: total, items: (names.join('#') || '商品一批').slice(0, 380), url: appUrl_() };
+  return { sid: sid, total: total, items: (names.join('#') || '商品一批').slice(0, 380), url: appUrl_(), kind: String(s.付款類型 || '') };
 }
 /** 綠界付款結果通知(已驗證檢查碼):付款成功 → 待刷卡 改 已刷卡待出貨 */
 function payDone_(p, test) {
@@ -2138,7 +2138,7 @@ function memberCreateShip0_(tk, items, d) {
     var oids = {}; lines.forEach(function (l) { oids[String(l.訂單ID)] = 1; });
     put_('出貨單', 0, { '出貨單ID': sid, '訂單ID': Object.keys(oids).join(','), '狀態': PAY[pay], '物流': '', '物流單號': '', '品項': lines.map(function (l) { return l.品名 + '×' + l.數量; }).join('、'), '建立時間': now_(), '出貨時間': '',
       'LINE ID': ctx.lid || '', '姓名': String(o0.姓名), '電話': phone, '付款方式': pay, '收件資訊': ship, '備註': t_(d.note, 200), '商品金額': c.sub, '優惠折抵': c.disc, '購物金折抵': c.cred + c.pick, '運費': c.fee, '總額': c.total,
-      '付款連結': '', '匯款後五碼': '', '會員等級': String(o0.會員等級 || ''), '折抵明細': JSON.stringify(c.alloc), '配送方式': method, '購物金明細': JSON.stringify(cdetail), '收款帳號': pay === '匯款' ? String(settings_().匯款資訊 || '') : '' });
+      '付款連結': '', '匯款後五碼': '', '會員等級': String(o0.會員等級 || ''), '折抵明細': JSON.stringify(c.alloc), '配送方式': method, '購物金明細': JSON.stringify(cdetail), '收款帳號': pay === '匯款' ? String(settings_().匯款資訊 || '') : '', '付款類型': pay === '刷卡' ? (['Credit', 'Installment', 'BNPL'].indexOf(d.kind) >= 0 ? d.kind : 'Credit') : '' });
     lines.forEach(function (l) { var n = cp_(l); n.出貨單ID = sid; put_('訂單明細', l._r, n); });
     log_('客人 ' + o0.姓名, '建立出貨單', sid, pay + (method ? ',' + method : '') + (c.pick ? ',購物金 -' + c.pick : '') + ',應付 ' + c.total + ':' + lines.map(function (l) { return l.品名 + '×' + l.數量; }).join('、'));
     Object.keys(oids).forEach(function (oid) { syncOrderStatus_(oid, '客人'); });

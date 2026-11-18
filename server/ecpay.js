@@ -69,6 +69,7 @@ export async function payFields(cfg, o) {
   const f = { MerchantID: cfg.mid, MerchantTradeNo: (String(o.sid).replace(/[^A-Za-z0-9]/g, '') + 'C' + Date.now().toString(36).toUpperCase()).slice(-20), MerchantTradeDate: twNow(), PaymentType: 'aio',
     TotalAmount: String(o.total), TradeDesc: 'coscos', ItemName: o.items, ReturnURL: o.returnUrl, ChoosePayment: o.kind === 'BNPL' ? 'BNPL' : 'Credit', EncryptType: '1', CustomField1: String(o.sid), NeedExtraPaidInfo: 'N' };
   if (o.backUrl) f.ClientBackURL = o.backUrl;
+  if (o.kind === 'Installment') f.CreditInstallment = '3,6,12,18,24';
   if (o.kind === 'BNPL') f.PaymentInfoURL = o.returnUrl; // 無卡分期為審核制,申請結果也送到同一個網址
   f.CheckMacValue = await payMac(cfg, f);
   return { action: cfg.action, fields: f, test: cfg.test };
