@@ -990,11 +990,22 @@ document.addEventListener('click', function (e) {
     }); return;
   }
   if (a === 'lgp') {
+    // 瀏覽器只允許「點擊當下」開新分頁:先開好空白分頁,等後端回傳後再把寄件單送進去(否則會被當成彈出視窗擋掉,看起來沒反應)
+    var wn = 'ecpr' + Date.now(), w = null;
+    try { w = window.open('', wn); if (w) w.document.write('<p style="font:16px sans-serif;padding:20px">寄件單載入中,請稍候…</p>'); } catch (e0) { w = null; }
     call('adminLogiPrint', T, id).then(function (r) {
-      var fm = document.createElement('form'); fm.method = 'POST'; fm.action = r.action; fm.target = '_blank';
-      Object.keys(r.fields).forEach(function (k) { var i = document.createElement('input'); i.type = 'hidden'; i.name = k; i.value = r.fields[k]; fm.appendChild(i); });
-      document.body.appendChild(fm); fm.submit(); fm.remove();
-    }).catch(function (er) { tell(er.message); }); return;
+      var go = function (tg) {
+        var fm = document.createElement('form'); fm.method = 'POST'; fm.action = r.action; fm.target = tg;
+        Object.keys(r.fields).forEach(function (k) { var i = document.createElement('input'); i.type = 'hidden'; i.name = k; i.value = r.fields[k]; fm.appendChild(i); });
+        document.body.appendChild(fm); fm.submit(); fm.remove();
+      };
+      if (w && !w.closed) { go(wn); return; }
+      // 新分頁被瀏覽器擋住:改成讓使用者再按一次按鈕開啟
+      var d = $('#dq'); d.oncancel = null; d.dataset.mine = ''; d.dataset.tok = '';
+      d.innerHTML = '<p style="margin-top:0">寄件單已準備好,請按下方按鈕開啟。<br><span class="m">(瀏覽器擋住了自動開啟的新分頁)</span></p><p style="margin-bottom:0"><button class="btn a" id="dqy">開啟寄件單</button> <button class="btn l" id="dqn">關閉</button></p>';
+      if (!d.open) d.showModal();
+      $('#dqy').onclick = function () { d.close(); go('_blank'); }; $('#dqn').onclick = function () { d.close(); };
+    }).catch(function (er) { if (w && !w.closed) w.close(); tell(er.message); }); return;
   }
   if (a === 'shadj') {
     var fa = $('#shf');
