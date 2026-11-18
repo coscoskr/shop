@@ -1,7 +1,7 @@
 // 請求處理核心:一次呼叫 = 一個資料庫交易(取得鎖 → 讀資料 → 執行原本的商業邏輯 → 寫回)
 import * as code from './code.js';
 import { createRuntime } from './adapter.js';
-import { ecpayCfg, ecpayIssue, payCfg, payFields, payVerify } from './ecpay.js';
+import { ecpayCfg, ecpayIssue, payCfg, payFields, payVerify, logiCfg, logiVerify, logiMapFields, logiCreate, logiPrintFields } from './ecpay.js';
 
 // 在記憶體裡「同步」執行商業邏輯前,先把服務物件掛到全域,並重置模組內的快取
 function withRt(rt, fn) {
@@ -23,6 +23,27 @@ const SPECIAL = {
     const cfg = payCfg(props);
     const back = /^https:\/\//.test(info.url) ? info.url + (info.url.indexOf('?') >= 0 ? '&' : '?') + 's=' + encodeURIComponent(info.sid) : '';
     return payFields(cfg, { sid: info.sid, total: info.total, items: info.items, returnUrl: env.SUPABASE_URL + '/functions/v1/api?ecpay=pay', backUrl: back, kind: ['BNPL', 'Installment'].indexOf(kind) >= 0 ? kind : (['BNPL', 'Installment'].indexOf(info.kind) >= 0 && !kind ? info.kind : 'Credit') });
+  },
+
+  // 客人選門市:回傳綠界超商地圖表單
+  async memberMapStart({ args, props, env }) {
+    const [cvs, cod, mobile] = args;
+    return logiMapFields(logiCfg(props), { sub: cvs === '全家' ? 'FAMIC2C' : 'UNIMARTC2C', cod: !!cod, mobile: !!mobile, reply: env.SUPABASE_URL + '/functions/v1/api?ecpay=map' });
+  },
+  // 後台:建立綠界超商物流單
+  async adminLogiCreate({ rt, args, props, env }) {
+    const [tk, sid] = args;
+    const prep = withRt(rt, () => code.INTERNAL.logiPrep_(tk, sid));
+    const cfg = logiCfg(props);
+    const r = await logiCreate(cfg, Object.assign({ reply: env.SUPABASE_URL + '/functions/v1/api?ecpay=logi' }, prep));
+    if (!r.ok) throw new Error('綠界建立物流單失敗:' + r.msg);
+    return withRt(rt, () => code.INTERNAL.logiSave_(tk, prep, r, cfg.test));
+  },
+  // 後台:列印寄件單
+  async adminLogiPrint({ rt, args, props }) {
+    const [tk, sid] = args;
+    const o = withRt(rt, () => code.INTERNAL.logiPrintPrep_(tk, sid));
+    return logiPrintFields(logiCfg(props), o);
   },
 
   // 批次開立電子發票(綠界):先整理資料 → 逐張向綠界開立 → 把發票號碼寫回出貨單
@@ -104,7 +125,7 @@ const SPECIAL = {
  * 回傳 { body, after }:body 是給前端的 JSON,after 是交易完成後再做的事(寄信、LINE 推播)
  */
 // 純讀取的功能不用排隊等寫入鎖(畫面載入、報價、後台列表)
-const NOLOCK = /^(getShop|shopData|quote|memberOrders|memberShipQuote|admin(Init|Orders|Products|PurchaseList|StockView|Report|Settings|Levels|Vendors|Brands|Cats|Carriers|Members|MemberGrants|Logs|Codes|Activities|LineHistory|LineInfo|ShipHistory|ShipQuote|ProxyQuote|HistBindList|Admins))$/;
+const NOLOCK = /^(memberMapStart|getShop|shopData|quote|memberOrders|memberShipQuote|admin(Init|Orders|Products|PurchaseList|StockView|Report|Settings|Levels|Vendors|Brands|Cats|Carriers|Members|MemberGrants|Logs|Codes|Activities|LineHistory|LineInfo|ShipHistory|ShipQuote|ProxyQuote|HistBindList|Admins))$/;
 export async function execute({ fn, args, db, env }) {
   const isPublic = Object.prototype.hasOwnProperty.call(code.API, fn) || Object.prototype.hasOwnProperty.call(SPECIAL, fn);
   if (!isPublic) return { body: { ok: false, error: '不存在的功能:' + String(fn).slice(0, 40) }, after: [] };
@@ -310,3 +331,33 @@ export async function handleEcpayPay({ rawBody, db, env }) {
   });
   return out;
 }
+
+/** 綠界超商地圖選完門市(瀏覽器 POST 過來):轉回網站並帶上門市資料 */
+export async function handleEcpayMap({ rawBody, db, env }) {
+  const p = Object.fromEntries(new URLSearchParams(rawBody));
+  let app = '';
+  await db.withTx(async (tx) => { const { props } = await tx.loadAll(); app = (env.props && env.props.APP_URL) || props.APP_URL || ''; await tx.commit([], []); }, { lock: false });
+  const pick = { t: p.LogisticsSubType === 'FAMIC2C' ? '全家' : '7-11', id: String(p.CVSStoreID || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 10), n: String(p.CVSStoreName || '').slice(0, 40), a: String(p.CVSAddress || '').slice(0, 80) };
+  const url = (/^https:\/\//.test(app) ? app : 'https://coscoskr.github.io/shop/') + '#cvs=' + encodeURIComponent(JSON.stringify(pick));
+  return '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>返回商店</title><p style="font:16px sans-serif;text-align:center;margin-top:40px">門市已選好,正在返回商店…</p><script>location.replace(' + JSON.stringify(url).replace(/</g, '\\u003c') + ')</script>';
+}
+/** 綠界物流狀態通知(ServerReplyURL):驗證檢查碼(MD5)後處理,回應 1|OK */
+export async function handleEcpayLogi({ rawBody, db, env }) {
+  const p = Object.fromEntries(new URLSearchParams(rawBody));
+  let out = '0|ERR';
+  await db.withTx(async (tx) => {
+    const { tableData, kv, props: dbProps } = await tx.loadAll();
+    const props = Object.assign({}, env.props || {}, dbProps);
+    const cfg = logiCfg(props);
+    if (String(p.MerchantID) !== cfg.mid || !logiVerify(cfg, p)) { console.error('ecpay logi: bad mac', p.AllPayLogisticsID); out = '0|CheckMacValue Error'; await tx.commit([], []); return; }
+    const rt = createRuntime({ H: code.H, tableData, kv, props, fetchMap: {} });
+    try { const r = withRt(rt, () => code.INTERNAL.logiStatus_(p, cfg.test)); console.log('ecpay logi', p.AllPayLogisticsID, p.RtnCode, r); }
+    catch (e) { console.error('logiStatus error', e); out = '0|ERR'; await tx.commit([], []); return; }
+    await tx.commit(rt.collectOps(), rt.kvOps);
+    rt.fetchQueue.forEach((f) => afterLogi.push(f));
+    out = '1|OK';
+  });
+  if (afterLogi.length) { const jobs = afterLogi.splice(0).map((f) => ({ type: 'fetch', f })); await runAfter(jobs, env); }
+  return out;
+}
+const afterLogi = [];

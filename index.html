@@ -79,6 +79,21 @@ fieldset label{display:inline-block;margin:2px 10px 2px 0}
 .payc.off{opacity:.45;cursor:not-allowed}
 .paynow{border:1.5px solid var(--pink);background:var(--soft);border-radius:12px;padding:14px;margin:10px 0}
 .paynow a{color:var(--acc)}
+.it{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff;margin:8px 0}
+.ih,.ir{display:grid;grid-template-columns:1fr 84px 96px 84px;gap:8px;align-items:center;padding:10px 12px}
+.ih{background:var(--soft);font-size:12px;color:var(--mute);font-weight:700}.ih span:not(:first-child){text-align:right}.ih span:nth-child(3){text-align:center}
+.ir{border-top:1px solid var(--line)}.ip{display:flex;gap:10px;align-items:flex-start;min-width:0}
+.ip img,.nop{width:52px;height:52px;border-radius:8px;object-fit:cover;flex:0 0 52px;background:var(--soft);display:flex;align-items:center;justify-content:center;font-size:22px}
+.in{min-width:0}.ib{display:block;color:var(--acc);font-size:11px;font-weight:700;letter-spacing:.3px}.inm{font-size:14px;line-height:1.35;word-break:break-word}
+.isp{display:inline-block;margin-top:3px;font-size:11px;background:var(--soft);color:var(--ink);border-radius:999px;padding:1px 8px}
+.irm{display:block;margin-top:4px;border:0;background:none;color:var(--mute);font-size:12px;padding:0;text-decoration:underline;cursor:pointer}
+.iu,.is{text-align:right;font-size:14px}.iu s{display:block;color:var(--mute);font-size:11px}.iq{text-align:center}.il{display:none}
+.stp{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:999px;overflow:hidden}.stp button{border:0;background:var(--soft);width:28px;height:28px;font-size:16px;cursor:pointer;color:var(--ink)}.stp b{min-width:26px;text-align:center;font-size:14px}
+.sumb{border:1.5px solid var(--pink);background:var(--soft);border-radius:12px;padding:12px 14px;margin:10px 0}.sumb>div{display:flex;justify-content:space-between;margin:3px 0;font-size:14px}.sumb .dsc{color:var(--acc)}
+.sumb .tot{border-top:1px dashed var(--pink);margin-top:8px;padding-top:8px;font-weight:800;font-size:17px}.sumb small{display:block;margin-top:6px}
+.cta{display:flex;flex-direction:column;gap:8px;margin:12px 0}.cta .btn{width:100%;padding:12px!important;font-size:15px!important}
+@media (max-width:560px){.ih{display:none}.ir{grid-template-columns:1fr 1fr 1fr;row-gap:6px}.ip{grid-column:1/-1}.iu,.iq,.is{text-align:left}.iq{text-align:center}.is{text-align:right}.il{display:block;font-size:11px;color:var(--mute)}}
+.cvsp{border:1.5px dashed var(--pink);border-radius:10px;padding:10px;margin:6px 0;display:flex;flex-direction:column;gap:8px;background:#fff}
 @media (max-width:340px){.payg{grid-template-columns:1fr}}
 #cb{position:relative}#cn{position:absolute;top:-6px;right:-6px;background:var(--acc);color:#fff;border-radius:10px;font-size:12px;padding:0 6px}
 main{grid-template-columns:repeat(2,1fr);gap:20px 12px;padding:0 12px 24px}
@@ -243,6 +258,7 @@ google.script.run.withSuccessHandler(function (d) {
   else if (PEND_S || HL_O || /[?&]m=1/.test(location.search)) { if (LT) { mt = LT; memLoad(function () { show(memList()); hlOrder(); }); } else show(memLogin()); }
   try { var pid0 = new URLSearchParams(location.search).get('p'); if (pid0 && !BOOT.token) { var pp0 = byId(pid0); if (pp0) { cur = pp0; dq = 1; show(detail(cur)); } } } catch (e0) {}
   liffBoot();
+  resumeDraft();
 }).withFailureHandler(function (e) { $('#grid').innerHTML = '<p>載入失敗:' + esc(e.message) + '</p>'; }).getShop();
 
 function credNote() { var t = String((D && D.creditNote) || '').trim(); return t ? '<p class="ds" style="white-space:pre-line;font-size:.85em">' + esc(t) + '</p>' : ''; }
@@ -470,6 +486,21 @@ function detail(p) {
     (p.stock === 0 ? '<p>這項商品已售完。</p><p><button class="btn l shb" data-a="shr">分享給朋友</button></p>' : (p.specs && p.specs.length ? '<label>規格<select id="spsel"><option value="">請選擇規格</option>' + p.specs.map(function (x) { var q = (p.specQty || {})[x], so = q === 0; return '<option' + (so ? ' disabled' : '') + ' value="' + esc(x) + '">' + esc(x) + (so ? '(售完)' : (q != null ? '(剩' + q + '件)' : '')) + '</option>'; }).join('') + '</select></label><p id="spn" class="m" style="margin:4px 0">請選擇規格查看剩餘數量</p>' : (p.stock !== null ? '<p class="m" style="margin:4px 0">剩餘數量:<b>' + p.stock + '</b> 件</p>' : '')) + '<p id="dte" class="tg" role="alert"></p><div class="r"><button class="btn l" data-a="dn">−</button><b id="qn">1</b><button class="btn l" data-a="up">+</button><button class="btn a" data-a="add">加入購物車</button><button type="button" class="btn l shb" data-a="shr">分享給朋友</button></div>') +
     '';
 }
+/* 購物車/下單:商品明細列(品牌、品名、規格、單價、數量、小計) */
+function itemRow(p, id, u, n, edit) {
+  var orig = p.price > u ? '<s>' + money(p.price) + '</s>' : '';
+  return '<div class="ir"><div class="ip">' + (p.img ? '<img src="' + esc(p.img) + '" alt="" referrerpolicy="no-referrer" loading="lazy">' : '<span class="nop">🛍️</span>') +
+    '<div class="in">' + (p.brand ? '<small class="ib">' + esc(p.brand) + '</small>' : '') + '<div class="inm">' + esc(p.name) + '</div>' + (sp(id) ? '<span class="isp">' + esc(sp(id)) + '</span>' : '') + (edit ? '<button type="button" class="irm" data-a="del" data-id="' + esc(id) + '">移除</button>' : '') + '</div></div>' +
+    '<div class="iu"><span class="il">單價</span>' + money(u) + orig + '</div>' +
+    '<div class="iq"><span class="il">數量</span>' + (edit ? '<span class="stp"><button type="button" data-a="dec" data-id="' + esc(id) + '" aria-label="減少">−</button><b>' + n + '</b><button type="button" data-a="inc" data-id="' + esc(id) + '" aria-label="增加">+</button></span>' : '<b>' + n + '</b>') + '</div>' +
+    '<div class="is"><span class="il">小計</span><b>' + money(u * n) + '</b></div></div>';
+}
+function sumBox(sub, discs, total, ids) {
+  var cnt = ids.reduce(function (t, id) { return t + (cart[id] || 0); }, 0);
+  return '<div class="sumb"><div><span>商品合計(' + ids.length + ' 項 / ' + cnt + ' 件)</span><span>' + money(sub) + '</span></div>' +
+    discs.map(function (d) { return '<div class="dsc"><span>' + esc(d[0]) + '</span><span>−' + money(d[1]) + '</span></div>'; }).join('') +
+    '<div class="tot"><span>訂單合計</span><span>' + money(total) + '</span></div><small class="ds">運費與付款方式在商品到貨、要出貨時再選擇</small></div>';
+}
 function cdWarn() {
   if ($('#cdw')) return;
   var d = document.createElement('div'); d.id = 'cdw'; d.setAttribute('role', 'alertdialog'); d.setAttribute('aria-modal', 'true');
@@ -480,34 +511,36 @@ function cartHtml(noRefresh) {
   var ids = Object.keys(cart), sub = 0, h = '<h2>購物車</h2>';
   if (!ids.length) return h + '<p>購物車是空的。</p><button class="btn l" data-a="x">繼續逛逛</button>';
   h = '<div id="cartbox">' + h;
+  h += '<div class="it"><div class="ih"><span>商品</span><span>單價</span><span>數量</span><span>小計</span></div>';
   ids.forEach(function (id) {
     var p = byId(bp(id)), n = cart[id]; if (!p) return; var u = unit(p, n); sub += u * n;
-    h += '<div class="ln"><div><div class="nm">' + bn(p) + (sp(id) ? ' <small>(' + esc(sp(id)) + ')</small>' : '') + '</div><small>' + money(u) + ' × ' + n + '</small></div><div class="r"><button class="btn l" data-a="dec" data-id="' + esc(id) + '">−</button><button class="btn l" data-a="inc" data-id="' + esc(id) + '">+</button><b>' + money(u * n) + '</b><button class="btn l" data-a="del" data-id="' + esc(id) + '">移除</button></div></div>';
+    h += itemRow(p, id, u, n, true);
   });
+  h += '</div>';
   var q = QT && QT.ok ? QT : null;
   if (q) {
-    h += '<p>商品 ' + money(q.sub) + (q.discount ? '<br>' + esc(q.dname) + ' <span class="tg">-' + money(q.discount) + '</span>' : '') +
-      '<br><b>合計 ' + money(q.total) + '</b></p>';
+    h += sumBox(q.sub, q.discount ? [[q.dname, q.discount]] : [], q.total, ids);
     if (q.login && q.balance > 0) h += '<p class="ds">購物金餘額 ' + money(q.balance) + ',可在「確定出貨」時選擇要折抵多少。</p>';
     if (!q.login && D.line && D.line.on) h += '<p class="ds">用 LINE 登入可享會員優惠、使用購物金,並收到到貨通知。 <button class="btn lgb" data-a="lgd">LINE 登入</button></p>';
   } else {
-    h += '<p>商品 ' + money(sub) + '<br><b>合計 ' + money(sub) + '</b></p>';
+    h += sumBox(sub, [], sub, ids);
   }
-  h += '<p class="ds">折扣碼在下一步「下單」時輸入。現在還不用結帳,等商品到貨、要出貨時再結帳。</p><p><button class="btn a" data-a="co">前往下單</button> <button class="btn l" data-a="x">繼續逛逛</button></p></div>';
+  h += '<p class="ds">折扣碼在下一步「下單」時輸入。現在還不用結帳,等商品到貨、要出貨時再結帳。</p><div class="cta"><button class="btn a" data-a="co">前往下單 →</button><button class="btn l" data-a="x">繼續逛逛</button></div></div>';
   if (!noRefresh) refreshQuote();
   return h;
 }
 function checkoutHtml() {
   var ids = Object.keys(cart), h = '<div id="cobox"><h2>下單</h2>';
   if (!ids.length) return '<h2>下單</h2><p>購物車是空的。</p><button class="btn l" data-a="x">繼續逛逛</button>';
-  h += '<div class="cosum">';
-  ids.forEach(function (id) { var p = byId(bp(id)); if (!p) return; h += '<div class="ln"><div class="nm">' + bn(p) + (sp(id) ? ' <small>(' + esc(sp(id)) + ')</small>' : '') + ' <small>× ' + cart[id] + '</small></div></div>'; });
+  var csub = 0;
+  h += '<div class="it"><div class="ih"><span>商品</span><span>單價</span><span>數量</span><span>小計</span></div>';
+  ids.forEach(function (id) { var p = byId(bp(id)); if (!p) return; var n = cart[id], u = unit(p, n); csub += u * n; h += itemRow(p, id, u, n, false); });
   h += '</div>';
   h += '<form id="cdf" class="cd"><label for="cdi" class="cdt">有折扣碼嗎?在這裡輸入</label><div class="cdr"><input id="cdi" value="' + esc(CODE) + '" maxlength="30" autocomplete="off" autocapitalize="characters" placeholder="輸入折扣碼"><button class="btn a">套用</button></div><div class="cdh">輸入後請按「套用」,折扣才會算進金額</div></form>';
   var q = QT && QT.ok ? QT : null;
   if (CODE && q) h += q.codeOk ? '<p class="tg">折扣碼已套用</p>' : '<p class="tg">' + (q.codeMin ? '此折扣碼需商品金額滿 NT$ ' + Number(q.codeMin).toLocaleString('en-US') + ' 才能使用' : '折扣碼不正確或已失效') + '</p>';
-  if (q) h += '<p>商品 ' + money(q.sub) + (q.discount ? '<br>' + esc(q.dname) + ' <span class="tg">-' + money(q.discount) + '</span>' : '') + '<br><b>合計 ' + money(q.total) + '</b></p>';
-  if (LT) h += '<p id="er" class="tg" role="alert"></p><p><button class="btn a" data-a="pn" id="pnb">確認下訂</button> <button type="button" class="btn l" data-a="cart">返回購物車</button></p>';
+  h += q ? sumBox(q.sub, q.discount ? [[q.dname, q.discount]] : [], q.total, ids) : sumBox(csub, [], csub, ids);
+  if (LT) h += '<p id="er" class="tg" role="alert"></p><div class="cta"><button class="btn a" data-a="pn" id="pnb">確認下訂</button><button type="button" class="btn l" data-a="cart">← 返回購物車</button></div>';
   else h += '<p class="ds">請留下姓名、電話與電子郵件。到貨、出貨通知會寄到你的電子郵件。付款方式與收件資料,等商品到貨要結帳時再填。</p><form id="f"><label>姓名<input name="name" required maxlength="40"></label><label>聯絡電話<input name="phone" required inputmode="tel"></label><label>電子郵件(必填,用來通知與聯絡)<input name="email" type="email" required maxlength="80" autocomplete="email"></label><p id="er" class="tg" role="alert"></p><button class="btn a" id="sb">確認下訂</button> <button type="button" class="btn l" data-a="cart">返回購物車</button></form>';
   h += '</div>'; if (!q) refreshQuote();
   return h;
@@ -726,10 +759,12 @@ function shipForm() {
     '<table><thead><tr><th>品名</th><th class="n">數量</th><th class="n">單價</th><th class="n">小計</th></tr></thead><tbody>' +
     picked.map(function (i) { var spc = sp(i.pid); return '<tr><td>' + esc(i.name) + (spc ? '<br><small>' + esc(spc) + '</small>' : '') + '</td><td class="n">' + i.qty + '</td><td class="n">' + i.unit + '</td><td class="n">' + i.sub + '</td></tr>'; }).join('') + '</tbody></table>' +
     '<div id="sq" class="ds" style="margin-top:8px">計算金額中…</div></div>' +
-    '<form id="sf"><fieldset><legend>配送方式</legend><label><input type="radio" name="method" value="店到店" checked> 店到店 ' + money(MD.feeCvs) + '</label><label><input type="radio" name="method" value="宅配"> 宅配 ' + money(MD.fee) + '</label><label><input type="radio" name="method" value="自取"> 自取(免運)</label>' + (MD.free ? '<small class="ds">滿 ' + money(MD.free) + ' 免運</small>' : '') + '</fieldset>' +
+    '<form id="sf"><fieldset class="payf"><legend>配送方式' + (MD.free ? ' <small class="ds" style="font-weight:400">滿 ' + money(MD.free) + ' 免運</small>' : '') + '</legend><div class="payg">' +
+      shipCard('店到店', '🏪', '超商店到店', '7-11/全家門市取貨 · ' + money(MD.feeCvs), true) + shipCard('宅配', '🚚', '宅配到府', '送到指定地址 · ' + money(MD.fee)) + shipCard('自取', '🏠', '到店自取', '台中門市自取 · 免運') + '</div></fieldset>' +
     '<label>收件人姓名(請填本名)<input name="rname" required maxlength="30" placeholder="與證件相同,例如:王小明" value="' + esc((MD.me && MD.me.pname) || o0.nm || '') + '"><small class="ds" style="color:var(--acc)">超商取貨需核對證件,請填寫本名,不可填暱稱</small></label>' +
     '<label>聯絡電話<input name="phone" required inputmode="tel" value="' + esc((MD.me && MD.me.phone) || o0.ph || '') + '"></label>' +
-    '<div id="mcvs"><label>超商<select name="cvs"><option>7-11</option><option>全家</option></select></label><label>取貨門市(店名或店號)<input name="store" maxlength="60"></label><small class="ds" id="mfh" hidden style="color:var(--acc)">賣貨便只能寄到 7-11 門市,請填 7-11 的店名或店號(不能填全家或地址)</small></div>' +
+    (logiOn() ? '<div id="mcvs"><label>超商<select name="cvs"><option>7-11</option><option>全家</option></select></label><input type="hidden" name="store"><input type="hidden" name="cvsid"><div class="cvsp"><div id="cvsn" class="ds">尚未選擇門市</div><button type="button" class="btn l" data-a="map">📍 選擇門市(開啟超商地圖)</button></div><small class="ds" id="mfh" hidden></small></div>'
+      : '<div id="mcvs"><label>超商<select name="cvs"><option>7-11</option><option>全家</option></select></label><label>取貨門市(店名或店號)<input name="store" maxlength="60"></label><small class="ds" id="mfh" hidden style="color:var(--acc)">賣貨便只能寄到 7-11 門市,請填 7-11 的店名或店號(不能填全家或地址)</small></div>') +
     '<div id="mhome" hidden><label>收件地址<input name="addr" maxlength="150" value="' + esc((MD.me && MD.me.addr) || '') + '"></label></div>' +
     (bal > 0 ? '<label>使用購物金(餘額 ' + money(bal) + ')<input name="credit" type="number" min="0" step="1" value="0" inputmode="numeric"></label><small class="ds" id="crh"></small>' + credNote() : '') +
     '<fieldset class="payf"><legend>付款方式</legend><div class="payg">' + payCards() + '</div></fieldset>' +
@@ -742,8 +777,9 @@ function sfState(ch) {
   else if (ch === 'pay') { if (f.pay.value === '賣貨便') f.method.value = '店到店'; else if (f.pay.value === '付現金') f.method.value = '自取'; }
   var cv = f.method.value === '店到店', hm = f.method.value === '宅配';
   $('#mcvs').hidden = !cv; $('#mhome').hidden = !hm;
-  f.store.required = cv; f.addr.required = hm;
-  var mf = f.pay.value === '賣貨便', fo = f.cvs.querySelector('option[value="全家"],option:nth-child(2)');
+  f.store.required = cv && !logiOn(); f.addr.required = hm;
+  if (ch === 'cvs' && f.cvsid) { f.cvsid.value = ''; f.store.value = ''; $('#cvsn').textContent = '尚未選擇門市'; }
+  var mf = f.pay.value === '賣貨便' && !logiOn(), fo = f.cvs.querySelector('option[value="全家"],option:nth-child(2)');
   if (mf) f.cvs.value = '7-11'; if (fo) fo.disabled = mf;
   f.store.placeholder = mf ? '賣貨便只能寄 7-11,請填 7-11 店名或店號' : '';
   var mh = $('#mfh'); if (mh) mh.hidden = !mf;
@@ -762,7 +798,7 @@ function sfQuote(ch) {
   }, 250);
 }
 document.addEventListener('input', function (e) { if (e.target.form && e.target.form.id === 'sf' && (e.target.name === 'credit')) sfQuote(); });
-document.addEventListener('change', function (e) { if (e.target.form && e.target.form.id === 'sf' && (e.target.name === 'method' || e.target.name === 'pay')) sfQuote(e.target.name); });
+document.addEventListener('change', function (e) { if (e.target.form && e.target.form.id === 'sf' && (e.target.name === 'method' || e.target.name === 'pay' || e.target.name === 'cvs')) sfQuote(e.target.name); });
 var HL_O = (function () { try { return new URLSearchParams(location.search).get('o') || ''; } catch (e) { return ''; } })();
 function hlOrder() { if (!HL_O) return; setTimeout(function () { var e = document.querySelector('[data-oid="' + HL_O.replace(/"/g, '') + '"]'); if (e) e.scrollIntoView({ block: 'center', behavior: 'smooth' }); }, 300); }
 var PEND_S = (function () { try { return new URLSearchParams(location.search).get('s') || ''; } catch (e) { return ''; } })();
@@ -809,6 +845,7 @@ document.addEventListener('click', function (e) {
     var fb = function () { var t = document.createElement('textarea'); t.value = v; t.style.position = 'fixed'; t.style.opacity = '0'; document.body.appendChild(t); t.select(); try { document.execCommand('copy'); ok(); } catch (x) {} document.body.removeChild(t); };
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(v).then(ok, fb); else fb();
   } else if (b.dataset.a === 'pay') goPay(b.dataset.id, b.dataset.k);
+  else if (b.dataset.a === 'map') goMap();
   else if (b.dataset.a === 'lgd') goLogin();
   else if (b.dataset.a === 'lo') show('<h2>確定要登出嗎?</h2><p class="ds">登出後將無法使用會員優惠與購物金,可隨時再用 LINE 登入。</p><p><button class="btn l" data-a="x">取消</button> <button class="btn a" data-a="lo2">確定登出</button></p>');
   else if (b.dataset.a === 'lo2') { LT = ''; mt = ''; MD = null; MSEL = {}; MTAB = 'o'; QT = null; useCr = false; try { localStorage.removeItem('lt'); } catch (x) {} $('#dlg').close(); setLg(); }
@@ -834,7 +871,7 @@ document.addEventListener('submit', function (e) {
   $('#sfe').textContent = '';
   if (!SNONCE) SNONCE = nonce_();
   google.script.run.withSuccessHandler(function (d) { SNONCE = ''; MD = d; MSEL = {}; MTAB = 's'; var ns = d.ships.filter(function (z) { return z.id === d.sid; })[0]; show(shipDetail(ns)); })
-    .withFailureHandler(function (er) { $('#sfe').textContent = er.message; }).memberCreateShip(mt, items, { pay: f.pay.value, method: f.method.value, rname: f.rname.value, cvs: f.cvs.value, store: f.store.value, addr: f.addr.value, credit: f.credit ? Number(f.credit.value) || 0 : 0, note: f.note.value, phone: f.phone.value, paytest: payOn(), nonce: SNONCE, kind: payKind(f) });
+    .withFailureHandler(function (er) { $('#sfe').textContent = er.message; }).memberCreateShip(mt, items, { pay: f.pay.value, method: f.method.value, rname: f.rname.value, cvs: f.cvs.value, store: f.store.value, addr: f.addr.value, credit: f.credit ? Number(f.credit.value) || 0 : 0, note: f.note.value, phone: f.phone.value, paytest: payOn(), nonce: SNONCE, kind: payKind(f), cvsid: f.cvsid ? f.cvsid.value : '' });
 });
 
 function payOn() { try { if (/[?&]paytest=1/.test(location.search)) sessionStorage.setItem('paytest', '1'); return !!(window.D && D.payLive) || sessionStorage.getItem('paytest') === '1'; } catch (e) { return false; } }
@@ -849,9 +886,43 @@ function payCards() {
     c('刷卡', 'Credit', '💳', '信用卡一次付清', on ? '線上刷卡,付款完成自動確認' : '即將開放', false, !on) +
     c('刷卡', 'Installment', '🗓️', '信用卡分期', on ? '3～24 期,依發卡銀行核准' : '即將開放', false, !on) +
     c('刷卡', 'BNPL', '📱', '無卡分期', on ? '免信用卡,線上申請審核' : '即將開放', false, !on) +
-    c('賣貨便', '', '🏪', '賣貨便', '7-11 取貨付款,僅店到店') +
+    (logiOn() ? c('賣貨便', '', '🏪', '超商取貨付款', '7-11/全家門市取貨時付款') : c('賣貨便', '', '🏪', '賣貨便', '7-11 取貨付款,僅店到店')) +
     c('付現金', '', '💵', '付現金', '到店自取時當面付款');
 }
+function logiOn() { return !!(window.D && D.logiLive) || payOn(); }
+/* 超商地圖:先把填到一半的出貨單存起來,選完門市回來再接著填 */
+function goMap() {
+  var f = $('#sf'); if (!f) return;
+  var v = {}; ['method', 'rname', 'phone', 'cvs', 'addr', 'note'].forEach(function (k) { if (f[k]) v[k] = f[k].value; });
+  v.credit = f.credit ? f.credit.value : ''; var pr = f.querySelector('input[name="pay"]:checked'); v.pay = pr ? pr.value : ''; v.kind = pr && pr.dataset.k || '';
+  try { sessionStorage.setItem('sdraft', JSON.stringify({ sel: MSEL, v: v, t: Date.now() })); } catch (e) {}
+  google.script.run.withSuccessHandler(function (r) {
+    var fm = document.createElement('form'); fm.method = 'POST'; fm.action = r.action; fm.target = '_top';
+    Object.keys(r.fields).forEach(function (k) { var i = document.createElement('input'); i.type = 'hidden'; i.name = k; i.value = r.fields[k]; fm.appendChild(i); });
+    document.body.appendChild(fm);
+    var bb = $('#busy'); if (bb) { bb.firstElementChild.innerHTML = '📍 即將開啟 ' + esc(v.cvs || '7-11') + ' 門市地圖<br><small style="font-weight:400">選好門市後會自動回到這裡</small>'; bb.classList.add('on'); }
+    setTimeout(function () { fm.submit(); }, 800);
+  }).withFailureHandler(function (er) { $('#sfe').textContent = er.message; }).memberMapStart(v.cvs || '7-11', v.pay === '賣貨便', /Mobi|Android|iPhone/i.test(navigator.userAgent));
+}
+function resumeDraft() {
+  var pick = null, dr = null;
+  try { pick = JSON.parse(sessionStorage.getItem('cvspick') || 'null'); dr = JSON.parse(sessionStorage.getItem('sdraft') || 'null'); } catch (e) {}
+  if (!pick || !dr || !LT || Date.now() - dr.t > 3600000) return;
+  try { sessionStorage.removeItem('cvspick'); sessionStorage.removeItem('sdraft'); } catch (e) {}
+  mt = LT;
+  memLoad(function () {
+    MSEL = dr.sel || {}; show(shipForm());
+    var f = $('#sf'), v = dr.v || {};
+    ['method', 'rname', 'phone', 'addr', 'note'].forEach(function (k) { if (f[k] && v[k] != null) f[k].value = v[k]; });
+    if (f.credit && v.credit) f.credit.value = v.credit;
+    var rr = [].slice.call(f.querySelectorAll('input[name="pay"]')).filter(function (x) { return x.value === v.pay && (x.dataset.k || '') === (v.kind || ''); })[0]; if (rr && !rr.disabled) rr.checked = true;
+    f.method.value = '店到店'; f.cvs.value = pick.t; f.cvsid.value = pick.id; f.store.value = pick.n;
+    $('#cvsn').innerHTML = '✅ <b>' + esc(pick.t + ' ' + pick.n) + '</b>(店號 ' + esc(pick.id) + ')<br><small>' + esc(pick.a) + '</small>';
+    sfQuote();
+  });
+}
+(function () { try { var h = location.hash; if (h.indexOf('#cvs=') === 0) { sessionStorage.setItem('cvspick', decodeURIComponent(h.slice(5))); history.replaceState(null, '', location.pathname + location.search); } } catch (e) {} })();
+function shipCard(v, ic, t, d, chk) { return '<label class="payc"><input type="radio" name="method" value="' + v + '"' + (chk ? ' checked' : '') + '><span class="ic">' + ic + '</span><span><b>' + t + '</b><small>' + d + '</small></span></label>'; }
 function payKind(f) { var r = f.querySelector('input[name="pay"]:checked'); return (r && r.dataset.k) || ''; }
 /* 信用卡:向後端取得綠界付款表單,送出到綠界付款頁 */
 function goPay(sid, kind) {

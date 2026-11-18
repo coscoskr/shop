@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 // 綠界電子發票(B2C)API:加解密與開立/查詢。Deno 與 Node 18+ 都可用(WebCrypto)
 const STAGE = { mid: '2000132', key: 'ejCk326UnaZWKisg', iv: 'q9jcZX8Ib9LM8wYk', host: 'https://einvoice-stage.ecpay.com.tw', test: true };
 
@@ -73,4 +74,43 @@ export async function payFields(cfg, o) {
   if (o.kind === 'BNPL') f.PaymentInfoURL = o.returnUrl; // 無卡分期為審核制,申請結果也送到同一個網址
   f.CheckMacValue = await payMac(cfg, f);
   return { action: cfg.action, fields: f, test: cfg.test };
+}
+
+/* ---------- 物流(超商店到店 C2C) ---------- */
+const LOGI_STAGE = { mid: '2000933', key: 'XBERn1YOvpM9nfZc', iv: 'h1ONHk4P4yqbl5LK', host: 'https://logistics-stage.ecpay.com.tw', test: true };
+/** props 有 ECPAY_LOGI_LIVE=1 才用正式環境(金鑰沿用金流那組,可用 ECPAY_LOGI_KEY/IV 另外指定) */
+export function logiCfg(props) {
+  props = props || {};
+  if (String(props.ECPAY_LOGI_LIVE || '') === '1') return { mid: String(props.ECPAY_LOGI_MID || props.ECPAY_PAY_MID || '').trim(), key: String(props.ECPAY_LOGI_KEY || props.ECPAY_PAY_KEY || '').trim(), iv: String(props.ECPAY_LOGI_IV || props.ECPAY_PAY_IV || '').trim(), host: 'https://logistics.ecpay.com.tw', test: false };
+  return Object.assign({}, LOGI_STAGE);
+}
+export function logiMac(cfg, params) {
+  const keys = Object.keys(params).filter((k) => k !== 'CheckMacValue').sort((a, b) => { const x = a.toLowerCase(), y = b.toLowerCase(); return x < y ? -1 : x > y ? 1 : 0; });
+  const raw = 'HashKey=' + cfg.key + '&' + keys.map((k) => k + '=' + params[k]).join('&') + '&HashIV=' + cfg.iv;
+  const enc = encodeURIComponent(raw).replace(/%20/g, '+').replace(/~/g, '%7e').replace(/'/g, '%27').toLowerCase();
+  return createHash('md5').update(enc).digest('hex').toUpperCase();
+}
+export function logiVerify(cfg, params) { return !!params.CheckMacValue && logiMac(cfg, params) === String(params.CheckMacValue).toUpperCase(); }
+/** 超商電子地圖(客人選門市,不需檢查碼) */
+export function logiMapFields(cfg, o) {
+  return { action: cfg.host + '/Express/map', fields: { MerchantID: cfg.mid, LogisticsType: 'CVS', LogisticsSubType: o.sub, IsCollection: o.cod ? 'Y' : 'N', ServerReplyURL: o.reply, Device: o.mobile ? '1' : '0' }, test: cfg.test };
+}
+/** 建立超商店到店物流單,回傳 { ok, id, payNo, valNo } 或 { ok:false, msg } */
+export async function logiCreate(cfg, o, fetchFn) {
+  const f = { MerchantID: cfg.mid, MerchantTradeNo: (String(o.sid).replace(/[^A-Za-z0-9]/g, '') + 'L' + Date.now().toString(36).toUpperCase()).slice(-20), MerchantTradeDate: twNow(),
+    LogisticsType: 'CVS', LogisticsSubType: o.sub, GoodsAmount: String(o.amt), IsCollection: o.cod ? 'Y' : 'N', GoodsName: 'coscos商品',
+    SenderName: o.sn, SenderCellPhone: o.sp, ReceiverName: o.rn, ReceiverCellPhone: o.ph, ServerReplyURL: o.reply, ReceiverStoreID: o.store };
+  if (o.cod) f.CollectionAmount = String(o.amt);
+  f.CheckMacValue = logiMac(cfg, f);
+  const r = await (fetchFn || fetch)(cfg.host + '/Express/Create', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(f).toString() });
+  const t = (await r.text()).trim();
+  if (/^1\|/.test(t)) { const q = new URLSearchParams(t.slice(2)); return { ok: true, id: q.get('AllPayLogisticsID') || '', payNo: q.get('CVSPaymentNo') || '', valNo: q.get('CVSValidationNo') || '' }; }
+  return { ok: false, msg: t.replace(/^0\|/, '').slice(0, 200) || ('HTTP ' + r.status) };
+}
+/** 列印寄件單(託運單)表單 */
+export function logiPrintFields(cfg, o) {
+  const fam = o.sub === 'FAMIC2C', f = { MerchantID: cfg.mid, AllPayLogisticsID: o.id, CVSPaymentNo: o.payNo };
+  if (!fam) f.CVSValidationNo = o.valNo;
+  f.CheckMacValue = logiMac(cfg, f);
+  return { action: cfg.host + (fam ? '/Express/PrintFAMIC2COrderInfo' : '/Express/PrintUniMartC2COrderInfo'), fields: f };
 }

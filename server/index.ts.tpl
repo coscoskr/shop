@@ -1,5 +1,5 @@
 import postgres from "https://deno.land/x/postgresjs@v3.4.5/mod.js";
-import { execute, runAfter, handleWebhook, handleEcpayPay } from "https://cdn.jsdelivr.net/gh/coscoskr/shop@{{SHA}}/server/core.js";
+import { execute, runAfter, handleWebhook, handleEcpayPay, handleEcpayMap, handleEcpayLogi } from "https://cdn.jsdelivr.net/gh/coscoskr/shop@{{SHA}}/server/core.js";
 import { makePgDb } from "https://cdn.jsdelivr.net/gh/coscoskr/shop@{{SHA}}/server/pg.js";
 
 // 只允許網站本身呼叫(瀏覽器端 CORS)。換網域時,在 Edge Function 的 Secrets 加 ALLOWED_ORIGINS(逗號分隔)。
@@ -50,7 +50,18 @@ for (const k of Object.keys(env.props)) if (env.props[k] === undefined) delete e
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: { ...SEC, ...corsFor(req) } });
   if (req.method === "GET") return jsonR(req, { ok: true, service: "coscos-api" });
-  if (new URL(req.url).searchParams.get("ecpay") === "pay") {
+  const eck = new URL(req.url).searchParams.get("ecpay");
+  if (eck === "map") {
+    // 綠界超商地圖選完門市
+    try { return new Response(await handleEcpayMap({ rawBody: await req.text(), db, env }), { headers: { "Content-Type": "text/html; charset=utf-8" } }); }
+    catch (e) { console.error("ecpay map error", e); return new Response("門市選擇失敗,請回上一頁重試", { status: 500, headers: { "Content-Type": "text/plain; charset=utf-8" } }); }
+  }
+  if (eck === "logi") {
+    // 綠界物流狀態通知
+    try { return new Response(await handleEcpayLogi({ rawBody: await req.text(), db, env }), { headers: { "Content-Type": "text/plain" } }); }
+    catch (e) { console.error("ecpay logi error", e); return new Response("0|ERR", { status: 500, headers: { "Content-Type": "text/plain" } }); }
+  }
+  if (eck === "pay") {
     // 綠界付款結果通知(信用卡)
     try { const t = await handleEcpayPay({ rawBody: await req.text(), db, env }); return new Response(t, { headers: { "Content-Type": "text/plain" } }); }
     catch (e) { console.error("ecpay pay error", e); return new Response("0|ERR", { status: 500, headers: { "Content-Type": "text/plain" } }); }
