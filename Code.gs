@@ -228,7 +228,7 @@ function getShop() {
 }
 function shopData_() {
   var st = settings_();
-  return {
+  return { payLive: prop_('ECPAY_PAY_LIVE') === '1',
     store: st.店名 || '', notice: st.公告 || '', creditNote: st.購物金注意事項 === undefined ? defSet_('購物金注意事項') : String(st.購物金注意事項 || ''), free: Number(st.免運門檻) || 0, fee: Number(st.宅配運費) || 0, feeCvs: Number(st.店到店運費) || 0,
     line: { on: lineOn_(), liff: prop_('LIFF_ID'), friend: String(st.加好友連結 || ''), community: String(st.LINE社群連結 || '') },
     biz: { name: String(st.公司名稱 || ''), addr: String(st.公司地址 || ''), tax: /^\d+$/.test(String(st.統一編號 || '')) ? ('00000000' + st.統一編號).slice(-8) : String(st.統一編號 || ''), ig: String(st.IG連結 || '') },
@@ -2052,6 +2052,7 @@ function memberCreateShip(tk, items, d) {
   var ctx = mem_(tk); d = d || {};
   var pay = d.pay, ship = t_(d.ship, 200), phone = t_(d.phone, 20), method = d.method ? String(d.method) : '';
   if (!PAY[pay]) throw new Error('請選擇付款方式');
+  if (pay === '刷卡' && prop_('ECPAY_PAY_LIVE') !== '1' && !d.paytest) throw new Error('線上付款即將開放,目前請選擇匯款或賣貨便');
   if (pay === '賣貨便' && method === '自取') throw new Error('賣貨便無法自取,請選擇匯款或付現金');
   if (pay === '賣貨便' && (d.method || d.cvs)) method = '店到店';
   if (pay === '付現金' && method !== '自取') throw new Error('付現金只能選擇自取');

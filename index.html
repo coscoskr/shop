@@ -714,7 +714,7 @@ function shipForm() {
     '<div id="mcvs"><label>超商<select name="cvs"><option>7-11</option><option>全家</option></select></label><label>取貨門市(店名或店號)<input name="store" maxlength="60"></label><small class="ds" id="mfh" hidden style="color:var(--acc)">賣貨便只能寄到 7-11 門市,請填 7-11 的店名或店號(不能填全家或地址)</small></div>' +
     '<div id="mhome" hidden><label>收件地址<input name="addr" maxlength="150" value="' + esc((MD.me && MD.me.addr) || '') + '"></label></div>' +
     (bal > 0 ? '<label>使用購物金(餘額 ' + money(bal) + ')<input name="credit" type="number" min="0" step="1" value="0" inputmode="numeric"></label><small class="ds" id="crh"></small>' + credNote() : '') +
-    '<fieldset><legend>付款方式</legend><label><input type="radio" name="pay" value="匯款" checked> 匯款(先轉帳,確認收款後出貨)</label><label><input type="radio" name="pay" value="賣貨便"> 賣貨便(貨到付款,僅店到店)</label><label><input type="radio" name="pay" value="付現金"> 付現金(僅自取)</label><label><input type="radio" name="pay" value="刷卡"> 線上付款:信用卡/無卡分期(付款後出貨)</label></fieldset>' +
+    '<fieldset><legend>付款方式</legend><label><input type="radio" name="pay" value="匯款" checked> 匯款(先轉帳,確認收款後出貨)</label><label><input type="radio" name="pay" value="賣貨便"> 賣貨便(貨到付款,僅店到店)</label><label><input type="radio" name="pay" value="付現金"> 付現金(僅自取)</label>' + (payOn() ? '<label><input type="radio" name="pay" value="刷卡"> 線上付款:信用卡/無卡分期(付款後出貨)</label>' : '<label style="color:var(--mute)"><input type="radio" name="pay" value="刷卡" disabled> 信用卡/無卡分期(即將開放)</label>') + '</fieldset>' +
     '<label>備註<textarea name="note" rows="2" maxlength="200"></textarea></label>' +
     '<p id="sfe" class="tg" role="alert"></p><button class="btn a">確認出貨</button> <button type="button" class="btn l" data-a="mb">返回</button></form>';
 }
@@ -815,9 +815,11 @@ document.addEventListener('submit', function (e) {
   var items = Object.keys(MSEL).map(function (k) { return { oid: k.split('|')[0], pid: k.split('|')[1] }; });
   $('#sfe').textContent = '';
   google.script.run.withSuccessHandler(function (d) { MD = d; MSEL = {}; MTAB = 's'; var ns = d.ships.filter(function (z) { return z.id === d.sid; })[0]; show(shipDetail(ns)); })
-    .withFailureHandler(function (er) { $('#sfe').textContent = er.message; }).memberCreateShip(mt, items, { pay: f.pay.value, method: f.method.value, rname: f.rname.value, cvs: f.cvs.value, store: f.store.value, addr: f.addr.value, credit: f.credit ? Number(f.credit.value) || 0 : 0, note: f.note.value, phone: f.phone.value });
+    .withFailureHandler(function (er) { $('#sfe').textContent = er.message; }).memberCreateShip(mt, items, { pay: f.pay.value, method: f.method.value, rname: f.rname.value, cvs: f.cvs.value, store: f.store.value, addr: f.addr.value, credit: f.credit ? Number(f.credit.value) || 0 : 0, note: f.note.value, phone: f.phone.value, paytest: payOn() });
 });
 
+function payOn() { try { if (/[?&]paytest=1/.test(location.search)) sessionStorage.setItem('paytest', '1'); return !!(window.D && D.payLive) || sessionStorage.getItem('paytest') === '1'; } catch (e) { return false; } }
+payOn();
 /* 信用卡:向後端取得綠界付款表單,送出到綠界付款頁 */
 function goPay(sid, kind) {
   var e = $('#paye'); if (e) e.textContent = '正在前往付款頁…';
