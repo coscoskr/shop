@@ -97,6 +97,7 @@ fieldset{border:1px solid var(--line);border-radius:2px;margin:14px 0;padding:10
 .warn{background:#FFF6E5;border:1px solid #F1D9A5;padding:8px 12px;margin:8px 0;border-radius:2px;white-space:pre-wrap}
 .itm{width:100%;table-layout:fixed}.itm th,.itm td{padding:4px 3px;font-size:13px;vertical-align:middle}.itm input,.itm select{width:100%;min-width:0;padding:4px;font-size:13px;box-sizing:border-box}.itm th:nth-child(1){width:15%}.itm th:nth-child(2),.itm th:nth-child(6){width:7%}.itm th:nth-child(3),.itm th:nth-child(4),.itm th:nth-child(5),.itm th:nth-child(10){width:5.5%}.itm th:nth-child(7){width:10%}.itm th:nth-child(8),.itm th:nth-child(11){width:9%}.itm th:nth-child(9){width:6.5%}.itm th:nth-child(12){width:7%}.itm th:nth-child(13){width:5%}
 .ig{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0}.ig .it{width:96px;text-align:center;font-size:12px}.ig img{width:96px;height:96px;object-fit:cover;border:1px solid var(--line)}
+.spgr{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:6px 0}.spgr>span{font-size:13px;width:34px}.spgr input{flex:1;min-width:120px}.spgl{display:contents}.spgt{display:inline-flex;align-items:center;gap:2px;background:#f6ece6;border:1px solid #e3cfc3;border-radius:999px;padding:2px 4px 2px 10px;font-size:13px}.spgt button{border:0;background:none;cursor:pointer;color:#a0675a;font-size:12px;padding:2px 6px}
 </style>
 </head>
 <body>
@@ -518,21 +519,27 @@ function drawSpecs() {
 }
 /* 顏色×尺寸:規格名稱用「顏色 / 尺寸」存(中間是空白/空白),前台會拆成兩排按鈕 */
 var SPSEP = ' / ';
-function spgFill() {
-  var c = [], z = [], two = SPL.length && SPL.every(function (x) { return String(x.n).split(SPSEP).length === 2; });
-  if (two) SPL.forEach(function (x) { var a = String(x.n).split(SPSEP); if (c.indexOf(a[0]) < 0) c.push(a[0]); if (z.indexOf(a[1]) < 0) z.push(a[1]); });
-  var gc = $('#spgc'), gs = $('#spgs'); if (gc) gc.value = c.join(','); if (gs) gs.value = z.join(',');
+var SPG = { c: [], s: [] };
+document.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.isComposing && (e.target.id === 'spgc' || e.target.id === 'spgs')) { e.preventDefault(); spgAdd(e.target.id === 'spgc' ? 'c' : 's'); } });
+function spgFill() { SPG = { c: [], s: [] }; spgDraw(); }
+function spgDraw() {
+  ['c', 's'].forEach(function (k) { var el = $(k === 'c' ? '#spgcl' : '#spgsl'); if (el) el.innerHTML = SPG[k].map(function (v, i) { return '<span class="spgt">' + esc(v) + '<button type="button" data-a="spgx" data-k="' + k + '" data-i="' + i + '" aria-label="移除">✕</button></span>'; }).join(''); });
 }
-function spgList(v) { var o = []; String(v || '').split(/[,，、\n]/).forEach(function (x) { x = x.replace(/[|=]/g, '').replace(/\s+\/\s+/g, '/').trim(); if (x && o.indexOf(x) < 0) o.push(x); }); return o; }
+function spgClean(x) { return String(x).replace(/[|=]/g, '').replace(/\s+\/\s+/g, '/').trim(); }
+function spgAdd(k) {
+  var inp = $(k === 'c' ? '#spgc' : '#spgs'); if (!inp) return;
+  String(inp.value).split(/[,，、\n]/).forEach(function (x) { x = spgClean(x); if (x && SPG[k].indexOf(x) < 0) SPG[k].push(x); });
+  inp.value = ''; inp.focus(); spgDraw();
+}
 function spgGen() {
-  var c = spgList($('#spgc').value), z = spgList($('#spgs').value), names = [];
-  if (!c.length && !z.length) { tell('請先填顏色或尺寸'); return; }
+  spgAdd('c'); spgAdd('s');
+  var c = SPG.c, z = SPG.s, names = [];
+  if (!c.length && !z.length) { tell('請先加入顏色或尺寸'); return; }
   if (c.length && z.length) c.forEach(function (a) { z.forEach(function (b) { names.push(a + SPSEP + b); }); }); else names = c.length ? c : z;
-  var old = {}; SPL.forEach(function (x) { if (String(x.n).trim()) old[String(x.n).trim()] = x.q; });
-  var lost = Object.keys(old).filter(function (n) { return names.indexOf(n) < 0; });
-  if (lost.length && !confirm('以下原本的規格會被移除:\n' + lost.join('\n') + '\n\n(已經下單的訂單不受影響)確定要產生新的組合嗎?')) return;
-  SPL = names.map(function (n) { return { n: n, q: old[n] == null ? '' : old[n] }; });
-  drawSpecs();
+  SPL = SPL.filter(function (x) { return String(x.n).trim(); });
+  var have = SPL.map(function (x) { return String(x.n).trim(); }), add = 0;
+  names.forEach(function (n) { if (have.indexOf(n) < 0) { SPL.push({ n: n, q: '' }); add++; } });
+  drawSpecs(); if (!add) tell('這些組合都已經有了');
 }
 function syncStock() {
   var f = $('#pf'); if (!f) return;
@@ -550,9 +557,10 @@ function editProd(id) {
   d.innerHTML = '<h3>' + (id ? '編輯 ' + esc(p.id) : '新增商品') + '</h3><form id="pf"><div class="g" style="grid-template-columns:1fr 1fr">' +
     '<div class="f"><span class="m">品牌(從清單選;清單沒有就在右邊空白格輸入新品牌,按「新增」)</span><div style="display:flex;gap:8px;margin-top:4px"><select name="brand" id="brsel" style="flex:1">' + brOpts(p.brand) + '</select><input name="newBrand" id="brnew" placeholder="新品牌:直接輸入" maxlength="40" autocomplete="off" style="flex:1"><button type="button" class="btn a" data-a="bradd">新增</button></div><span class="m" id="brmsg">輸入的品牌若和清單裡的只差大小寫(例:lloyd / LLOYD),會自動用清單裡的寫法。</span></div>' +
         '<div>' + fld('品名', 'name', p.name) + '<div style="margin-top:10px"><span class="m">規格(可新增,沒有上限;沒有規格就留空)</span><div id="spl"></div><button type="button" class="btn l s" data-a="spadd">+ 新增規格</button>' +
-          '<div style="margin-top:10px;padding:10px;border:1px dashed #d9c9bd;border-radius:8px"><b style="font-size:13px">顏色 × 尺寸 快速產生</b><span class="m" style="display:block;font-size:12px;margin:2px 0 6px">用逗號分隔,按「產生組合」會建立每個顏色×尺寸的規格,前台會先選顏色再選尺寸。只有一種也可以(例如只填尺寸)。</span>' +
-          '<label style="display:block">顏色<input id="spgc" placeholder="例如:栗色,沙色,黑色"></label><label style="display:block;margin-top:4px">尺寸<input id="spgs" placeholder="例如:US6/23.5cm,US7/24cm,US8/24.5cm"></label>' +
-          '<button type="button" class="btn a s" data-a="spgen" style="margin-top:6px">產生組合</button></div></div></div>' +
+          '<div style="margin-top:10px;padding:10px;border:1px dashed #d9c9bd;border-radius:8px"><b style="font-size:13px">顏色 × 尺寸 快速產生</b><span class="m" style="display:block;font-size:12px;margin:2px 0 6px">輸入一個按 Enter(或「加入」),可加很多個;再按「加入組合」就會把每個顏色×尺寸加到上面的規格清單(原本的規格會保留)。不同顏色尺寸不同時,可以分次加入。</span>' +
+          '<div class="spgr"><span>顏色</span><div id="spgcl" class="spgl"></div><input id="spgc" placeholder="例如:沙色"><button type="button" class="btn l s" data-a="spgi" data-k="c">加入</button></div>' +
+          '<div class="spgr"><span>尺寸</span><div id="spgsl" class="spgl"></div><input id="spgs" placeholder="例如:EU35"><button type="button" class="btn l s" data-a="spgi" data-k="s">加入</button></div>' +
+          '<button type="button" class="btn a s" data-a="spgen" style="margin-top:6px">加入組合</button> <button type="button" class="btn l s" data-a="spgclr" style="margin-top:6px">清空顏色/尺寸</button></div></div></div>' +
     '<div>' + fld('單價', 'price', p.price, 'number') + '<div style="margin-top:10px">' + fld('多數量優惠', 'tiers', p.tiers, 'text', '3=450,5=400 (買3件起每件450、買5件起每件400)') + '</div></div>' +
     '<label>銷售型態<select name="type">' + opts(['現貨', '預購'], p.type) + '</select></label>' +
     '<div><label>數量(必填)<span style="display:flex;gap:12px;align-items:center"><input name="stock" type="number" min="0" step="1" style="flex:1;min-width:0" value="' + (p.stock === '' ? '' : p.stock) + '"' + (p.stock === '' && id ? ' disabled' : '') + '><span class="ck" style="white-space:nowrap"><input type="checkbox" name="unlimited"' + (id && p.stock === '' ? ' checked' : '') + '> 無限數量</span></span></label><span class="m" id="sph"></span></div>' +
@@ -994,6 +1002,9 @@ document.addEventListener('click', function (e) {
     return;
   }
   if (a === 'spgen') { spgGen(); return; }
+  if (a === 'spgi') { spgAdd(b.dataset.k); return; }
+  if (a === 'spgx') { SPG[b.dataset.k].splice(+b.dataset.i, 1); spgDraw(); return; }
+  if (a === 'spgclr') { SPG = { c: [], s: [] }; spgDraw(); return; }
   if (a === 'spadd') { SPL.push({ n: '', q: '' }); drawSpecs(); var ins = document.querySelectorAll('.spi'); if (ins.length) ins[ins.length - 1].focus(); return; }
   if (a === 'sprm') { SPL.splice(Number(b.dataset.i), 1); drawSpecs(); return; }
   if (a === 'mb') openMember(id);
