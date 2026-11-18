@@ -1,6 +1,7 @@
 // 請求處理核心:一次呼叫 = 一個資料庫交易(取得鎖 → 讀資料 → 執行原本的商業邏輯 → 寫回)
 import * as code from './code.js';
 import { createRuntime } from './adapter.js';
+import { ecpayCfg, ecpayIssue } from './ecpay.js';
 
 // 在記憶體裡「同步」執行商業邏輯前,先把服務物件掛到全域,並重置模組內的快取
 function withRt(rt, fn) {
@@ -15,6 +16,19 @@ const LINE_FRIEND_URL = 'https://api.line.me/friendship/v1/status';
 
 // 需要非同步(網路、檔案)的功能,在這裡處理;其餘全部交給原本的函式
 const SPECIAL = {
+  // 批次開立電子發票(綠界):先整理資料 → 逐張向綠界開立 → 把發票號碼寫回出貨單
+  async adminIssueInvoice({ rt, args, props }) {
+    const [tk, ids] = args;
+    const cfg = ecpayCfg(props);
+    const prep = withRt(rt, () => code.INTERNAL.invPrep_(tk, ids, cfg.test));
+    const results = [];
+    for (const it of prep.list) {
+      try { results.push(Object.assign({ sid: it.sid }, await ecpayIssue(cfg, it.data))); }
+      catch (e) { results.push({ sid: it.sid, ok: false, msg: String(e && e.message || e) }); }
+    }
+    return withRt(rt, () => code.INTERNAL.invSave_(tk, prep, results, cfg.test));
+  },
+
   // LINE 登入完成後的回呼:用網址上的 code 換使用者資料
   async lineCallback({ rt, args, props }) {
     const [codeStr, state] = args;

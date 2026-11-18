@@ -20,7 +20,7 @@ var H = {
   '固定支出': ['固定ID', '名稱', '金額', '備註', '啟用'],
   '人事': ['人員ID', '姓名', '薪資', '勞保', '健保', '勞退', '其他', '備註', '啟用'],
   '廠商付款': ['付款ID', '付款日期', '廠商', '金額', '匯款備註', '品項數', '應付成本', '品項', '建立人', '建立時間', '圖片'],
-  '出貨單': ['出貨單ID', '訂單ID', '狀態', '物流', '物流單號', '品項', '建立時間', '出貨時間', 'LINE ID', '姓名', '電話', '付款方式', '收件資訊', '備註', '商品金額', '優惠折抵', '購物金折抵', '運費', '總額', '付款連結', '匯款後五碼', '會員等級', '折抵明細', '配送方式', '購物金明細', '匯款日期', '收款帳號', '列印時間', '出貨單圖片'],
+  '出貨單': ['出貨單ID', '訂單ID', '狀態', '物流', '物流單號', '品項', '建立時間', '出貨時間', 'LINE ID', '姓名', '電話', '付款方式', '收件資訊', '備註', '商品金額', '優惠折抵', '購物金折抵', '運費', '總額', '付款連結', '匯款後五碼', '會員等級', '折抵明細', '配送方式', '購物金明細', '匯款日期', '收款帳號', '列印時間', '出貨單圖片', '發票號碼', '發票日期'],
   '會員': ['LINE ID', '暱稱', '頭像', '等級', '加入時間', '最近登入', '已加好友', '備註', '姓名', '電話', 'Email', '收件地址'],
   '購物金': ['序號', 'LINE ID', '發放時間', '金額', '剩餘', '到期日', '來源', '備註', '操作人', '訂單ID', '活動ID'],
   '等級': ['等級', '折扣率', '適用類別'],
@@ -908,7 +908,7 @@ function memberLogin(phone, oid) {
 }
 function shipObj_(r) {
   return { id: String(r.出貨單ID), oids: String(r.訂單ID).split(','), st: String(r.狀態), pay: String(r.付款方式), co: String(r.物流 || ''), no: String(r.物流單號 || ''), it: String(r.品項 || ''),
-    cr: String(r.建立時間 || ''), at: String(r.出貨時間 || ''), name: String(r.姓名 || ''), phone: String(r.電話 || ''), ship: String(r.收件資訊 || ''), note: String(r.備註 || ''),
+    cr: String(r.建立時間 || ''), at: String(r.出貨時間 || ''), name: String(r.姓名 || ''), phone: String(r.電話 || ''), ship: String(r.收件資訊 || ''), note: String(r.備註 || ''), inv: String(r.發票號碼 || ''), invd: String(r.發票日期 || ''),
     sub: Number(r.商品金額), disc: Number(r.優惠折抵), cred: Number(r.購物金折抵), fee: Number(r.運費), total: Number(r.總額),
     link: /^https:\/\//.test(String(r.付款連結)) ? String(r.付款連結) : '', last5: String(r.匯款後五碼 || ''), rdate: String(r.匯款日期 || ''), bank: String(r.收款帳號 || ''), pr: String(r.列印時間 || ''), img: String(r.出貨單圖片 || ''), method: String(r.配送方式 || ''), trk: shortTrack_(r) };
 }
@@ -1610,6 +1610,7 @@ function deleteShip_(u, sid) {
   if (!s) throw new Error('找不到出貨單 ' + sid);
   var f = FLOW[s.付款方式] || [];
   if (f.indexOf(s.狀態) >= si_(s.付款方式)) throw new Error('出貨單 ' + sid + ' 已出貨,無法刪除,請先把狀態改回出貨前');
+  if (String(s.發票號碼 || '')) throw new Error('出貨單 ' + sid + ' 已開立發票(' + s.發票號碼 + '),不能刪除');
   var snap = { ship: cp_(s), lines: rows_('訂單明細').filter(function (l) { return String(l.出貨單ID) === sid; }).map(cp_) };
   rows_('訂單明細').forEach(function (l) {
     if (String(l.出貨單ID) === sid) { var n = cp_(l); n.出貨單ID = ''; put_('訂單明細', l._r, n); }
@@ -1626,6 +1627,76 @@ function adminDeleteShip(tk, sid) {
   var u = me_(tk);
   lk_(function () { deleteShip_(u, String(sid)); });
   return adminOrders(tk);
+}
+/* ---------- 電子發票(綠界):實際連線在 server/core.js,這裡只負責整理資料與寫回 ---------- */
+var INV_DONE = ['已出貨', '已自取付款'];
+/** 整理要開發票的出貨單:只開「已出貨/已自取付款」且還沒開過的;金額=出貨單應付(含運費,已扣優惠與購物金) */
+function invPrep_(tk, ids, test) {
+  var u = me_(tk);
+  ids = (ids || []).map(String).filter(function (x, i, a) { return x && a.indexOf(x) === i; });
+  if (!ids.length) throw new Error('請先勾選出貨單');
+  if (ids.length > 30) throw new Error('一次最多開 30 張,請分批開立');
+  var all = rows_('出貨單'), lines = rows_('訂單明細'), mem = {}, list = [], skip = [];
+  rows_('會員').forEach(function (m) { mem[String(m['LINE ID'])] = m; });
+  ids.forEach(function (id) {
+    var s = all.filter(function (x) { return String(x.出貨單ID) === id; })[0];
+    if (!s) { skip.push({ sid: id, why: '找不到出貨單' }); return; }
+    if (String(s.發票號碼 || '')) { skip.push({ sid: id, why: '已開過發票 ' + s.發票號碼 }); return; }
+    if (INV_DONE.indexOf(String(s.狀態)) < 0) { skip.push({ sid: id, why: '狀態是「' + s.狀態 + '」,要「已出貨」才能開' }); return; }
+    var total = Math.round(Number(s.總額) || 0), fee = Math.round(Number(s.運費) || 0);
+    if (total <= 0) { skip.push({ sid: id, why: '應付金額是 0,不用開發票' }); return; }
+    var phone = nz_(s.電話), m = mem[String(s['LINE ID'] || '')] || {}, email = String(m.Email || '').trim();
+    if (!/^09\d{8}$/.test(phone)) phone = /^09\d{8}$/.test(nz_(m.電話)) ? nz_(m.電話) : '';
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) email = '';
+    if (!phone && !email) { skip.push({ sid: id, why: '沒有手機號碼(09 開頭)或 Email,無法寄發票通知' }); return; }
+    if (fee > total) fee = 0;
+    var net = total - fee, ls = lines.filter(function (l) { return String(l.出貨單ID) === id; });
+    var P = ls.reduce(function (t, l) { return t + Math.max(0, Number(l.小計) || 0); }, 0), items = [];
+    if (net > 0) {
+      if (!ls.length || P <= 0) items.push({ name: '商品一批', qty: 1, amt: net });
+      else {
+        var acc = 0, big = 0;
+        ls.forEach(function (l, i) {
+          var a = Math.round(Math.max(0, Number(l.小計) || 0) * net / P); acc += a;
+          var nm = String(l.品名 || '商品') + (String(l.規格 || '') ? ' ' + l.規格 : '');
+          items.push({ name: nm, qty: Math.max(1, Math.round(Number(l.數量) || 1)), amt: a });
+          if (a > items[big].amt) big = i;
+        });
+        items[big].amt += net - acc;
+        items = items.filter(function (x) { return x.amt > 0; });
+      }
+    }
+    if (fee > 0) items.push({ name: '運費', qty: 1, amt: fee, word: '式' });
+    var Items = items.map(function (x, i) {
+      var nm = String(x.name).replace(/[|\r\n\t]/g, ' ').slice(0, 80), q = x.qty, pr = x.amt / q;
+      if (Math.round(pr) !== pr) { nm = (nm + ' ×' + q).slice(0, 90); q = 1; pr = x.amt; }
+      return { ItemSeq: i + 1, ItemName: nm, ItemCount: q, ItemWord: x.word || '件', ItemPrice: pr, ItemTaxType: '1', ItemAmount: x.amt, ItemRemark: '' };
+    });
+    list.push({ sid: id, data: {
+      RelateNumber: test ? (id + 'T' + Date.now().toString(36)).slice(0, 30) : id,
+      CustomerID: '', CustomerIdentifier: '', CustomerName: String(s.姓名 || '').slice(0, 30), CustomerAddr: '', CustomerPhone: phone, CustomerEmail: phone ? '' : email,
+      ClearanceMark: '', Print: '0', Donation: '0', LoveCode: '', CarrierType: '1', CarrierNum: '', TaxType: '1', SalesAmount: total,
+      InvoiceRemark: '出貨單 ' + id, InvType: '07', vat: '1', Items: Items } });
+  });
+  return { acc: u.acc, list: list, skip: skip };
+}
+/** 把綠界回傳結果寫回出貨單,回傳最新訂單資料與摘要訊息 */
+function invSave_(tk, prep, results, test) {
+  var ok = [], bad = [];
+  lk_(function () {
+    var all = rows_('出貨單');
+    results.forEach(function (r) {
+      if (!r.ok) { bad.push(r.sid + ':' + r.msg); log_(prep.acc, '發票開立失敗', r.sid, String(r.msg || '')); return; }
+      var s = all.filter(function (x) { return String(x.出貨單ID) === r.sid; })[0]; if (!s) return;
+      var n = cp_(s); n.發票號碼 = (test ? '測試' : '') + r.no; n.發票日期 = String(r.date || now_()).slice(0, 19); put_('出貨單', s._r, n);
+      ok.push(r.sid + ' ' + r.no);
+      log_(prep.acc, '開立發票', r.sid, (test ? '(測試環境)' : '') + r.no + ' 隨機碼 ' + (r.rand || '') + ' 金額 ' + s.總額 + (r.recovered ? '(查回先前已開立)' : ''));
+    });
+  });
+  var msg = (test ? '【目前是綠界測試環境,發票不是真的】\n' : '') + '開立成功 ' + ok.length + ' 張' + (ok.length ? ':\n' + ok.join('\n') : '') +
+    (bad.length ? '\n\n開立失敗 ' + bad.length + ' 張:\n' + bad.join('\n') : '') +
+    (prep.skip.length ? '\n\n略過 ' + prep.skip.length + ' 張:\n' + prep.skip.map(function (x) { return x.sid + ':' + x.why; }).join('\n') : '');
+  var r = adminOrders(tk); r.msg = msg; return r;
 }
 /** 合併同一位客人的多張出貨單(出貨前、同付款方式、同狀態):品項與金額加總,運費依合併後金額重算,保留最早的那張 */
 function adminMergeShips(tk, ids) {
