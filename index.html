@@ -180,14 +180,14 @@ try { LT = localStorage.getItem('lt') || ''; } catch (e) {}
 if (BOOT.token) { LT = BOOT.token; try { localStorage.setItem('lt', LT); } catch (e) {} }
 var $ = function (s) { return document.querySelector(s); };
 var BUSY = 0, BT = 0;
-function busy(d) { BUSY = Math.max(0, BUSY + d); clearTimeout(BT); if (BUSY > 0) BT = setTimeout(function () { var b = document.getElementById('busy'); if (b) b.classList.add('on'); }, 350); else { var b = document.getElementById('busy'); if (b) b.classList.remove('on'); } }
+function busy(d, now) { BUSY = Math.max(0, BUSY + d); clearTimeout(BT); var bb = document.getElementById('busy'); if (BUSY > 0 && now && bb) { bb.firstElementChild.textContent = '處理中,請稍候…請勿重複點擊'; bb.classList.add('on'); } else if (BUSY > 0) BT = setTimeout(function () { var b = document.getElementById('busy'); if (b) { b.firstElementChild.textContent = '網站運轉中,請稍候…'; b.classList.add('on'); } }, 350); else { var b = document.getElementById('busy'); if (b) b.classList.remove('on'); } }
 (function () {
   var real = google.script.run;
   function wrap(s, f) {
     return new Proxy({}, { get: function (_, k) {
       if (k === 'withSuccessHandler') return function (fn) { return wrap(fn, f); };
       if (k === 'withFailureHandler') return function (fn) { return wrap(s, fn); };
-      return function () { busy(1); var x = real.withSuccessHandler(function (v) { busy(-1); if (s) s(v); }).withFailureHandler(function (e) { busy(-1); if (f) f(e); }); return x[k].apply(x, arguments); };
+      return function () { busy(1, !/^(getShop|shopData|quote|memberOrders|memberShipQuote|trackLink)$/.test(k)); var x = real.withSuccessHandler(function (v) { busy(-1); if (s) s(v); }).withFailureHandler(function (e) { busy(-1); if (f) f(e); }); return x[k].apply(x, arguments); };
     } });
   }
   google.script.run = wrap(null, null);
@@ -513,10 +513,13 @@ function formHtml() {
   return '<h2>遊客下單</h2><p class="ds">請留下姓名、電話與電子郵件。到貨、出貨通知會寄到你的電子郵件。付款方式與收件資料,等商品到貨要結帳時再填。</p><form id="f"><label>姓名<input name="name" required maxlength="40"></label><label>聯絡電話<input name="phone" required inputmode="tel"></label><label>電子郵件(必填,用來通知與聯絡)<input name="email" type="email" required maxlength="80" autocomplete="email"></label>' +
     '<p id="er" class="tg" role="alert"></p><button class="btn a" id="sb">確認下訂</button> <button type="button" class="btn l" data-a="cart">返回購物車</button></form>';
 }
+var PNONCE = '', SNONCE = '';
+function nonce_() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 10); }
 function placeNow(o, sb) {
+  if (!PNONCE) PNONCE = nonce_(); o.nonce = PNONCE;
   o.token = LT; o.useCredit = false; o.code = CODE; o.items = Object.keys(cart).map(function (id) { return { id: id, qty: cart[id] }; });
   google.script.run.withSuccessHandler(function (r) {
-    cart = {}; count(); QT = null; useCr = false; mt = r.mt || LT;
+    PNONCE = ''; cart = {}; count(); QT = null; useCr = false; mt = r.mt || LT;
     var oid = r.orderId;
     MTAB = 'o'; MSEL = {}; memLoad(function () { show('<h2>訂單已成立</h2><p>訂單編號 <b>' + esc(oid) + '</b></p><p class="ds">現貨或已到貨的商品,即可勾選結帳並出貨;預購商品到貨後會通知你。</p><button class="btn a" data-a="mt" data-t="o">我知道了,查看訂單明細</button>'); });
     D.products.forEach(function (p) { if (p.stock !== null) { var n = 0; o.items.forEach(function (i) { if (bp(i.id) === p.id) n += i.qty; }); if (n) p.stock = Math.max(0, p.stock - n); } });
@@ -814,8 +817,9 @@ document.addEventListener('submit', function (e) {
   var f = e.target; if (f.id !== 'sf') return; e.preventDefault();
   var items = Object.keys(MSEL).map(function (k) { return { oid: k.split('|')[0], pid: k.split('|')[1] }; });
   $('#sfe').textContent = '';
-  google.script.run.withSuccessHandler(function (d) { MD = d; MSEL = {}; MTAB = 's'; var ns = d.ships.filter(function (z) { return z.id === d.sid; })[0]; show(shipDetail(ns)); })
-    .withFailureHandler(function (er) { $('#sfe').textContent = er.message; }).memberCreateShip(mt, items, { pay: f.pay.value, method: f.method.value, rname: f.rname.value, cvs: f.cvs.value, store: f.store.value, addr: f.addr.value, credit: f.credit ? Number(f.credit.value) || 0 : 0, note: f.note.value, phone: f.phone.value, paytest: payOn() });
+  if (!SNONCE) SNONCE = nonce_();
+  google.script.run.withSuccessHandler(function (d) { SNONCE = ''; MD = d; MSEL = {}; MTAB = 's'; var ns = d.ships.filter(function (z) { return z.id === d.sid; })[0]; show(shipDetail(ns)); })
+    .withFailureHandler(function (er) { $('#sfe').textContent = er.message; }).memberCreateShip(mt, items, { pay: f.pay.value, method: f.method.value, rname: f.rname.value, cvs: f.cvs.value, store: f.store.value, addr: f.addr.value, credit: f.credit ? Number(f.credit.value) || 0 : 0, note: f.note.value, phone: f.phone.value, paytest: payOn(), nonce: SNONCE });
 });
 
 function payOn() { try { if (/[?&]paytest=1/.test(location.search)) sessionStorage.setItem('paytest', '1'); return !!(window.D && D.payLive) || sessionStorage.getItem('paytest') === '1'; } catch (e) { return false; } }

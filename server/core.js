@@ -103,13 +103,15 @@ const SPECIAL = {
  * db: { withTx(async (tx) => …) },tx 提供 loadAll()、commit(ops, kvOps)
  * 回傳 { body, after }:body 是給前端的 JSON,after 是交易完成後再做的事(寄信、LINE 推播)
  */
+// 純讀取的功能不用排隊等寫入鎖(畫面載入、報價、後台列表)
+const NOLOCK = /^(getShop|shopData|quote|memberOrders|memberShipQuote|admin(Init|Orders|Products|PurchaseList|StockView|Report|Settings|Levels|Vendors|Brands|Cats|Carriers|Members|MemberGrants|Logs|Codes|Activities|LineHistory|LineInfo|ShipHistory|ShipQuote|ProxyQuote|HistBindList|Admins))$/;
 export async function execute({ fn, args, db, env }) {
   const isPublic = Object.prototype.hasOwnProperty.call(code.API, fn) || Object.prototype.hasOwnProperty.call(SPECIAL, fn);
   if (!isPublic) return { body: { ok: false, error: '不存在的功能:' + String(fn).slice(0, 40) }, after: [] };
   args = Array.isArray(args) ? args : [];
   const after = [];
   const body = await db.withTx(async (tx) => {
-    const { tableData, kv, props: dbProps } = await tx.loadAll();
+    const { tableData, kv, props: dbProps } = await tx.loadAll({ big: /^(adminLogs|adminLineHistory|adminShipHistory)$/.test(fn) });
     const props = Object.assign({}, env.props || {}, dbProps);
     const rt = createRuntime({ H: code.H, tableData, kv, props, fetchMap: {} });
     let result, err = null;
@@ -124,7 +126,7 @@ export async function execute({ fn, args, db, env }) {
     rt.mailQueue.forEach((m) => after.push({ type: 'mail', m }));
     rt.fetchQueue.forEach((f) => after.push({ type: 'fetch', f }));
     return { ok: true, result: result === undefined ? null : result };
-  });
+  }, { lock: !NOLOCK.test(fn) });
   return { body, after };
 }
 

@@ -237,6 +237,13 @@ function shopData_() {
 }
 function placeOrder(o) {
   o = o || {};
+  var nk = o.nonce ? 'pn_' + String(o.nonce).slice(0, 40) : '', nc = CacheService.getScriptCache();
+  if (nk) { var prev = nc.get(nk); if (prev) return JSON.parse(prev); } // 同一次結帳重複送出:直接回傳第一次的結果,不會重複下單
+  var res0 = placeOrder0_(o);
+  if (nk) nc.put(nk, JSON.stringify(res0), 1800);
+  return res0;
+}
+function placeOrder0_(o) {
   var ctx = null;
   if (o.token) { try { ctx = mem_(o.token); } catch (e) { ctx = null; } }
   if (ctx && !ctx.lid) ctx = null;
@@ -1288,7 +1295,8 @@ function seq_(sheet, prefix) {
 function adminOrders(tk) {
   me_(tk);
   var items = {}, sh = {}, lm = lineMeta_(true);
-  rows_('出貨單').forEach(function (r) { sh[String(r.出貨單ID)] = shipObj_(r); sh[String(r.出貨單ID)].lid = String(r['LINE ID'] || ''); sh[String(r.出貨單ID)].link = String(r.付款連結 || ''); });
+  var bal = {}, td = today_(); rows_('購物金').forEach(function (g) { var l = String(g['LINE ID'] || ''); if (l && Number(g.剩餘) > 0 && String(g.到期日) >= td) bal[l] = (bal[l] || 0) + Number(g.剩餘); });
+  rows_('出貨單').forEach(function (r) { var o = sh[String(r.出貨單ID)] = shipObj_(r); o.lid = String(r['LINE ID'] || ''); o.link = String(r.付款連結 || ''); o.bal = bal[o.lid] || 0; var al = shipAlloc_(r); o.ad = al[0]; o.ac = al[1]; });
   var ofShip = {};
   rows_('訂單明細').forEach(function (r) {
     var m = lm(r);
@@ -1703,6 +1711,44 @@ function invSave_(tk, prep, results, test) {
     (prep.skip.length ? '\n\n略過 ' + prep.skip.length + ' 張:\n' + prep.skip.map(function (x) { return x.sid + ':' + x.why; }).join('\n') : '');
   var r = adminOrders(tk); r.msg = msg; return r;
 }
+/** 出貨單裡「訂單層級」分攤過來的優惠與購物金(建立時就決定,後台改價不動這部分) */
+function shipAlloc_(s) {
+  var a = {}; try { a = JSON.parse(s.折抵明細 || '{}') || {}; } catch (e) {}
+  return Object.keys(a).reduce(function (t, k) { var v = a[k] || [0, 0]; return [t[0] + Number(v[0] || 0), t[1] + Number(v[1] || 0)]; }, [0, 0]);
+}
+/** 後台調整出貨單金額:購物金折抵(會從客人購物金扣/退)、手動折扣改價(負數=加價);只限尚未付款、未開發票 */
+function adminAdjustShip(tk, sid, d) {
+  var u = me_(tk), msg = ''; d = d || {}; sid = String(sid || '');
+  lk_(function () {
+    var s = rows_('出貨單').filter(function (x) { return String(x.出貨單ID) === sid; })[0];
+    if (!s) throw new Error('找不到出貨單');
+    var f = FLOW[s.付款方式] || [];
+    if (f.indexOf(String(s.狀態)) !== 0) throw new Error('出貨單已付款或已開始處理(' + s.狀態 + '),不能再改金額');
+    if (String(s.發票號碼 || '')) throw new Error('已開立發票,不能改金額');
+    var al = shipAlloc_(s), X = Math.round(Number(d.cred)), M = Math.round(Number(d.man));
+    if (!(X >= 0) || String(d.cred).trim() === '') throw new Error('購物金折抵請填 0 以上的數字');
+    if (isNaN(M) || String(d.man).trim() === '') throw new Error('手動折扣請填數字(不折扣填 0,加價填負數)');
+    if (X < al[1]) throw new Error('這張出貨單下單時已分攤 ' + al[1] + ' 元購物金,折抵不能少於這個數字');
+    var lid = String(s['LINE ID'] || ''), extra = X - al[1];
+    if (extra > 0 && !lid) throw new Error('這位客人沒有用 LINE 登入,沒有購物金可以折抵');
+    var sub = Number(s.商品金額) || 0, fee = Number(s.運費) || 0, disc = al[0] + M;
+    if (sub - disc - X < 0) throw new Error('折扣加購物金超過商品金額(商品 ' + sub + ')');
+    var old = { c: Number(s.購物金折抵) || 0, dsc: Number(s.優惠折抵) || 0, t: Number(s.總額) || 0 };
+    refund_(s.購物金明細);
+    var det = extra > 0 ? spend_(lid, extra) : {};
+    var n = cp_(s); n.購物金折抵 = X; n.購物金明細 = JSON.stringify(det); n.優惠折抵 = disc; n.總額 = Math.max(0, sub - disc - X) + fee;
+    put_('出貨單', s._r, n);
+    log_(u.acc, '調整出貨單金額', sid, '購物金 ' + old.c + '→' + X + ',優惠/改價 ' + old.dsc + '→' + disc + ',應付 ' + old.t + '→' + n.總額);
+    String(s.訂單ID).split(',').forEach(function (oid) { syncOrderStatus_(oid, u.acc); });
+    msg = '出貨單 ' + sid + ' 應付金額 ' + old.t + ' → ' + n.總額;
+    if (d.notify && lid && n.總額 !== old.t) {
+      var txt = String(s.姓名 || '') + ' 您好,出貨單 ' + sid + ' 的金額已調整\n' + (X ? '購物金折抵:NT$ ' + X + '\n' : '') + (disc > al[0] ? '優惠折扣:NT$ ' + (disc - al[0]) + '\n' : '') + '應付金額:NT$ ' + n.總額 +
+        (String(s.付款方式) === '匯款' ? '\n\n' + String(settings_().匯款資訊 || '') + '\n匯款後請到會員專區填寫帳號後五碼:' + appUrl_() : '\n\n可到會員專區查看:' + appUrl_());
+      msg += pushLine_(lid, txt) ? '\n已用 LINE 通知客人' : '\nLINE 通知發送失敗';
+    }
+  });
+  var r = adminOrders(tk); r.msg = msg; return r;
+}
 /** 合併同一位客人的多張出貨單(出貨前、同付款方式、同狀態):品項與金額加總,運費依合併後金額重算,保留最早的那張 */
 function adminMergeShips(tk, ids) {
   var u = me_(tk), msg = '';
@@ -2049,6 +2095,13 @@ function realName_(v) {
 }
 /** 客人勾選已到貨品項 →「確定出貨」→ 建立出貨單,之後走付款與出貨流程 */
 function memberCreateShip(tk, items, d) {
+  var nk = d && d.nonce ? 'sn_' + String(d.nonce).slice(0, 40) : '', nc = CacheService.getScriptCache();
+  if (nk && nc.get(nk)) { var r0 = memberOrders(tk); r0.sid = nc.get(nk); return r0; } // 重複按「確定出貨」不會建兩張
+  var r1 = memberCreateShip0_(tk, items, d);
+  if (nk) nc.put(nk, String(r1.sid), 1800);
+  return r1;
+}
+function memberCreateShip0_(tk, items, d) {
   var ctx = mem_(tk); d = d || {};
   var pay = d.pay, ship = t_(d.ship, 200), phone = t_(d.phone, 20), method = d.method ? String(d.method) : '';
   if (!PAY[pay]) throw new Error('請選擇付款方式');
