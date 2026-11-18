@@ -1,5 +1,5 @@
 import postgres from "https://deno.land/x/postgresjs@v3.4.5/mod.js";
-import { execute, runAfter, handleWebhook, handleEcpayPay, handleEcpayMap, handleEcpayLogi } from "https://cdn.jsdelivr.net/gh/coscoskr/shop@{{SHA}}/server/core.js";
+import { execute, runAfter, handleWebhook, handleCoolbau, handleEcpayPay, handleEcpayMap, handleEcpayLogi } from "https://cdn.jsdelivr.net/gh/coscoskr/shop@{{SHA}}/server/core.js";
 import { makePgDb } from "https://cdn.jsdelivr.net/gh/coscoskr/shop@{{SHA}}/server/pg.js";
 
 // 只允許網站本身呼叫(瀏覽器端 CORS)。換網域時,在 Edge Function 的 Secrets 加 ALLOWED_ORIGINS(逗號分隔)。
@@ -43,6 +43,7 @@ const env = {
     LINE_MSG_TOKEN: Deno.env.get("LINE_MSG_TOKEN"),
     APP_URL: Deno.env.get("APP_URL"),
     ANTHROPIC_API_KEY: Deno.env.get("ANTHROPIC_API_KEY"),
+    COOLBAU_ARR_SECRET: Deno.env.get("COOLBAU_ARR_SECRET"),
   } as Record<string, string | undefined>,
 };
 for (const k of Object.keys(env.props)) if (env.props[k] === undefined) delete env.props[k];
@@ -65,6 +66,23 @@ Deno.serve(async (req: Request) => {
     // 綠界付款結果通知(信用卡)
     try { const t = await handleEcpayPay({ rawBody: await req.text(), db, env }); return new Response(t, { headers: { "Content-Type": "text/plain" } }); }
     catch (e) { console.error("ecpay pay error", e); return new Response("0|ERR", { status: 500, headers: { "Content-Type": "text/plain" } }); }
+  }
+  const cbs = req.headers.get("x-coolbau-signature");
+  if (cbs) {
+    // 酷柏批發系統的到貨通知(由簽章驗證身分;金鑰放在 Edge Function 的 Secrets:COOLBAU_ARR_SECRET)
+    try {
+      const cip = (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() || "unknown";
+      if (limited(cip, "coolbau")) return jsonR(req, { ok: false, error: "too many" }, 429);
+      const body = await req.text();
+      if (body.length > 300_000) return jsonR(req, { ok: false, error: "too large" }, 413);
+      const r = await handleCoolbau({ rawBody: body, signature: cbs, db, env });
+      // @ts-ignore EdgeRuntime 由 Supabase 提供
+      if (r.later) EdgeRuntime.waitUntil(r.later);
+      return jsonR(req, r.body, r.status);
+    } catch (e) {
+      console.error("coolbau error", e);
+      return jsonR(req, { ok: false }, 500);
+    }
   }
   const sig = req.headers.get("x-line-signature");
   if (sig) {

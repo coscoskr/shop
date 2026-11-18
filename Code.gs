@@ -2733,6 +2733,12 @@ function arrText_(uid, text) {
     return { reply: '✅ 已綁定為到貨管理員。\n之後把廠商的到貨通知(文字或截圖)轉傳到這裡,我會對應訂單先回預覽,你回「確認」才會真正入帳並通知客人。' };
   }
   if (!arrIsAdmin_(uid)) return null;
+  if (/^酷柏$/.test(text)) return cbPend_().length ? { ai: true, cb: true } : { reply: '目前沒有待對應的酷柏到貨。' };
+  if (/^酷柏清除$/.test(text)) {
+    var cn = cbPend_().length; cbPendSave_([]); arrSave_(arrPend_().filter(function (pl) { return !(pl.cb && pl.cb.length); }));
+    if (cn) log_('到貨助理', '清除酷柏待對應', '', cn + ' 項(沒有入帳)');
+    return { reply: cn ? '已清除 ' + cn + ' 項待對應的酷柏到貨(這些沒有入帳,請確認已在後台手動處理)。' : '目前沒有待對應的酷柏到貨。' };
+  }
   if (/^(確認|確定|ok|OK|Ok)$/.test(text)) return { reply: arrApply_() };
   if (/^取消$/.test(text)) { var n = arrPend_().length; arrSave_([]); return { reply: n ? '已取消,沒有任何變更。' : '目前沒有待確認的到貨。' }; }
   return { ai: true };
@@ -2754,7 +2760,7 @@ function arrCands_() {
   return rows.slice(0, 400).map(function (r) { return r.t; }).join('\n');
 }
 /** 依下單時間先後分配到貨,多的轉現貨庫存,存成待確認的計畫並回傳預覽文字 */
-function arrPlan_(items) {
+function arrPlan_(items, opt) {
   var prods = {}; rows_('商品').forEach(function (p) { prods[String(p.商品ID)] = p; });
   var pend = arrPend_(), taken = {}, ords = {}, mem = {};
   pend.forEach(function (pl) { pl.assign.forEach(function (a) { taken[a.oid + '|' + a.pid] = 1; }); });
@@ -2772,7 +2778,7 @@ function arrPlan_(items) {
     agg[k].qty += q;
     if (it.price !== null && it.price !== undefined && it.price !== '' && Number(it.price) > 0) agg[k].price = Number(it.price);
   });
-  var plan = { assign: [], surplus: [], unk: unk, skip: [] }, msg = [];
+  var plan = { assign: [], surplus: [], unk: unk, skip: [], cb: (opt && opt.cb) || [] }, msg = [];
   var lines = rows_('訂單明細');
   order.forEach(function (k) {
     var a = agg[k], left = a.qty, got = [];
@@ -2791,25 +2797,25 @@ function arrPlan_(items) {
     else if (left > 0) { plan.surplus.push({ pid: a.pid, spec: a.spec, qty: left, price: a.price, name: a.name }); got.push('  ➕ 現貨庫存 ×' + left); }
     msg.push('・' + a.name + (a.spec ? '(' + a.spec + ')' : '') + ' 到 ' + a.qty + ' 件' + (a.price !== '' ? ',進價 ' + a.price : '') + '\n' + (got.join('\n') || '  (沒有待到貨的訂單)'));
   });
-  var head = '📦 到貨預覽';
+  var head = (opt && opt.head) || '📦 到貨預覽';
   if (!plan.assign.length && !plan.surplus.length) return head + '\n看不出可入帳的品項。' + (unk.length ? '\n對不上商品:' + unk.join('、') : '') + '\n請再傳清楚一點的通知,或到後台手動處理。';
-  pend.push(plan); arrSave_(pend);
-  var t = head + (pend.length > 1 ? '(第 ' + pend.length + ' 則,待確認共 ' + pend.length + ' 則)' : '') + '\n' + msg.join('\n');
+  if (opt && opt.auto) opt.plan = plan; else { pend.push(plan); arrSave_(pend); }
+  var t = head + (pend.length > 1 && !(opt && opt.auto) ? '(第 ' + pend.length + ' 則,待確認共 ' + pend.length + ' 則)' : '') + '\n' + msg.join('\n');
   if (plan.skip.length) t += '\n⚠️ ' + plan.skip.join('\n⚠️ ');
   if (unk.length) t += '\n⚠️ 對不上商品(不處理):' + unk.join('、');
-  return t + '\n\n回「確認」入帳並通知客人;回「取消」放棄。';
+  return t + (opt && opt.auto ? '' : '\n\n回「確認」入帳並通知客人;回「取消」放棄。');
 }
-/** 套用所有待確認的到貨計畫 */
-function arrApply_() {
-  var pend = arrPend_(); if (!pend.length) return '目前沒有待確認的到貨(可能已超過 6 小時失效),請重新轉傳。';
-  var arrived = {}, nAs = 0, nSur = 0, miss = [], WHO = '到貨助理';
+/** 套用所有待確認的到貨計畫(plans 有給時只套用指定的計畫,不動待確認清單) */
+function arrApply_(plans, why) {
+  var pend = plans || arrPend_(); if (!pend.length) return '目前沒有待確認的到貨(可能已超過 6 小時失效),請重新轉傳。';
+  var arrived = {}, nAs = 0, nSur = 0, miss = [], WHO = why ? '酷柏到貨' : '到貨助理', WHY = why || 'LINE 轉傳到貨通知';
   pend.forEach(function (pl) {
     pl.assign.forEach(function (a) {
       var l = rows_('訂單明細').filter(function (x) { return String(x.訂單ID) === a.oid && String(x.商品ID) === a.pid; })[0];
       if (!l || ['已到貨', '已出貨'].indexOf(String(l.到貨狀態)) >= 0 || l.出貨單ID) { miss.push(a.oid + ' ' + a.name); return; }
       var n = cp_(l); n.到貨狀態 = '已到貨'; n.可出貨 = 'Y'; n.到貨操作人 = WHO; n.到貨時間 = now_(); ordOk_(n, WHO);
       put_('訂單明細', l._r, n);
-      log_(WHO, '到貨', a.oid + ' ' + a.name, '到貨:' + l.到貨狀態 + '→已到貨(LINE 轉傳到貨通知)');
+      log_(WHO, '到貨', a.oid + ' ' + a.name, '到貨:' + l.到貨狀態 + '→已到貨(' + WHY + ')');
       (arrived[a.oid] = arrived[a.oid] || []).push(a.name); nAs++;
     });
     pl.surplus.forEach(function (s) {
@@ -2821,15 +2827,117 @@ function arrApply_() {
         '成本': s.price !== '' ? s.price : (inn.成本 === undefined ? '' : inn.成本), '成本含稅': inn.成本含稅 || 'N', '貨源': String(inn.貨源 || ''),
         '廠商付款ID': '', '到貨操作人': WHO, '到貨時間': now_(), '日期': today_(), '建立人': WHO, '出貨單ID': '' };
       put_('庫存進貨', 0, row); stockMove_(row, s.qty);
-      log_(WHO, '新增庫存進貨', id + ' ' + p.名稱, s.qty + ' 件' + (s.spec ? ',規格 ' + s.spec : '') + ',已到貨(LINE 轉傳到貨通知,庫存 +' + s.qty + ')');
+      log_(WHO, '新增庫存進貨', id + ' ' + p.名稱, s.qty + ' 件' + (s.spec ? ',規格 ' + s.spec : '') + ',已到貨(' + WHY + ',庫存 +' + s.qty + ')');
       nSur += s.qty;
     });
   });
-  arrSave_([]);
+  cbDone_(pend);
+  if (!plans) arrSave_([]);
   var nt = Object.keys(arrived).length ? notifyArrival_(arrived) : { sent: 0, noLine: 0, failed: 0 };
   var t = '✅ 已入帳:客訂到貨 ' + nAs + ' 筆、轉入現貨庫存 ' + nSur + ' 件。';
   if (Object.keys(arrived).length) t += '\n已通知客人 ' + nt.sent + ' 位' + (nt.noLine ? ',' + nt.noLine + ' 位沒有 LINE/Email 請自行聯絡' : '') + '。';
   if (miss.length) t += '\n⚠️ 這些已被別人處理或找不到,略過:' + miss.join('、');
+  return t;
+}
+
+/* --- 酷柏到貨自動入帳 ---
+   酷柏批發系統 KEY 到貨後,會把我們帳號這次到貨的品項直接送過來(簽章驗證在 server/core.js 的 handleCoolbau)。
+   對照過的品項(設定表「酷柏對照 …」)直接入帳並通知客人;第一次遇到的品項先記在設定表「酷柏待對應」,
+   配對後傳預覽給到貨管理員,回「確認」才入帳,同時記住對照,之後同品項就全自動。
+   管理員 LINE 指令:「酷柏」重新配對待對應品項;「酷柏清除」清掉待對應(已在後台手動處理時用)。 */
+var CB_MAP_ = '酷柏對照 ', CB_PEND_ = '酷柏待對應';
+function cbNorm_(s) { return String(s || '').replace(/\s+/g, '').replace(/（/g, '(').replace(/）/g, ')').toLowerCase().slice(0, 80); }
+/** 一個酷柏品項可用的對照鍵(由精確到寬鬆):商品+規格編號、商品+規格文字、整個商品(只有單一規格的商品才用) */
+function cbKeys_(it) {
+  var p = String(it.proid || ''), k = [];
+  if (it.specid && String(it.specid) !== '0') k.push(p + '|' + String(it.specid));
+  k.push(p + '|t:' + cbNorm_(it.spec));
+  if (it.single) k.push(p + '|*');
+  return k;
+}
+function cbPk_(it) { return String(it.proid || '') + '|' + String(it.specid || '') + '|' + cbNorm_(it.spec); }
+/** '商品ID|規格' → {pid, spec};商品已刪除或規格已改名就當作沒有對照 */
+function cbTarget_(v, prods) {
+  v = String(v || ''); var i = v.indexOf('|'); if (i < 1) return null;
+  var pid = v.slice(0, i), sp = v.slice(i + 1), p = prods[pid]; if (!p) return null;
+  var sl = specs_(p);
+  if (sl.length ? sl.indexOf(sp) < 0 : sp !== '') return null;
+  return { pid: pid, spec: sp };
+}
+function cbMapGet_(it, st, prods) {
+  var ks = cbKeys_(it);
+  for (var i = 0; i < ks.length; i++) { var t = cbTarget_(st[CB_MAP_ + ks[i]], prods); if (t) return t; }
+  return null;
+}
+function cbMapPut_(m) { cbKeys_(m).forEach(function (k) { setSet_(CB_MAP_ + k, String(m.pid) + '|' + String(m.cspec || '')); }); }
+function cbPend_() { try { var a = JSON.parse(String(settings_()[CB_PEND_] || '[]')); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+function cbPendSave_(a) { setSet_(CB_PEND_, JSON.stringify((a || []).slice(0, 150))); }
+function cbPendAdd_(items) {
+  var a = cbPend_(), ix = {}; a.forEach(function (x, i) { ix[cbPk_(x)] = i; });
+  items.forEach(function (it) {
+    var k = cbPk_(it), q = Math.floor(Number(it.qty));
+    if (ix[k] === undefined) { ix[k] = a.length; a.push({ proid: String(it.proid), specid: String(it.specid || ''), title: t_(it.title, 120), spec: t_(it.spec, 80), single: it.single ? 1 : 0, qty: 0, price: '' }); }
+    var x = a[ix[k]]; x.qty += q; if (Number(it.price) > 0) x.price = Number(it.price);
+  });
+  cbPendSave_(a);
+}
+/** 計畫入帳後:記住對照,並把已處理的品項從待對應移除 */
+function cbDone_(plans) {
+  var ks = {}, n = 0;
+  (plans || []).forEach(function (pl) { (pl.cb || []).forEach(function (m) { cbMapPut_(m); ks[m.k] = 1; n++; }); });
+  if (n) cbPendSave_(cbPend_().filter(function (x) { return !ks[cbPk_(x)]; }));
+}
+/** 酷柏送來一批到貨:對照過的直接入帳並通知客人,其餘記成待對應。回傳 {ok, auto, stock, skip, pending, added, dup} */
+function cbArrIn_(d) {
+  d = d || {};
+  var c = CacheService.getScriptCache(), bk = 'cbarr_' + t_(d.batch, 80);
+  if (d.batch) { var prev = c.get(bk); if (prev) { var pr = JSON.parse(prev); pr.dup = true; pr.added = 0; return pr; } } // 同一批重送:不重複入帳
+  var prods = {}; rows_('商品').forEach(function (p) { prods[String(p.商品ID)] = p; });
+  var st = settings_(), auto = [], unk = [];
+  (d.items || []).slice(0, 300).forEach(function (it) {
+    var q = Math.floor(Number(it && it.qty)); if (!it || !it.proid || !(q >= 1)) return;
+    var m = cbMapGet_(it, st, prods);
+    if (m) auto.push({ pid: m.pid, spec: m.spec, qty: q, price: it.price, text: t_(it.title, 40) }); else unk.push(it);
+  });
+  var res = { ok: true, auto: 0, stock: 0, skip: 0, pending: 0, added: unk.length }, admin = String(st.到貨管理員LINE || ''), text = '';
+  if (auto.length) {
+    var opt = { auto: true, head: '📦 酷柏到貨(已自動入帳)' }, pv = arrPlan_(auto, opt);
+    if (opt.plan) {
+      text = pv + '\n\n' + arrApply_([opt.plan], '酷柏到貨自動入帳');
+      res.auto = opt.plan.assign.length; res.skip = opt.plan.skip.length;
+      opt.plan.surplus.forEach(function (s) { res.stock += Number(s.qty); });
+    } else {
+      res.skip = auto.length;
+      text = '⚠️ 酷柏到貨沒有自動入帳:\n' + auto.map(function (a) { return '・' + String(prods[a.pid].名稱) + (a.spec ? '(' + a.spec + ')' : '') + ' ×' + a.qty; }).join('\n') + '\n到貨數量不夠分給排隊中的客人(不能拆單),請到後台處理。';
+    }
+  }
+  if (unk.length) cbPendAdd_(unk);
+  res.pending = cbPend_().length;
+  if (admin && text) pushLine_(admin, text.slice(0, 4900));
+  if (d.batch) c.put(bk, JSON.stringify(res), 2592000);
+  log_('酷柏到貨', '收到到貨', t_(d.batch, 80), '自動入帳 ' + res.auto + ' 筆、轉現貨 ' + res.stock + ' 件、略過 ' + res.skip + '、待對應 ' + res.pending + ' 項');
+  return res;
+}
+/** 給配對用:待對應的酷柏品項(每列:#編號|品名|規格|件數) */
+function cbPendList_() { return cbPend_().map(function (x, i) { return '#' + (i + 1) + '|' + x.title + '|' + x.spec + '|' + x.qty; }).join('\n'); }
+/** 配對結果 [{ref, pid, spec}] → 建立待確認計畫(取代之前的酷柏預覽),回傳要傳給到貨管理員的文字 */
+function cbPendPlan_(ai) {
+  var pe = cbPend_(); if (!pe.length) return '';
+  var prods = {}; rows_('商品').forEach(function (p) { prods[String(p.商品ID)] = p; });
+  var items = [], cb = [], link = [], bad = [], seen = {};
+  (ai || []).forEach(function (r) {
+    var i = Math.floor(Number(r && r.ref)) - 1, x = pe[i]; if (!x || seen[i] || !r.pid) return;
+    var t = cbTarget_(String(r.pid) + '|' + String(r.spec || '').trim(), prods); if (!t) return;
+    seen[i] = 1;
+    items.push({ pid: t.pid, spec: t.spec, qty: x.qty, price: x.price, text: x.title });
+    cb.push({ proid: x.proid, specid: x.specid, spec: x.spec, single: x.single, pid: t.pid, cspec: t.spec, k: cbPk_(x) });
+    link.push('・' + x.title + (x.spec ? '(' + x.spec + ')' : '') + '\n   → ' + String(prods[t.pid].名稱) + (t.spec ? '(' + t.spec + ')' : ''));
+  });
+  pe.forEach(function (x, i) { if (!seen[i]) bad.push('・' + x.title + (x.spec ? '(' + x.spec + ')' : '') + ' ×' + x.qty); });
+  arrSave_(arrPend_().filter(function (pl) { return !(pl.cb && pl.cb.length); })); // 舊的酷柏預覽作廢,避免同一批到貨入帳兩次
+  var t = '';
+  if (items.length) t = '🔗 酷柏到貨:這些品項第一次出現,請確認對應(確認後會記住,下次自動入帳)\n' + link.join('\n') + '\n\n' + arrPlan_(items, { cb: cb, head: '📦 酷柏到貨預覽' });
+  if (bad.length) t += (t ? '\n\n' : '📦 酷柏到貨\n') + '⚠️ 這些品項在店內找不到對應的商品,沒有入帳:\n' + bad.join('\n') + '\n請先建立商品後傳「酷柏」重新配對;已在後台手動處理的話傳「酷柏清除」。';
   return t;
 }
 
@@ -3089,7 +3197,7 @@ function defSet_(k) { var r = DEFAULT_SETTINGS.filter(function (x) { return x[0]
 function adminSettings(tk) {
   me_(tk); var s = settings_(), o = {};
   SET_KEYS.forEach(function (k) { o[k] = s[k] === undefined ? defSet_(k) : s[k]; });
-  return { values: o, line: { login: lineOn_(), msg: !!prop_('LINE_MSG_TOKEN'), url: appUrl_() }, arr: { bound: !!String(s.到貨管理員LINE || ''), ai: !!prop_('ANTHROPIC_API_KEY') } };
+  return { values: o, line: { login: lineOn_(), msg: !!prop_('LINE_MSG_TOKEN'), url: appUrl_() }, arr: { bound: !!String(s.到貨管理員LINE || ''), ai: !!prop_('ANTHROPIC_API_KEY'), cb: !!prop_('COOLBAU_ARR_SECRET'), cbPend: cbPend_().length } };
 }
 function adminSaveSettings(tk, v) {
   var u = me_(tk);
