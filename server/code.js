@@ -1285,13 +1285,27 @@ function adminReport(tk, f) {
     if (f.pay && (!s || String(s.付款方式) !== f.pay)) return;
     if (q && (String(l.訂單ID) + o.姓名 + l.品名 + (l.規格 || '')).toLowerCase().indexOf(q) < 0) return;
     var m = lm(l), qty = Number(l.數量), rev = Number(l.小計) - (dsc[l._r] || 0), has = m.cost !== '';
-    sum.lines++; sum.qty += qty; sum.revenue += rev; os[String(l.訂單ID)] = 1; if (s && (FLOW[s.付款方式] || []).indexOf(String(s.狀態)) >= si_(s.付款方式)) ss[String(s.出貨單ID)] = 1;
+    sum.lines++; sum.qty += qty; sum.revenue += rev; os[String(l.訂單ID)] = 1;
     if (has) { sum.cost += m.cost * qty; sum.profit += rev - m.cost * qty; } else sum.noCost++;
     var k = String(l.品名) + (l.規格 ? '(' + l.規格 + ')' : ''), pr = prod[k] = prod[k] || { name: k, qty: 0, revenue: 0, cost: 0, profit: 0 };
     pr.qty += qty; pr.revenue += rev; if (has) { pr.cost += m.cost * qty; pr.profit += rev - m.cost * qty; }
     status[st] = (status[st] || 0) + 1;
   });
-  sum.orders = Object.keys(os).length; sum.ships = Object.keys(ss).length;
+  sum.orders = Object.keys(os).length;
+  // 出貨統計:依「出貨時間」(狀態改成已出貨的那天)落在期間內的出貨單;有填出貨日期就用出貨日期,否則用上方的日期區間
+  var a0 = (f.sFrom || f.sTo) ? f.sFrom : f.oFrom, a1 = (f.sFrom || f.sTo) ? f.sTo : f.oTo, lnBy = {};
+  rows_('訂單明細').forEach(function (l) { if (l.出貨單ID) (lnBy[String(l.出貨單ID)] = lnBy[String(l.出貨單ID)] || []).push(l); });
+  sum.ships = 0; sum.shipRev = 0; sum.shipCost = 0; sum.shipProfit = 0; sum.shipNoCost = 0; sum.shipFee = 0;
+  Object.keys(ships).forEach(function (sid) {
+    var s = ships[sid], sd = String(s.出貨時間 || '').slice(0, 10);
+    if (!sd || (a0 && sd < a0) || (a1 && sd > a1)) return;
+    if ((FLOW[s.付款方式] || []).indexOf(String(s.狀態)) < si_(s.付款方式) || String(s.狀態) === '已退回') return;
+    if (f.pay && String(s.付款方式) !== f.pay) return;
+    if (q && (sid + s.姓名 + (s.品項 || '')).toLowerCase().indexOf(q) < 0) return;
+    var rev = (Number(s.商品金額) || 0) - (Number(s.優惠折抵) || 0), cost = 0, miss = 0;
+    (lnBy[sid] || []).forEach(function (l) { var m = lm(l); if (m.cost === '') miss++; else cost += m.cost * Number(l.數量); });
+    sum.ships++; sum.shipRev += rev; sum.shipCost += cost; sum.shipProfit += rev - cost; sum.shipNoCost += miss; sum.shipFee += Number(s.運費) || 0;
+  });
   var statuses = ['尚未建立出貨單']; Object.keys(FLOW).forEach(function (k) { FLOW[k].forEach(function (x) { if (statuses.indexOf(x) < 0) statuses.push(x); }); });
   return { sum: sum, prods: Object.keys(prod).map(function (k) { return prod[k]; }).sort(function (a, b) { return b.revenue - a.revenue; }).slice(0, 200), statuses: statuses };
 }
