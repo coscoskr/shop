@@ -248,8 +248,10 @@ function rdyAll_() {
   return out;
 }
 /** 訂單品項退回庫存(刪訂單、改數量/規格):用現貨出的預購商品品項退回現貨,其餘照原本的數量邏輯 */
+var RDY_WHO_ = '預購現貨'; // 用現貨出的預購商品品項,叫貨人記這個,才能跟「下單時商品還是現貨型態」的舊品項分開
+function rdyLine_(p, l) { return rdyIs_(p) && String(l.型態) === '現貨' && String(l.叫貨人 || '') === RDY_WHO_; }
 function lineBack_(p, l, sp, q) {
-  if (rdyIs_(p) && String(l.型態) === '現貨') rdyAdd_(String(p.商品ID), sp, q, l.成本); else adjStock_(p, sp, q);
+  if (rdyLine_(p, l)) rdyAdd_(String(p.商品ID), sp, q, l.成本); else adjStock_(p, sp, q);
 }
 /** 增減庫存(delta 負=扣庫存):有設定數量的規格扣該規格,商品總數量也同步 */
 function adjStock_(p, sp, delta) {
@@ -334,7 +336,7 @@ function placeCore_(want, ctx, o, name, phone, email, who, notePre) {
       var rc = inStock ? null : rdyTake_(String(p.商品ID), l[3] || '', l[1]); // 預購商品:這個規格的現貨夠這筆的數量,就整筆用現貨(不佔預購名額)
       if (rc === null) adjStock_(p, l[3] || '', -l[1]); else inStock = true;
       put_('訂單明細', 0, { '訂單ID': oid, '商品ID': lpid, '規格': l[3] || '', '品名': p.名稱, '數量': l[1], '單價': l[2], '小計': l[1] * l[2], '到貨狀態': inStock ? '已到貨' : '待到貨', '可出貨': inStock ? 'Y' : 'N', '型態': rc !== null ? '現貨' : p.銷售型態,
-        '廠商': (innM[String(p.商品ID)] || {}).廠商 || '', '成本': (rc !== null && rc !== '') ? rc : ((innM[String(p.商品ID)] || {}).成本 === undefined ? '' : (innM[String(p.商品ID)] || {}).成本), '成本含稅': (innM[String(p.商品ID)] || {}).成本含稅 || 'N', '貨源': (innM[String(p.商品ID)] || {}).貨源 || '', '叫貨狀態': inStock ? '已叫貨' : '', '叫貨人': inStock ? '系統' : '', '叫貨時間': inStock ? now_() : '' });
+        '廠商': (innM[String(p.商品ID)] || {}).廠商 || '', '成本': (rc !== null && rc !== '') ? rc : ((innM[String(p.商品ID)] || {}).成本 === undefined ? '' : (innM[String(p.商品ID)] || {}).成本), '成本含稅': (innM[String(p.商品ID)] || {}).成本含稅 || 'N', '貨源': (innM[String(p.商品ID)] || {}).貨源 || '', '叫貨狀態': inStock ? '已叫貨' : '', '叫貨人': rc !== null ? RDY_WHO_ : inStock ? '系統' : '', '叫貨時間': inStock ? now_() : '' });
     });
     var detail = c.credit > 0 ? spend_(ctx.lid, c.credit) : {};
     put_('訂單', 0, { '訂單ID': oid, '下單時間': now_(), '姓名': name, '電話': phone, '付款方式': '', '狀態': '已下訂', '商品金額': c.sub, '運費': c.fee, '總額': c.total, '收件資訊': ship, '備註': t_((notePre || '') + (o.note || ''), 200),
@@ -1484,7 +1486,7 @@ function adminEditLineFull(tk, oid, pid, d) {
     var delta = q - Number(l.數量);
     var p = rows_('商品').filter(function (x) { return String(x.商品ID) === bp_(pid); })[0];
     var oldSp = String(l.規格 || ''), newSp = (!d.keep && d.spec !== undefined) ? t_(d.spec, 60) : oldSp;
-    var rdyL = rdyIs_(p) && String(l.型態) === '現貨', toPre = rdyL && type !== '現貨';
+    var rdyL = rdyLine_(p, l), toPre = rdyL && type !== '現貨';
     if (rdyL && (delta !== 0 || newSp !== oldSp || toPre)) { // 用現貨出的預購商品品項:先退回現貨,再照新的規格/數量取;改成預購就只退回
       rdyAdd_(String(p.商品ID), oldSp, Number(l.數量), l.成本);
       if (!toPre && rdyTake_(String(p.商品ID), newSp, q) === null) throw new Error('「' + p.名稱 + (newSp ? ' ' + newSp : '') + '」現貨不足,只有 ' + rdyQty_(rdyGet_(String(p.商品ID)), newSp) + ' 件(含這筆原本的)。要讓它變成預購,請把型態改成「預購」');

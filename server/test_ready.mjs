@@ -69,4 +69,12 @@ ok(r.ok && lineOf(O4, BOX).sale_type === '現貨' && Number(lineOf(O4, BOX).cost
 r = await buy([{ id: BOX, qty: 1 }]); ok(!r.ok, 'no ready stock and no quota → refused: ' + r.error);
 // 8) 現貨商品下單照舊
 r = await buy([{ id: COOKIE, qty: 2 }]); ok(r.ok && DB['商品'].find(p => p.id === COOKIE).stock === 6, 'in-stock product order still deducts quantity (8 → 6)');
+// 9) 舊資料:下單時商品還是現貨型態、後來改成預購的品項(型態=現貨但不是用現貨出的),刪訂單不能憑空變出現貨
+DB['商品'].find(p => p.id === BOX).stock = '';
+r = await buy([{ id: BOX, qty: 1 }]); const O5 = DB['訂單'][DB['訂單'].length - 1].order_id;
+Object.assign(lineOf(O5, BOX), { sale_type: '現貨', arrival_status: '已到貨', ordered_by: '系統' }); // 模擬舊品項
+const before5 = JSON.stringify((await shop('擴香禮盒')).ready);
+r = await call('adminDeleteOrder', tk, O5);
+ok(r.ok && JSON.stringify((await shop('擴香禮盒')).ready) === before5, 'old 現貨-type line on a pre-order product does not create ready stock on delete: ' + before5);
+ok(lineOf(O4, BOX).ordered_by === '預購現貨', 'lines taken from ready stock are marked 叫貨人=預購現貨');
 console.log(fails ? fails + ' FAILED' : 'ALL PASSED');
