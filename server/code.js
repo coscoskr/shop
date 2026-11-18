@@ -2234,7 +2234,7 @@ function shipFlex_(s, alt, shipImg) {
       flexRow_('🚚 ' + md + ' 已出貨', co, { lc: PO_.ink, rc: PO_.mute, margin: 'none' }),
       T(no ? no.replace(/(.{4})(?=.)/g, '$1 ') : '(尚未提供物流單號)', { size: no ? 'xxl' : 'sm', weight: 'bold', color: PO_.ink, adjustMode: 'shrink-to-fit', margin: 'sm' })] });
     body.push(poGrid_([['收件人', String(s.姓名 || '')], ['電話', String(s.電話 || '')], ['付款方式', String(s.付款方式 || '')], ['運送方式', String(s.配送方式 || '')],
-      ['訂單編號', String(s.訂單ID || '').split(',').join('、')], ['建立時間', String(s.建立時間 || '').slice(0, 16)], ['配送 / 收件資訊', String(s.收件資訊 || '')]]));
+      ['訂單編號', String(s.訂單ID || '').split(',').join('、')], ['建立時間', String(s.建立時間 || '').slice(0, 16)], ['配送 / 收件資訊', String(s.收件資訊 || '') + (String(s.付款方式) === '賣貨便' ? '\n(賣貨便以實際下單超商為主)' : '')]]));
     body.push(poTable_(ls.slice(0, 20).map(function (l) { return { name: String(l.品名), spec: String(l.規格 || ''), qty: l.數量, sub: Number(l.小計 || 0) }; })));
     if (ls.length > 20) body.push(T('…其他 ' + (ls.length - 20) + ' 項', { size: 'xxs', color: PO_.mute, margin: 'sm' }));
     var sum = [['共 ' + ls.length + ' 項 / ' + qty + ' 件', ''], ['商品合計', money_(s.商品金額)]];
