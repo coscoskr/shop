@@ -2338,11 +2338,11 @@ function invFlex_(s, inv, alt) {
   try {
     var T = flexT_, sid = String(s.出貨單ID), no = String(inv.no || ''), d = String(inv.date || '').slice(0, 10);
     var ph = nz_(s.電話), car = /^09\d{8}$/.test(ph) ? '手機 ' + ph.slice(0, 4) + '***' + ph.slice(7) : '綠界載具';
-    var b = { type: 'bubble', size: 'mega',
-      header: flexHead_('🧾 電子發票已開立', sid),
+    var b = { type: 'bubble', size: 'giga',
+      header: { type: 'box', layout: 'horizontal', backgroundColor: BR_.acc, paddingAll: '14px', contents: [T('🧾 電子發票已開立', { color: '#FFFFFF', weight: 'bold', flex: 0 }), T(sid, { color: '#F6DCD5', size: 'xs', align: 'end', gravity: 'center' })] },
       hero: flexHero_('發票號碼', no.replace(/^([A-Z]{2})(\d+)$/, '$1-$2')),
       body: { type: 'box', layout: 'vertical', backgroundColor: BR_.paper, paddingAll: '16px', contents: [
-        flexRow_('開立日期', d, { margin: 'none' }), flexRow_('隨機碼', String(inv.rand || '—')), flexRow_('發票載具', '綠界載具(' + car + ')'),
+        flexRow_('開立日期', d, { margin: 'none' }), flexRow_('隨機碼', String(inv.rand || '—')), { type: 'box', layout: 'horizontal', margin: 'sm', contents: [T('發票載具', { size: 'sm', color: BR_.mute, flex: 0 }), T('綠界載具 ' + car, { size: 'sm', color: BR_.ink, align: 'end', wrap: true })] },
         { type: 'separator', margin: 'md', color: BR_.line },
         flexRow_('發票金額', money_(s.總額), { bold: true, size: 'lg', margin: 'md' }),
         T('發票已存在綠界載具,可歸戶到財政部手機條碼,用「統一發票兌獎」App 自動對獎', { size: 'xxs', color: BR_.mute, wrap: true, margin: 'md' })] } };
