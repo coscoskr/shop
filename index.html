@@ -30,7 +30,8 @@ h1{font-size:18px;margin:0;white-space:nowrap;letter-spacing:.5px}
 #sg{position:absolute;left:0;right:0;top:100%;background:#fff;border:1px solid var(--line);display:none;z-index:6}
 #sg div{padding:8px 12px;cursor:pointer}#sg div:hover{background:var(--soft)}
 .btn{border:1px solid var(--ink);background:var(--ink);color:#fff;padding:8px 16px;border-radius:999px;cursor:pointer}
-.btn.l{background:none;color:var(--ink)}.btn.a{background:var(--acc);border-color:var(--acc)}
+.btn.l{background:none;color:var(--ink)}
+.sgl{font-size:13px;color:var(--mute);margin:10px 0 6px}.sg{display:flex;flex-wrap:wrap;gap:8px}.sgb{border:1px solid var(--line);background:#fff;color:var(--ink);padding:8px 14px;border-radius:6px;cursor:pointer;font-size:15px;min-width:56px}.sgb.on{border-color:var(--acc);color:var(--acc);box-shadow:inset 0 0 0 1px var(--acc)}.sgb:disabled{opacity:.35;text-decoration:line-through;cursor:not-allowed}.btn.a{background:var(--acc);border-color:var(--acc)}
 :focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 #notice{background:#fde8e4;color:#8a2c1c;padding:9px 16px;font-size:14px;font-weight:700;text-align:center}
 #pm{position:fixed;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(60,40,20,.5);opacity:0;transition:opacity .25s}
@@ -478,12 +479,37 @@ function loginHtml(why, guestBtn) {
     (guestBtn ? '<button class="btn l" data-a="guest">以遊客身分繼續</button> ' : '') + '<button class="btn l" data-a="x">關閉</button>';
 }
 
+/* 規格按鈕:名稱是「顏色 / 尺寸」的商品,先選顏色再選尺寸;其他商品一排規格按鈕 */
+var SPSEP = ' / ', SPC = '', SPZ = '';
+function spTwo(p) { return p.specs.length > 0 && p.specs.every(function (x) { return String(x).split(SPSEP).length === 2; }); }
+function spOut(p, x) { var q = (p.specQty || {})[x]; return q === 0 || specRoom(p, x) <= 0; }
+function spBtn(v, on, off, k) { return '<button type="button" class="sgb' + (on ? ' on' : '') + '" data-sg="' + k + '" data-v="' + esc(v) + '"' + (off ? ' disabled' : '') + '>' + esc(v) + '</button>'; }
+function specPick(p) {
+  if (!spTwo(p)) return '<div class="sgl">規格:' + esc(SPZ || '請選擇') + '</div><div class="sg">' + p.specs.map(function (x) { return spBtn(x, SPZ === x, spOut(p, x), 'z'); }).join('') + '</div>';
+  var cs = [], zs = [];
+  p.specs.forEach(function (x) { var a = x.split(SPSEP); if (cs.indexOf(a[0]) < 0) cs.push(a[0]); if (zs.indexOf(a[1]) < 0) zs.push(a[1]); });
+  function has(c, z) { var k = c + SPSEP + z; return p.specs.indexOf(k) >= 0 && !spOut(p, k); }
+  return '<div class="sgl">顏色:' + esc(SPC || '請選擇') + '</div><div class="sg">' + cs.map(function (c) { return spBtn(c, SPC === c, !zs.some(function (z) { return has(c, z); }), 'c'); }).join('') + '</div>' +
+    '<div class="sgl">尺寸:' + esc(SPZ || '請選擇') + '</div><div class="sg">' + zs.map(function (z) { return spBtn(z, SPZ === z, SPC ? !has(SPC, z) : !cs.some(function (c) { return has(c, z); }), 'z'); }).join('') + '</div>';
+}
+function spSet(k, v) {
+  var p = cur; if (!p) return;
+  if (k === 'c') SPC = SPC === v ? '' : v; else SPZ = SPZ === v ? '' : v;
+  var two = spTwo(p), val = '';
+  if (two) { if (SPC && SPZ && (p.specs.indexOf(SPC + SPSEP + SPZ) < 0 || spOut(p, SPC + SPSEP + SPZ))) { if (k === 'c') SPZ = ''; else SPC = ''; } val = SPC && SPZ ? SPC + SPSEP + SPZ : ''; }
+  else val = SPZ;
+  var h = $('#spsel'); if (h) { h.value = val; h.dispatchEvent(new Event('change', { bubbles: true })); }
+  var w = $('#spw'); if (w) w.innerHTML = specPick(p);
+  var n = $('#spn'); if (n && !val && two) n.textContent = SPC ? '請選擇尺寸' : '請選擇顏色和尺寸';
+}
+document.addEventListener('click', function (e) { var b = e.target.closest && e.target.closest('.sgb'); if (b && !b.disabled) spSet(b.dataset.sg, b.dataset.v); });
 function detail(p) {
+  SPC = ''; SPZ = '';
   var t = p.tiers.map(function (x) { return '買 ' + x.min + ' 件以上,每件 ' + money(x.price); }).join('<br>');
   return '<div class="tb">' + (!LT && D.line && D.line.on ? '<button type="button" class="lgb" data-a="lgd">LINE 登入</button>' : '') + '<button type="button" class="xb" data-a="x" aria-label="關閉">✕</button></div><h2>' + bn(p) + '</h2>' + (p.imgs && p.imgs.length ? '<img class="big" id="bigimg" src="' + esc(p.imgs[0]) + '" alt="" referrerpolicy="no-referrer">' + (p.imgs.length > 1 ? '<div class="th">' + p.imgs.map(function (u, k) { return '<img src="' + esc(u) + '" referrerpolicy="no-referrer" alt="商品圖片 ' + (k + 1) + '" data-a="bigimg" data-u="' + esc(u) + '" class="' + (k ? '' : 'on') + '">'; }).join('') + '</div>' : '') : '') +
     '<p><span class="pr">' + money(p.price) + '</span> <span class="tg">' + tag(p) + '</span></p>' + (t ? '<p class="tg">' + t + '</p>' : '') +
     '<p class="ds">' + esc(p.desc) + '</p>' +
-    (p.stock === 0 ? '<p>這項商品已售完。</p><p><button class="btn l shb" data-a="shr">分享給朋友</button></p>' : (p.specs && p.specs.length ? '<label>規格<select id="spsel"><option value="">請選擇規格</option>' + p.specs.map(function (x) { var q = (p.specQty || {})[x], so = q === 0; return '<option' + (so ? ' disabled' : '') + ' value="' + esc(x) + '">' + esc(x) + (so ? '(售完)' : (q != null ? '(剩' + q + '件)' : '')) + '</option>'; }).join('') + '</select></label><p id="spn" class="m" style="margin:4px 0">請選擇規格查看剩餘數量</p>' : (p.stock !== null ? '<p class="m" style="margin:4px 0">剩餘數量:<b>' + p.stock + '</b> 件</p>' : '')) + '<p id="dte" class="tg" role="alert"></p><div class="r"><button class="btn l" data-a="dn">−</button><b id="qn">1</b><button class="btn l" data-a="up">+</button><button class="btn a" data-a="add">加入購物車</button><button type="button" class="btn l shb" data-a="shr">分享給朋友</button></div>') +
+    (p.stock === 0 ? '<p>這項商品已售完。</p><p><button class="btn l shb" data-a="shr">分享給朋友</button></p>' : (p.specs && p.specs.length ? '<input type="hidden" id="spsel" value=""><div id="spw">' + specPick(p) + '</div><p id="spn" class="m" style="margin:4px 0">請選擇規格查看剩餘數量</p>' : (p.stock !== null ? '<p class="m" style="margin:4px 0">剩餘數量:<b>' + p.stock + '</b> 件</p>' : '')) + '<p id="dte" class="tg" role="alert"></p><div class="r"><button class="btn l" data-a="dn">−</button><b id="qn">1</b><button class="btn l" data-a="up">+</button><button class="btn a" data-a="add">加入購物車</button><button type="button" class="btn l shb" data-a="shr">分享給朋友</button></div>') +
     '';
 }
 /* 購物車/下單:商品明細列(品牌、品名、規格、單價、數量、小計) */

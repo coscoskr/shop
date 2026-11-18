@@ -516,6 +516,24 @@ function drawSpecs() {
   b.innerHTML = SPL.map(function (x, i) { return '<div style="display:flex;gap:6px;margin:4px 0;align-items:center"><input class="spi" data-i="' + i + '" value="' + esc(x.n) + '" maxlength="30" placeholder="規格:黑色 / M" style="flex:1;min-width:0"><input class="spq" data-i="' + i + '" type="number" min="0" step="1" value="' + esc(x.q) + '" placeholder="數量" style="width:84px" aria-label="此規格數量"><button type="button" class="btn l s" data-a="sprm" data-i="' + i + '">移除</button></div>'; }).join('') || '<span class="m">沒有規格</span>';
   syncStock();
 }
+/* 顏色×尺寸:規格名稱用「顏色 / 尺寸」存(中間是空白/空白),前台會拆成兩排按鈕 */
+var SPSEP = ' / ';
+function spgFill() {
+  var c = [], z = [], two = SPL.length && SPL.every(function (x) { return String(x.n).split(SPSEP).length === 2; });
+  if (two) SPL.forEach(function (x) { var a = String(x.n).split(SPSEP); if (c.indexOf(a[0]) < 0) c.push(a[0]); if (z.indexOf(a[1]) < 0) z.push(a[1]); });
+  var gc = $('#spgc'), gs = $('#spgs'); if (gc) gc.value = c.join(','); if (gs) gs.value = z.join(',');
+}
+function spgList(v) { var o = []; String(v || '').split(/[,，、\n]/).forEach(function (x) { x = x.replace(/[|=]/g, '').replace(/\s+\/\s+/g, '/').trim(); if (x && o.indexOf(x) < 0) o.push(x); }); return o; }
+function spgGen() {
+  var c = spgList($('#spgc').value), z = spgList($('#spgs').value), names = [];
+  if (!c.length && !z.length) { tell('請先填顏色或尺寸'); return; }
+  if (c.length && z.length) c.forEach(function (a) { z.forEach(function (b) { names.push(a + SPSEP + b); }); }); else names = c.length ? c : z;
+  var old = {}; SPL.forEach(function (x) { if (String(x.n).trim()) old[String(x.n).trim()] = x.q; });
+  var lost = Object.keys(old).filter(function (n) { return names.indexOf(n) < 0; });
+  if (lost.length && !confirm('以下原本的規格會被移除:\n' + lost.join('\n') + '\n\n(已經下單的訂單不受影響)確定要產生新的組合嗎?')) return;
+  SPL = names.map(function (n) { return { n: n, q: old[n] == null ? '' : old[n] }; });
+  drawSpecs();
+}
 function syncStock() {
   var f = $('#pf'); if (!f) return;
   var has = SPL.some(function (x) { return String(x.n).trim(); }), st = f.elements.stock, un = f.elements.unlimited, h = $('#sph');
@@ -531,7 +549,10 @@ function editProd(id) {
   var d = $('#dlg');
   d.innerHTML = '<h3>' + (id ? '編輯 ' + esc(p.id) : '新增商品') + '</h3><form id="pf"><div class="g" style="grid-template-columns:1fr 1fr">' +
     '<div class="f"><span class="m">品牌(從清單選;清單沒有就在右邊空白格輸入新品牌,按「新增」)</span><div style="display:flex;gap:8px;margin-top:4px"><select name="brand" id="brsel" style="flex:1">' + brOpts(p.brand) + '</select><input name="newBrand" id="brnew" placeholder="新品牌:直接輸入" maxlength="40" autocomplete="off" style="flex:1"><button type="button" class="btn a" data-a="bradd">新增</button></div><span class="m" id="brmsg">輸入的品牌若和清單裡的只差大小寫(例:lloyd / LLOYD),會自動用清單裡的寫法。</span></div>' +
-        '<div>' + fld('品名', 'name', p.name) + '<div style="margin-top:10px"><span class="m">規格(可新增,沒有上限;沒有規格就留空)</span><div id="spl"></div><button type="button" class="btn l s" data-a="spadd">+ 新增規格</button></div></div>' +
+        '<div>' + fld('品名', 'name', p.name) + '<div style="margin-top:10px"><span class="m">規格(可新增,沒有上限;沒有規格就留空)</span><div id="spl"></div><button type="button" class="btn l s" data-a="spadd">+ 新增規格</button>' +
+          '<div style="margin-top:10px;padding:10px;border:1px dashed #d9c9bd;border-radius:8px"><b style="font-size:13px">顏色 × 尺寸 快速產生</b><span class="m" style="display:block;font-size:12px;margin:2px 0 6px">用逗號分隔,按「產生組合」會建立每個顏色×尺寸的規格,前台會先選顏色再選尺寸。只有一種也可以(例如只填尺寸)。</span>' +
+          '<label style="display:block">顏色<input id="spgc" placeholder="例如:栗色,沙色,黑色"></label><label style="display:block;margin-top:4px">尺寸<input id="spgs" placeholder="例如:US6/23.5cm,US7/24cm,US8/24.5cm"></label>' +
+          '<button type="button" class="btn a s" data-a="spgen" style="margin-top:6px">產生組合</button></div></div></div>' +
     '<div>' + fld('單價', 'price', p.price, 'number') + '<div style="margin-top:10px">' + fld('多數量優惠', 'tiers', p.tiers, 'text', '3=450,5=400 (買3件起每件450、買5件起每件400)') + '</div></div>' +
     '<label>銷售型態<select name="type">' + opts(['現貨', '預購'], p.type) + '</select></label>' +
     '<div><label>數量(必填)<span style="display:flex;gap:12px;align-items:center"><input name="stock" type="number" min="0" step="1" style="flex:1;min-width:0" value="' + (p.stock === '' ? '' : p.stock) + '"' + (p.stock === '' && id ? ' disabled' : '') + '><span class="ck" style="white-space:nowrap"><input type="checkbox" name="unlimited"' + (id && p.stock === '' ? ' checked' : '') + '> 無限數量</span></span></label><span class="m" id="sph"></span></div>' +
@@ -545,7 +566,7 @@ function editProd(id) {
     '</div></fieldset>' +
     '<p class="er" id="pe" role="alert"></p><button class="btn a">儲存</button> <button type="button" class="btn l" data-a="x">取消</button>' +
     (id ? ' <button type="button" class="btn l" data-a="dp" data-id="' + esc(id) + '">刪除</button>' : '') + '</form>';
-  SPL = (p.specs || []).map(function (n) { var q = (p.specQty || {})[n]; return { n: n, q: q == null ? '' : q }; }); if (innerWidth > 860) d.style.width = 'min(760px,96vw)'; d.addEventListener('close', function () { d.style.width = ''; }, { once: true }); d.showModal(); drawImgs(); drawCats();
+  SPL = (p.specs || []).map(function (n) { var q = (p.specQty || {})[n]; return { n: n, q: q == null ? '' : q }; }); spgFill(); if (innerWidth > 860) d.style.width = 'min(760px,96vw)'; d.addEventListener('close', function () { d.style.width = ''; }, { once: true }); d.showModal(); drawImgs(); drawCats();
   var f = $('#pf');
   f.elements.unlimited.onchange = function () { f.elements.stock.disabled = this.checked; if (this.checked) f.elements.stock.value = ''; };
   drawSpecs();
@@ -972,6 +993,7 @@ document.addEventListener('click', function (e) {
     if (ps.length) call('adminShipPrinted', T, ps).then(function () { (O || []).forEach(function (o) { o.ships.forEach(function (s) { if (ps.indexOf(s.id) >= 0) s.pr = now; }); }); ps.forEach(function (id) { delete SSEL[id]; }); if (tab === 's') shipRows(); }).catch(function () {});
     return;
   }
+  if (a === 'spgen') { spgGen(); return; }
   if (a === 'spadd') { SPL.push({ n: '', q: '' }); drawSpecs(); var ins = document.querySelectorAll('.spi'); if (ins.length) ins[ins.length - 1].focus(); return; }
   if (a === 'sprm') { SPL.splice(Number(b.dataset.i), 1); drawSpecs(); return; }
   if (a === 'mb') openMember(id);
