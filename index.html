@@ -94,6 +94,7 @@ fieldset label{display:inline-block;margin:2px 10px 2px 0}
 .sumb .tot{border-top:1px dashed var(--pink);margin-top:8px;padding-top:8px;font-weight:800;font-size:17px}.sumb small{display:block;margin-top:6px}
 .cta{display:flex;flex-direction:column;gap:8px;margin:12px 0}.cta .btn{width:100%;padding:12px!important;font-size:15px!important}
 @media (max-width:560px){.ih{display:none}.ir{grid-template-columns:1fr 1fr 1fr;row-gap:6px}.ip{grid-column:1/-1}.iu,.iq,.is{text-align:left}.iq{text-align:center}.is{text-align:right}.il{display:block;font-size:11px;color:var(--mute)}}
+.errbox{background:#fdecec;color:#b42318!important;border:1px solid #f5c2c0;border-radius:10px;padding:10px 12px;font-weight:700}
 .cvsp{border:1.5px dashed var(--pink);border-radius:10px;padding:10px;margin:6px 0;display:flex;flex-direction:column;gap:8px;background:#fff}
 @media (max-width:340px){.payg{grid-template-columns:1fr}}
 #cb{position:relative}#cn{position:absolute;top:-6px;right:-6px;background:var(--acc);color:#fff;border-radius:10px;font-size:12px;padding:0 6px}
@@ -595,7 +596,7 @@ function placeNow(o, sb) {
     MTAB = 'o'; MSEL = {}; memLoad(function () { show('<h2>訂單已成立</h2><p>訂單編號 <b>' + esc(oid) + '</b></p><p class="ds">現貨或已到貨的商品,即可勾選結帳並出貨;預購商品到貨後會通知你。</p><button class="btn a" data-a="mt" data-t="o">我知道了,查看訂單明細</button>'); });
     D.products.forEach(function (p) { if (p.stock !== null) { var n = 0; o.items.forEach(function (i) { if (bp(i.id) === p.id) n += i.qty; }); if (n) p.stock = Math.max(0, p.stock - n); } });
     grid();
-  }).withFailureHandler(function (er) { var pb = $('#pnb'); if (pb) pb.disabled = false; if (sb || pb) { if (sb) sb.disabled = false; $('#er').textContent = er.message; } else show('<h2>無法下單</h2><p>' + esc(er.message) + '</p><button class="btn a" data-a="cart">返回購物車</button>'); }).placeOrder(o);
+  }).withFailureHandler(function (er) { var pb = $('#pnb'); if (pb) pb.disabled = false; if (sb || pb) { if (sb) sb.disabled = false; showErr('#er', er.message); } else show('<h2>無法下單</h2><p>' + esc(er.message) + '</p><button class="btn a" data-a="cart">返回購物車</button>'); }).placeOrder(o);
 }
 
 document.addEventListener('click', function (e) {
@@ -898,9 +899,11 @@ document.addEventListener('submit', function (e) {
   $('#sfe').textContent = '';
   if (!SNONCE) SNONCE = nonce_();
   google.script.run.withSuccessHandler(function (d) { SNONCE = ''; MD = d; MSEL = {}; MTAB = 's'; var ns = d.ships.filter(function (z) { return z.id === d.sid; })[0]; show(shipDetail(ns)); })
-    .withFailureHandler(function (er) { $('#sfe').textContent = er.message; }).memberCreateShip(mt, items, { pay: f.pay.value, method: f.method.value, rname: f.rname.value, cvs: f.cvs.value, store: f.store.value, addr: f.addr.value, credit: f.credit ? Number(f.credit.value) || 0 : 0, note: f.note.value, phone: f.phone.value, paytest: testOn(), nonce: SNONCE, kind: payKind(f), cvsid: f.cvsid ? f.cvsid.value : '' });
+    .withFailureHandler(function (er) { showErr('#sfe', er.message); }).memberCreateShip(mt, items, { pay: f.pay.value, method: f.method.value, rname: f.rname.value, cvs: f.cvs.value, store: f.store.value, addr: f.addr.value, credit: f.credit ? Number(f.credit.value) || 0 : 0, note: f.note.value, phone: f.phone.value, paytest: testOn(), nonce: SNONCE, kind: payKind(f), cvsid: f.cvsid ? f.cvsid.value : '' });
 });
 
+/* 錯誤訊息:顯示在表單下方並捲到看得到的位置,避免按了沒反應的錯覺 */
+function showErr(sel, msg) { var e = $(sel); if (!e) { alert(msg); return; } e.textContent = msg; e.classList.add('errbox'); try { e.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (x) {} }
 function testOn() { try { if (/[?&]paytest=1/.test(location.search)) sessionStorage.setItem('paytest', '1'); return sessionStorage.getItem('paytest') === '1'; } catch (e) { return false; } }
 function payOn() { return !!(window.D && D.payLive) || testOn(); }
 payOn();
@@ -948,7 +951,7 @@ function goMap() {
     document.body.appendChild(fm);
     var bb = $('#busy'); if (bb) { bb.firstElementChild.innerHTML = '即將開啟 ' + esc(v.cvs || '7-11') + ' 門市地圖<br><small style="font-weight:400">選好門市後會自動回到這裡</small>'; bb.classList.add('on'); }
     setTimeout(function () { fm.submit(); }, 800);
-  }).withFailureHandler(function (er) { $('#sfe').textContent = er.message; }).memberMapStart(v.cvs || '7-11', v.pay === '賣貨便', /Mobi|Android|iPhone/i.test(navigator.userAgent));
+  }).withFailureHandler(function (er) { showErr('#sfe', er.message); }).memberMapStart(v.cvs || '7-11', v.pay === '賣貨便', /Mobi|Android|iPhone/i.test(navigator.userAgent));
 }
 function resumeDraft() {
   var pick = null, dr = null;
