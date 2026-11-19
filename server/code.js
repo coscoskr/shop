@@ -1461,7 +1461,7 @@ function adminOrders(tk) {
   var ofShip = {};
   rows_('訂單明細').forEach(function (r) {
     var m = lm(r);
-    (items[r.訂單ID] = items[r.訂單ID] || []).push({ pid: String(r.商品ID), name: r.品名, qty: Number(r.數量), unit: Number(r.單價), sub: Number(r.小計), arr: r.到貨狀態, sid: String(r.出貨單ID || ''), typ: m.typ, eta: m.eta, vendor: m.vendor, cost: m.cost, tax: m.tax, src: m.src, spec: m.spec });
+    (items[r.訂單ID] = items[r.訂單ID] || []).push({ pid: String(r.商品ID), name: r.品名, qty: Number(r.數量), unit: Number(r.單價), sub: Number(r.小計), arr: r.到貨狀態, sid: String(r.出貨單ID || ''), arrAt: String(r.到貨時間 || ''), typ: m.typ, eta: m.eta, vendor: m.vendor, cost: m.cost, tax: m.tax, src: m.src, spec: m.spec });
     if (r.出貨單ID && sh[String(r.出貨單ID)]) { var a = ofShip[r.訂單ID] = ofShip[r.訂單ID] || {}; a[String(r.出貨單ID)] = sh[String(r.出貨單ID)]; }
   });
   return { logiLive: logiOn_(),
