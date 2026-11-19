@@ -632,9 +632,9 @@ function cbBind(p) {
     call('adminCbSearch', T, q).then(function (list) {
       if (!list.length) { res.innerHTML = '<p class="m">酷柏找不到「' + esc(q) + '」</p>'; return; }
       res.innerHTML = list.map(function (x, i) {
-        return '<div style="border:1px solid #e6dcd3;border-radius:8px;padding:8px;margin-top:6px"><b>' + esc(x.title) + '</b> <span class="m">酷柏編號 ' + x.id + '・' + (x.on ? '上架中' : '已下架') + '</span>' +
+        return '<div style="border:1px solid #e6dcd3;border-radius:8px;padding:8px;margin-top:6px"><b>' + esc(x.title) + '</b> <span class="m">酷柏編號 ' + esc(x.id) + '・' + (x.on ? '上架中' : '已下架') + '</span>' +
           (x.bound ? '<br><span class="m">目前綁定:' + esc(x.bound) + '</span>' : '') +
-          '<div class="m" style="font-size:12px">規格:' + esc(x.specs.map(function (s) { return s.title; }).join(' / ') || '(無)') + '</div>' +
+          '<div class="m" style="font-size:12px">規格:' + esc((x.specs || []).map(function (s) { return s.title; }).join(' / ') || '(無)') + '</div>' +
           '<button type="button" class="btn a s" data-cbp="' + i + '" style="margin-top:4px">綁定到這個商品</button><div class="cbm"></div></div>';
       }).join('');
       res.onclick = function (e) {
@@ -644,10 +644,10 @@ function cbBind(p) {
           if (x.single) {
             m.innerHTML = '<div style="margin-top:6px">這個酷柏商品沒有分款式(規格只是交期之類),整個商品對到:' + specSel(sl.length === 1 ? sl[0] : '') + ' <button type="button" class="btn a s" data-cbs="' + i + '">儲存綁定</button></div>';
           } else {
-            m.innerHTML = '<div style="margin-top:6px">每個酷柏規格各自對到這個商品的哪個規格:' + x.specs.map(function (s) {
+            m.innerHTML = '<div style="margin-top:6px">每個酷柏規格各自對到這個商品的哪個規格:' + (x.specs || []).map(function (s) {
               var g = cbNm(s.title), hit = sl.filter(function (n) { var h = cbNm(n); return h && g && (h.indexOf(g) === 0 || g.indexOf(h) === 0); });
               var cur = s.bound && s.bound.indexOf(p.id + ' ') === 0 ? (s.bound.match(/\(([^)]*)\)$/) || [])[1] : (hit.length === 1 ? hit[0] : null);
-              return '<div style="display:flex;gap:8px;align-items:center;margin:3px 0" data-sid="' + s.id + '"><span style="flex:1">' + esc(s.title) + (s.bound ? ' <span class="m">(目前:' + esc(s.bound) + ')</span>' : '') + '</span>' + specSel(cur == null ? '__none' : cur, true) + '</div>';
+              return '<div style="display:flex;gap:8px;align-items:center;margin:3px 0" data-sid="' + esc(s.id) + '"><span style="flex:1">' + esc(s.title) + (s.bound ? ' <span class="m">(目前:' + esc(s.bound) + ')</span>' : '') + '</span>' + specSel(cur == null ? '__none' : cur, true) + '</div>';
             }).join('') + '<button type="button" class="btn a s" data-cbs="' + i + '">儲存綁定</button></div>';
             if (!sl.length) m.querySelectorAll('select.cbsp').forEach(function (el) { el.value = '__none'; });
           }
