@@ -263,7 +263,10 @@ google.script.run.withSuccessHandler(function (d) {
     google.script.run.withSuccessHandler(function (r) { LCHK = false; MD = r; setLg(); })
       .withFailureHandler(function () { LCHK = false; if (mt === LT) { LT = ''; mt = ''; try { localStorage.removeItem('lt'); } catch (x) {} } setLg(); }).memberOrders(LT);
   }
-  try { var c1 = new URLSearchParams(location.search).get('c'); if (c1 && D.cats.some(function (x) { return x === c1 || x.indexOf(c1 + '/') === 0; })) cat = c1; } catch (e1) {}
+  // 分享的網址:?c=分類(含 @品牌/xxx、@現貨、@預購 這類自動分類)、?b=篩選的品牌(逗號分隔)
+  try { var q1 = new URLSearchParams(location.search), c1 = q1.get('c'), b1 = q1.get('b');
+    if (c1 && (D.cats.some(function (x) { return x === c1 || x.indexOf(c1 + '/') === 0; }) || (c1.charAt(0) === '@' && D.products.some(function (p) { return catHit(p.cats, c1, p); })))) cat = c1;
+    if (b1) b1.split(',').forEach(function (b) { if (b && D.products.some(function (p) { return p.brand === b; })) FIL.brands[b] = true; }); } catch (e1) {}
   nav(); grid();
   if (BOOT.token) memLoad(function () { show(memList()); hlOrder(); });
   else if (PEND_S || HL_O || /[?&]m=1/.test(location.search)) { if (LT) { mt = LT; memLoad(function () { show(memList()); hlOrder(); }); } else show(memLogin()); }
@@ -302,7 +305,7 @@ function goLogin() {
   if (D && D.line && D.line.liff) { location.href = 'https://liff.line.me/' + D.line.liff; return; }
   google.script.run.withSuccessHandler(function (u) { location.href = u; }).withFailureHandler(function () { show(loginHtml()); }).lineStart();
 }
-function urlCat() { try { var u = new URL(location.href); if (cat) u.searchParams.set('c', cat); else u.searchParams.delete('c'); if (u.href !== location.href) history.replaceState(null, '', u.pathname + u.search + u.hash); } catch (e) { } }
+function urlCat() { try { var u = new URL(location.href), bs = Object.keys(FIL.brands).filter(function (k) { return FIL.brands[k]; }); if (cat) u.searchParams.set('c', cat); else u.searchParams.delete('c'); if (bs.length) u.searchParams.set('b', bs.join(',')); else u.searchParams.delete('b'); if (u.href !== location.href) history.replaceState(null, '', u.pathname + u.search + u.hash); } catch (e) { } }
 function nav() {
   setLg(); urlCat();
   var big = [], subs = {};
@@ -637,14 +640,14 @@ document.addEventListener('click', function (e) {
   else if (a === 'shr') shareProd(cur);
   else if (a === 'shcp') { var su = b.dataset.u, okc = function () { b.textContent = '已複製,可貼到 IG 或任何地方'; }, fbc = function () { var t = document.createElement('textarea'); t.value = su; t.style.cssText = 'position:fixed;opacity:0'; document.body.appendChild(t); t.select(); try { document.execCommand('copy'); okc(); } catch (x) { b.textContent = su; } document.body.removeChild(t); }; if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(su).then(okc, fbc); else fbc(); }
   else if (a === 'flt') show(fltHtml());
-  else if (a === 'fclr') { FIL = { type: '', brands: {}, min: '', max: '', avail: false }; PAGE = 1; $('#dlg').close(); grid(); }
+  else if (a === 'fclr') { FIL = { type: '', brands: {}, min: '', max: '', avail: false }; PAGE = 1; $('#dlg').close(); grid(); urlCat(); }
   else if (a === 'fapply') {
     var ff = $('#ff'), ty = ff.querySelector('[name=ft]:checked'), br = {};
     [].slice.call(ff.querySelectorAll('[name=fb]:checked')).forEach(function (x) { br[x.value] = true; });
     var mn0 = ff.querySelector('[name=fmin]').value.trim(), mx0 = ff.querySelector('[name=fmax]').value.trim();
     FIL = { type: ty ? ty.value : '', brands: br, min: mn0 === '' ? '' : Math.max(0, +mn0 || 0), max: mx0 === '' ? '' : Math.max(0, +mx0 || 0), avail: !!ff.querySelector('[name=fa]').checked };
     if (FIL.min !== '' && FIL.max !== '' && FIL.min > FIL.max) { var tmp = FIL.min; FIL.min = FIL.max; FIL.max = tmp; }
-    PAGE = 1; $('#dlg').close(); grid(); toTop();
+    PAGE = 1; $('#dlg').close(); grid(); urlCat(); toTop();
   }
   else if (a === 'pg') { PAGE = +b.dataset.p || 1; grid(); toTop(); }
   else if (a === 'open') { cur = byId(id); dq = 1; show(detail(cur)); }
