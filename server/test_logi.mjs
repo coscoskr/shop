@@ -48,6 +48,9 @@ r = await call('adminLogiClear', tk, 'S4'); ok(r.ok && S('S4').logistics_id === 
 r = await call('adminLogiPrint', tk, 'S1'); ok(r.ok && /PrintUniMartC2COrderInfo/.test(r.result.action) && r.result.fields.CVSValidationNo === '1234', 'print fields');
 const cb = async (code) => { const p = { MerchantID: cfg.mid, MerchantTradeNo: 'S1LX', RtnCode: code, RtnMsg: 'x', AllPayLogisticsID: '1718546', LogisticsType: 'CVS', LogisticsSubType: 'UNIMARTC2C', GoodsAmount: '1065', UpdateStatusDate: '2026/11/20 10:00:00', ReceiverName: '王小明', ReceiverPhone: '', ReceiverCellPhone: '0912345678', ReceiverEmail: '', ReceiverAddress: '', CVSPaymentNo: 'C9876543', CVSValidationNo: '1234', BookingNote: '' }; p.CheckMacValue = logiMac(cfg, p); return handleEcpayLogi({ rawBody: new URLSearchParams(p).toString(), db: fakeDb, env: {} }); };
 globalThis.fetch = async () => ({ ok: true, status: 200, text: async () => '{}' });
+r = await cb('300'); ok(r === '1|OK' && S('S1').status === '已查帳待出貨', '300 not shipped');
+r = await cb('2068'); ok(r === '1|OK' && S('S1').status === '已出貨' && !!S('S1').shipped_at, '2068 → 已出貨 ' + S('S1').status);
+r = await cb('2068'); ok(r === '1|OK' && S('S1').status === '已出貨', '2068 repeat ok');
 r = await cb('2063'); ok(r === '1|OK', 'arrive cb');
 S('S1').status = '已出貨'; r = await cb('2074'); ok(r === '1|OK' && S('S1').status === '已出貨', 'prepaid return: status kept');
 r = await handleEcpayLogi({ rawBody: 'MerchantID=' + cfg.mid + '&AllPayLogisticsID=1&CheckMacValue=BAD', db: fakeDb, env: {} }); ok(r.startsWith('0|'), 'bad mac');

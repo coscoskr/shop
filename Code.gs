@@ -2314,15 +2314,34 @@ function logiStatus_(p, test) {
     if (!s) { out = 'no ship'; return; }
     var sid = String(s.出貨單ID), cod = String(s.付款方式) === '賣貨便';
     log_('綠界物流', '物流狀態', sid, code + ' ' + String(p.RtnMsg || '') + (test ? '(測試環境)' : ''));
+    // 賣家已到門市寄件(或之後的運送、到店、取件貨態)→ 出貨單自動改成「已出貨」,並照常發出貨通知、同步訂單、發回饋購物金
+    var shipped = '';
+    if (LOGI_SENT.indexOf(code) >= 0) shipped = logiMarkShipped_(s, code + ' ' + String(p.RtnMsg || ''));
+    if (shipped) { out = 'shipped'; s = rows_('出貨單').filter(function (x) { return String(x.出貨單ID) === sid; })[0] || s; }
     if (['2063', '2073', '3018'].indexOf(code) >= 0) {
       var lid = String(s['LINE ID'] || ''), st = settings_(), tpl = String(st.到店通知內容 === undefined ? defSet_('到店通知內容') : st.到店通知內容 || '').trim(), c = cvsOf_(s) || {};
       if (lid && tpl) pushLine_(lid, tpl.split('{門市}').join((c.cvs || '') + ' ' + (c.store || '')).split('{出貨單號}').join(sid).split('{付款提醒}').join(cod ? '取件時請付款 NT$ ' + s.總額 + '\n' : '').split('{姓名}').join(String(s.姓名 || '')));
       out = 'arrive';
     } else if (cod && ['2074', '2076', '3020', '3025', '3019'].indexOf(code) >= 0 && String(s.狀態) !== '已退回') {
       var n = cp_(s); n.狀態 = '已退回'; put_('出貨單', s._r, n); log_('綠界物流', '未取件退回', sid, code + ' ' + String(p.RtnMsg || '')); out = 'return';
-    } else out = 'log';
+    } else if (!shipped) out = 'log';
   });
   return out;
+}
+/* 綠界貨態:代表包裹已經寄出(含之後的運送、到店、取件)
+   7-11:2068 交貨便收件(賣家已到門市寄件)、2030 物流中心驗收成功、2063/2073 已到取件門市、2067 已取件
+   全家:3024 貨件已至門市寄件、3001 轉運中、3006 配送中、3018 已到取件門市、3022 已取件 */
+var LOGI_SENT = ['2068', '2030', '2063', '2073', '2067', '3024', '3001', '3006', '3018', '3022'];
+function logiMarkShipped_(s, why) {
+  var f = FLOW[s.付款方式] || [], sid = String(s.出貨單ID), si = si_(s.付款方式), st = '已出貨';
+  if (f.indexOf(st) < 0 || f.indexOf(String(s.狀態)) >= si || String(s.狀態) === '已退回') return '';
+  var n = cp_(s); n.狀態 = st; if (!s.出貨時間) n.出貨時間 = now_();
+  put_('出貨單', s._r, n);
+  log_('綠界物流', '修改出貨單', sid, diff_(s, n) + '(綠界貨態:' + why + ')');
+  String(s.訂單ID).split(',').forEach(function (oid) { syncOrderStatus_(oid, '綠界物流'); });
+  awardCredits_(sid, '綠界物流');
+  var nt = shipNotice_(s, n, f); if (nt) log_('綠界物流', '出貨通知', sid, nt);
+  return st;
 }
 /** 收件人必須填本名(超商取貨要核對證件):中文 2~6 字,或英文姓名 */
 function realName_(v) {
