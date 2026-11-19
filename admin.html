@@ -631,7 +631,8 @@ function cbBind(p, id) {
   var mapHtml = function (x, keep) {
     if (x.single) return '<div class="cbmap" style="margin-top:6px">整個商品對到:' + specSel(keep && keep['*'] != null ? keep['*'] : (sl().length === 1 ? sl()[0] : '')) + '</div>';
     return '<div class="cbmap" style="margin-top:6px">每個酷柏規格對到這個商品的哪個規格:' + (x.specs || []).map(function (s) {
-      var g = cbNm(s.title), hit = sl().filter(function (n) { var h = cbNm(n); return h && g && (h.indexOf(g) === 0 || g.indexOf(h) === 0); });
+      // 自動對應:名稱互相包含就算(規格常寫成「英文 | 編號 中文」,也拆開每一段比對)
+      var g = cbNm(s.title), hit = sl().filter(function (n) { return [n].concat(String(n).split(/[|｜\/]/)).some(function (part) { var h = cbNm(part); return h && g && h.length >= 2 && (h.indexOf(g) >= 0 || g.indexOf(h) >= 0); }); });
       var cur = keep && keep[s.id] != null ? keep[s.id] : (hit.length === 1 ? hit[0] : (s.plain && sl().length <= 1 ? (sl()[0] || '') : '__none'));
       return '<div style="display:flex;gap:8px;align-items:center;margin:3px 0" data-sid="' + esc(s.id) + '"><span style="flex:1">' + esc(s.title) + (s.bound ? ' <span class="m">(目前:' + esc(s.bound) + ')</span>' : '') + '</span>' + specSel(cur, true) + '</div>';
     }).join('') + '</div>';
@@ -1030,6 +1031,7 @@ document.addEventListener('submit', function (e) {
       cats: CSEL.slice(),
       vendor: g('vendor').value, source: g('source').value, cost: g('cost').value, taxIncl: g('tax').value === 'Y'};
     if (window.cbCollect) { var cbd = window.cbCollect(); if (cbd) o2.cb = cbd; }
+    if (o2.cb && o2.cb.rows && !o2.cb.rows.some(function (r) { return r.cspec && r.cspec !== '__none'; })) { $('#pe').textContent = '下方選了酷柏商品「' + o2.cb.title + '」,但它的每個規格都選「不綁定」。請在每個酷柏規格旁的選單選對應的規格;不想綁定就選「都不是／先不綁定」再儲存。'; var cbx = $('#cbr'); if (cbx) cbx.scrollIntoView({ block: 'center' }); return; }
     $('#pe').textContent = ''; wait('商品儲存中…請稍候');
     call('adminSaveProduct', T, o2).then(function (r) {
       P = r; if (o2.newBrand.trim()) call('adminBrands', T).then(function (b) { BR = b.sort(function(a, b) { var x = String(a.name || a).toLowerCase(), y = String(b.name || b).toLowerCase(); return x < y ? -1 : x > y ? 1 : 0; }); BL = b.map(function (x) { return x.name; }); });

@@ -196,6 +196,8 @@ function specParse_(p) {
   return { names: names, q: q };
 }
 function specs_(p) { return specParse_(p).names; }
+/** 規格名稱整理:最多 30 字,| ~ = 是系統分隔用的字元,換成 / - - */
+function specNorm_(s) { return t_(s, 30).split('|').join('/').split('~').join('-').split('=').join('-'); }
 function specQty_(p) { return specParse_(p).q; }
 /** 這個商品(含規格)目前還能賣幾件;null=不限量 */
 function availOf_(p, sp) {
@@ -792,7 +794,7 @@ function adminSaveProduct(tk, d) {
     [].concat(d.specs || []).forEach(function (s) {
       var sq = '';
       if (s && typeof s === 'object') { sq = s.q; s = s.n; }
-      s = t_(s, 30).split('|').join('/').split('~').join('-').split('=').join('-');
+      s = specNorm_(s);
       if (!s || seenSp[s]) return; seenSp[s] = 1;
       if (sq === '' || sq == null) { specAll = false; specs.push(s); return; }
       sq = Math.floor(Number(sq)); if (!(sq >= 0)) throw new Error('規格「' + s + '」的數量不正確');
@@ -3357,7 +3359,7 @@ function cbBindDo_(u, pid, d) {
     pid = String(pid || ''); var p = rows_('商品').filter(function (x) { return String(x.商品ID) === pid; })[0];
     if (!p) throw new Error('找不到這個商品');
     var proid = String(Math.floor(Number(d.proid)) || ''); if (!proid || proid === '0') throw new Error('酷柏商品編號不正確');
-    var sl = specs_(p), chk = function (c) { c = String(c == null ? '' : c); if (sl.length ? sl.indexOf(c) < 0 : c !== '') throw new Error('規格「' + c + '」不在這個商品裡'); return c; };
+    var sl = specs_(p), chk = function (c) { c = c == null || c === '' ? '' : specNorm_(c); if (sl.length ? sl.indexOf(c) < 0 : c !== '') throw new Error('規格「' + c + '」不在這個商品裡'); return c; };
     var n = 0;
     if (d.single) chk(d.cspec);
     cbClear_(proid, d.single ? null : (d.rows || []).map(function (r) { return String(Math.floor(Number(r.specid)) || ''); })); // 同一個酷柏商品之前的對照(含舊的文字對照)先清掉,避免舊的錯誤對照優先
@@ -3367,7 +3369,7 @@ function cbBindDo_(u, pid, d) {
       if (r.cspec === null || r.cspec === undefined || r.cspec === '__none') { setSet_(CB_MAP_ + proid + '|' + sid, ''); return; }
       setSet_(CB_MAP_ + proid + '|' + sid, pid + '|' + chk(r.cspec)); n++;
     });
-    if (!n) throw new Error('沒有選任何規格');
+    if (!n) throw new Error('酷柏商品的規格都選了「不綁定」,請把每個酷柏規格對到這個商品的規格,或改選「都不是／先不綁定」');
     setSet_('酷柏品名 ' + proid, t_(d.title, 120));
     log_(u.acc, '綁定酷柏商品', pid, '酷柏 ' + proid + ' ' + t_(d.title, 60) + '(' + n + ' 項)');
     RDYN_ = []; var r = cbPendAuto_(); // 待對應裡剛好有這個酷柏商品:立刻入帳並通知客人
