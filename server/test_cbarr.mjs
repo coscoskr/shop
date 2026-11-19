@@ -42,8 +42,8 @@ line('O1', 'P072', '蝴蝶結貓耳毛帽', '灰', 1); line('O2', 'P072', '蝴�
 line('O1', 'P008', 'Hello Kitty聯名款擴香3入禮盒組', '', 2);
 const L = (oid, pid) => DB['訂單明細'].find(r => r.order_id === oid && r.product_id === pid);
 const setv = (k) => (DB['設定'].find(r => r.key === k) || {}).value;
-const GREY = { proid: 6717, specid: 22371, title: '【韓國】MLB 蝴蝶結貓耳毛帽-灰色(3ABNB0866-07GRP)', spec: '11/30左右', qty: 2, price: 983, single: 1 };
-const KITTY = { proid: 7104, specid: 23001, title: '【韓國】Hetras x Hello Kitty聯名款擴香3入禮盒組', spec: '11/10左右', qty: 2, price: 850, single: 1 };
+const GREY = { proid: 6717, specid: 22371, title: '【韓國】MLB 貓耳造型毛帽-灰色(3ABNB0866-07GRP)', spec: '11/30左右', qty: 2, price: 983, single: 1 };
+const KITTY = { proid: 7104, specid: 23001, title: '【韓國】Hetras x Kitty 擴香禮盒組', spec: '11/10左右', qty: 2, price: 850, single: 1 };
 
 // 1) 還沒設定金鑰 → 503;金鑰錯 → 401;過期 → 401
 let r = await post({ type: 'arrival', batch: 'b0', items: [GREY] });
@@ -60,7 +60,7 @@ aiReply = { items: [{ ref: 1, pid: 'P072', spec: '灰' }, { ref: 2, pid: 'P008',
 r = await post({ type: 'arrival', batch: 'b1', items: [GREY, KITTY] });
 ok(r.status === 200 && r.body.ok && r.body.auto === 0 && r.body.pending === 2 && r.body.added === 2, 'first time: nothing auto, 2 pending ' + JSON.stringify(r.body));
 ok(L('O1', 'P072').arrival_status === '未到貨', 'first time: order lines untouched');
-ok(aiCalls === 1 && /#1\|【韓國】MLB 蝴蝶結貓耳毛帽-灰色/.test(aiPrompt) && /P072\|蝴蝶結貓耳毛帽/.test(aiPrompt), 'matcher got both lists');
+ok(aiCalls === 1 && /#1\|【韓國】MLB 貓耳造型毛帽-灰色/.test(aiPrompt) && /P072\|蝴蝶結貓耳毛帽/.test(aiPrompt), 'matcher got both lists');
 const pv = sent.filter(s => s.to === 'UADMIN').pop();
 ok(pv && /請確認對應/.test(pv.text) && /→ 蝴蝶結貓耳毛帽\(灰\)/.test(pv.text) && /回「確認」/.test(pv.text), 'admin got mapping preview');
 
@@ -168,4 +168,25 @@ a = run((I) => I.arrPlan_([{ pid: 'P008', spec: '', qty: 1, price: null, text: '
 ok(/O8 .*×1/.test(a.r) && !/現貨庫存/.test(a.r), 'a second preview before confirming gives the remaining 1 to the same customer (not to stock)');
 a = run((I) => I.arrText_('UADMIN', '確認'));
 ok(Number(L('O8', 'P008').qty) === 2 && L('O8', 'P008').arrival_status === '已到貨' && LX('O8', 'P008~~2') && Number(LX('O8', 'P008~~2').qty) === 1 && LX('O8', 'P008~~2').arrival_status === '已到貨', 'confirm applies both previews: 2 + 1 all arrived for O8');
+// 13) 第一次出現、但品牌＋品名＋規格對得上而且只有一個可能 → 直接入帳(不用等確認)並記住
+DB['商品'].push({ id: 'P293', name: '沐浴乳1013ml', categories: '', sale_type: '預購', price: 299, stock: null, specs: 'Hotel Wood｜NO.7 五星級飯店|Flower Park｜NO.2 花園', on_sale: 'Y', brand: 'Hetras' });
+order('O9', '2026-11-19 09:00:00', 'U9'); line('O9', 'P293', '沐浴乳1013ml', 'Hotel Wood｜NO.7 五星級飯店', 1);
+sent.length = 0; const ai0 = aiCalls;
+r = await post({ type: 'arrival', batch: 'b9', items: [{ proid: 7383, specid: 23963, title: '【韓國】hetras沐浴乳1013ml系列', spec: 'Hotel Wood', qty: 1, price: 216, lots: [[1, 216, 'w173043']], single: 0 }] });
+ok(r.body.auto === 0 && r.body.guess === 1 && r.body.pending === 0 && aiCalls === ai0, 'first-time but unambiguous → applied without AI/confirmation ' + JSON.stringify(r.body));
+ok(L('O9', 'P293').arrival_status === '已到貨' && Number(L('O9', 'P293').cost) === 216 && sent.some(x => x.to === 'U9') && sent.some(x => x.to === 'UADMIN' && /已自動對照並入帳/.test(x.text)), 'O9 arrived, customer notified, admin told');
+ok(setv('酷柏對照 7383|23963') === 'P293|Hotel Wood｜NO.7 五星級飯店', 'mapping remembered');
+// 兩個規格都像 → 不猜,照舊交給配對/確認
+DB['商品'].push({ id: 'P294', name: '香水50ml', categories: '', sale_type: '預購', price: 1, stock: null, specs: 'CHAMO|CHAMO 新版', on_sale: 'Y', brand: 'Tamburins' });
+aiReply = { items: [] };
+r = await post({ type: 'arrival', batch: 'b10', items: [{ proid: 7400, specid: 1, title: '【韓國】TAMBURINS香水50ml', spec: 'CHAMO', qty: 1, price: 900, single: 0 }] });
+ok(r.body.pending === 1 && !r.body.guess, 'ambiguous spec → not guessed, waits for matching');
+run((I) => I.arrText_('UADMIN', '酷柏清除'));
+// 14) 已經在待對應清單裡的(例:上線前就送來的),排程提醒(poke)時也會自動對照入帳
+r = await post({ type: 'arrival', batch: 'b11', items: [{ proid: 7500, specid: 9, title: '【韓國】hetras身體乳300ml', spec: '標準', qty: 1, price: 150, single: 1 }] });
+ok(r.body.pending === 1, 'unknown product waits');
+DB['商品'].push({ id: 'P295', name: '身體乳300ml', categories: '', sale_type: '預購', price: 1, stock: null, specs: '', on_sale: 'Y', brand: 'Hetras' });
+order('O10', '2026-11-19 09:30:00', 'U10'); line('O10', 'P295', '身體乳300ml', '', 1);
+r = await post({ type: 'poke' });
+ok(r.body.auto === 1 && r.body.pending === 0 && L('O10', 'P295').arrival_status === '已到貨', 'poke auto-applies the pending item ' + JSON.stringify(r.body));
 console.log(fails ? fails + ' FAILED' : 'ALL PASSED');

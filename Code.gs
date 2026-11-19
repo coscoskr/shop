@@ -3125,6 +3125,44 @@ function cbDone_(plans) {
   (plans || []).forEach(function (pl) { (pl.cb || []).forEach(function (m) { cbMapPut_(m); ks[m.k] = 1; n++; }); });
   if (n) cbPendSave_(cbPend_().filter(function (x) { return !ks[cbPk_(x)]; }));
 }
+/* 自動對照(不用人確認):品牌、品名、規格都對得上、而且全店只有一個商品規格符合 → 直接當作對照過,入帳並記住。
+   對不上或有兩個以上可能 → 才交給 AI 配對、請到貨管理員確認。 */
+function cbG_(s) { return String(s || '').replace(/【[^】]*】/g, '').replace(/[\s\-_.,，。、・·\/|｜()（）\[\]#＃+*:：'"「」]/g, '').toLowerCase(); }
+function cbGuess_(it, prods) {
+  var t = cbG_(it.title), ks = cbG_(it.spec), plain = !!it.single, hit = [];
+  if (!t) return null;
+  Object.keys(prods).forEach(function (pid) {
+    var p = prods[pid], nm = cbG_(p.名稱), br = cbG_(p.品牌);
+    if (!nm || nm.length < 3 || t.indexOf(nm) < 0) return;           // 店內品名要完整出現在酷柏品名裡
+    if (br && t.indexOf(br) < 0) return;                              // 有填品牌的話,品牌也要出現
+    var sl = specs_(p);
+    if (!sl.length) { if (plain) hit.push({ pid: pid, spec: '' }); return; }
+    var m = sl.filter(function (x) {
+      var g = cbG_(x); if (!g) return false;
+      if (!plain && ks) return g.indexOf(ks) === 0 || ks.indexOf(g) === 0; // 酷柏規格(例 Hotel Wood)對店內規格(例 Hotel Wood｜NO.7 五星級飯店)
+      return t.indexOf(g) >= 0;                                       // 酷柏沒分規格:顏色等寫在品名裡(例 …老帽-棕色 → 棕色)
+    });
+    if (m.length === 1) hit.push({ pid: pid, spec: m[0] });
+    else if (m.length > 1) hit.push(null, null);                      // 同一個商品有兩個規格都像 → 不猜
+  });
+  return hit.length === 1 && hit[0] ? hit[0] : null;
+}
+/** 待對應清單裡能自動對照的,直接入帳並記住;回傳要傳給到貨管理員的文字(沒有就空字串) */
+function cbPendAuto_() {
+  var pe = cbPend_(); if (!pe.length) return '';
+  var prods = {}; rows_('商品').forEach(function (p) { prods[String(p.商品ID)] = p; });
+  var items = [], cb = [];
+  pe.forEach(function (x) {
+    var g = cbGuess_(x, prods); if (!g) return;
+    items.push({ pid: g.pid, spec: g.spec, qty: x.qty, price: x.price, lots: cbLots_(x), text: x.title });
+    cb.push({ proid: x.proid, specid: x.specid, spec: x.spec, single: x.single, pid: g.pid, cspec: g.spec, k: cbPk_(x) });
+  });
+  if (!items.length) return '';
+  arrSave_(arrPend_().filter(function (pl) { return !(pl.cb && pl.cb.length); })); // 舊的酷柏預覽作廢,避免入帳兩次
+  var opt = { auto: true, cb: cb, head: '📦 酷柏到貨(第一次出現的品項,已自動對照並入帳)' }, pv = arrPlan_(items, opt);
+  if (!opt.plan) return '';
+  return pv + '\n\n' + arrApply_([opt.plan], '酷柏到貨自動入帳');
+}
 /** 酷柏送來一批到貨:對照過的直接入帳並通知客人,其餘記成待對應。回傳 {ok, auto, stock, skip, pending, added, dup} */
 function cbArrIn_(d) {
   d = d || {};
@@ -3150,7 +3188,11 @@ function cbArrIn_(d) {
       text = '⚠️ 酷柏到貨沒有自動入帳:\n' + auto.map(function (a) { return '・' + String(prods[a.pid].名稱) + (a.spec ? '(' + a.spec + ')' : '') + ' ×' + a.qty; }).join('\n') + '\n到貨數量不夠分給排隊中的客人(不能拆單),請到後台處理。';
     }
   }
-  if (unk.length) cbPendAdd_(unk);
+  if (unk.length) {
+    cbPendAdd_(unk);
+    var ga = cbPendAuto_(); // 第一次出現、但對得上的:直接入帳(不用等人確認)
+    if (ga) { text = (text ? text + '\n\n' : '') + ga; res.guess = 1; }
+  }
   res.pending = cbPend_().length;
   if (admin && text) pushLine_(admin, text.slice(0, 4900));
   if (d.batch) c.put(bk, JSON.stringify(res), 2592000);
