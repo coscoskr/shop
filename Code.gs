@@ -3043,6 +3043,15 @@ function cbLink_(lk, parts) {
     if (a.indexOf(lk) < 0) { a.push(lk); c.put(k, JSON.stringify(a), CB_TTL_); }
   });
 }
+/** 這筆酷柏批發單之前已經入帳、而且入帳的品項現在還是到貨狀態(訂單品項已到貨/已出貨,或庫存進貨已到貨) */
+function cbWidDone_(w) {
+  var ks; try { ks = JSON.parse(CacheService.getScriptCache().get('cbw_' + w) || '[]'); } catch (e) { ks = []; }
+  return ks.some(function (lk) {
+    if (lk.indexOf('K|') === 0) return rows_('庫存進貨').some(function (k) { return String(k.訂單ID) === lk.slice(2) && String(k.到貨狀態) === '已到貨'; });
+    var i = lk.indexOf('|'), oid = lk.slice(0, i), pid = lk.slice(i + 1);
+    return rows_('訂單明細').some(function (l) { return String(l.訂單ID) === oid && String(l.商品ID) === pid && ['已到貨', '已出貨'].indexOf(String(l.到貨狀態)) >= 0; });
+  });
+}
 function cbAvg_(parts) { var q = 0, sum = 0; (parts || []).forEach(function (p) { q += Number(p[1]); sum += Number(p[1]) * Number(p[2]); }); return q ? Math.round(sum / q * 100) / 100 : ''; }
 /** 酷柏更正成本(到貨後才算出實際成本):更新已入帳的訂單品項、庫存進貨與商品成本;還沒入帳(待對應/待確認)的也一起改。已記錄廠商付款的不動 */
 function cbCostIn_(d) {
@@ -3203,14 +3212,20 @@ function cbArrIn_(d) {
   var c = CacheService.getScriptCache(), bk = 'cbarr_' + t_(d.batch, 80);
   if (d.batch) { var prev = c.get(bk); if (prev) { var pr = JSON.parse(prev); pr.dup = true; pr.added = 0; return pr; } } // 同一批重送:不重複入帳
   var prods = {}; rows_('商品').forEach(function (p) { prods[String(p.商品ID)] = p; });
-  var st = settings_(), auto = [], unk = [];
+  var st = settings_(), auto = [], unk = [], already = 0, pw = {};
+  cbPend_().forEach(function (x) { (x.lots || []).forEach(function (t) { if (t[2]) pw[String(t[2])] = 1; }); });
   (d.items || []).slice(0, 300).forEach(function (it) {
+    // 同一筆批發單再 KEY 一次(先改回未到貨又改到貨):這邊已經入帳、而且還是到貨狀態的件數不再入帳;已在待對應的也不重複加
+    if (it && Array.isArray(it.lots) && it.lots.length && it.lots.every(function (t) { return t && t[2]; })) {
+      var keep = it.lots.filter(function (t) { var w = String(t[2]); if (pw[w] || cbWidDone_(w)) { already += Math.floor(Number(t[0])) || 0; return false; } return true; });
+      if (keep.length !== it.lots.length) { it = JSON.parse(JSON.stringify(it)); it.lots = keep; it.qty = keep.reduce(function (a, t) { return a + (Math.floor(Number(t[0])) || 0); }, 0); }
+    }
     var q = Math.floor(Number(it && it.qty)); if (!it || !it.proid || !(q >= 1)) return;
     var m = cbMapGet_(it, st, prods);
     if (m) auto.push({ pid: m.pid, spec: m.spec, qty: q, price: it.price, lots: cbLots_(it), text: t_(it.title, 40) }); else unk.push(it);
   });
   RDYN_ = [];
-  var res = { ok: true, auto: 0, stock: 0, skip: 0, pending: 0, added: unk.length }, text = '';
+  var res = { ok: true, auto: 0, stock: 0, skip: 0, pending: 0, added: unk.length, already: already }, text = '';
   if (auto.length) {
     var opt = { auto: true, head: '📦 酷柏到貨(已自動入帳)' }, pv = arrPlan_(auto, opt); CBST_ = { same: 0, chg: 0 };
     if (opt.plan) {

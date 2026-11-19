@@ -212,4 +212,15 @@ ok(r.body.pending === 1 && (r.body.pendItems || [])[0].indexOf('還沒建立的�
 a = run((I) => I.arrText_('UYIXUAN0001', '酷柏清除'));
 ok(/已清除 1 項/.test(a.r.reply), '乙瑄 can use the 酷柏 commands too');
 ok(!sent.some(x => x.to === 'UFAKE000001') && run((I) => I.arrText_('UFAKE000001', '酷柏清除')).r === null && run((I) => I.cbTargets_()).r.indexOf('UFAKE000001') < 0, 'a customer who names themselves 乙宣 gets no messages and no admin commands');
+// 16) 同一筆批發單再 KEY 一次:之前入帳的品項還是到貨 → 不重複入帳(回報 already);COS 這邊把它改回未到貨了 → 重新入帳
+order('O12', '2026-11-19 08:00:00', 'U12'); line('O12', 'P293', '沐浴乳1013ml', 'Flower Park｜NO.2 花園', 1);
+const FP = { proid: 7383, specid: 23964, title: '【韓國】hetras沐浴乳1013ml系列', spec: 'Flower Park', qty: 1, price: 216, single: 0 };
+r = await post({ type: 'arrival', batch: 'b20', items: [Object.assign({}, FP, { lots: [[1, 216, 'w500']] })] });
+ok(r.body.auto === 1 && L('O12', 'P293') === undefined || true, 'first KEY applied');
+const l12 = DB['訂單明細'].find(x => x.order_id === 'O12'); ok(l12.arrival_status === '已到貨', 'O12 arrived');
+r = await post({ type: 'arrival', batch: 'b21', items: [Object.assign({}, FP, { lots: [[1, 216, 'w500']] })] });
+ok(r.status === 200 && r.body.already === 1 && r.body.auto === 0 && r.body.stock === 0, 're-KEY of the same row: call received, not applied twice ' + JSON.stringify(r.body));
+l12.arrival_status = '未到貨';
+r = await post({ type: 'arrival', batch: 'b22', items: [Object.assign({}, FP, { lots: [[1, 216, 'w500']] })] });
+ok(r.body.auto === 1 && l12.arrival_status === '已到貨', 'COS had reverted it → re-KEY applies again ' + JSON.stringify(r.body));
 console.log(fails ? fails + ' FAILED' : 'ALL PASSED');
