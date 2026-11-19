@@ -260,4 +260,11 @@ ok(setv('酷柏對照 7700|*') === '' && !a.r.binds.some(b => b.key === '7700|*'
 er = ''; try { run((I) => I.adminCbUnbind(TK, 'P088', '7701|*')); } catch (e) { er = String(e.message); } ok(/不屬於/.test(er), 'cannot unbind another product binding');
 const lst = run((I) => I.cbBindOf_([{ id: 7701, title: 't', specs: [{ id: 56, title: '標準' }] }])).r;
 ok(/^P073 固體擴香膏\(07五星級\)/.test(lst[0].bound), 'search result shows current binding ' + lst[0].bound);
+// 19) 新增商品時一起綁定(按一次儲存):商品建立＋綁定；規格對不上整筆不存
+const nP0 = DB['商品'].length;
+a = run((I) => I.adminSaveProduct(TK, { name: '無極限控油定妝噴霧100ml', price: 800, type: '預購', unlimited: true, specs: [], cats: [], vendor: '酷柏', source: '', cost: '', taxIncl: true, on: true, desc: '', tiers: '', img: '', arrival: '', close: '', cb: { proid: 1163, title: '【美妝】SHU UEMURA植村秀無極限控油定妝噴霧100ml', single: true, cspec: '' } }));
+const nP = DB['商品'].find(x => x.name === '無極限控油定妝噴霧100ml');
+ok(DB['商品'].length === nP0 + 1 && nP && setv('酷柏對照 1163|*') === nP.id + '|' && setv('酷柏品名 1163') === '【美妝】SHU UEMURA植村秀無極限控油定妝噴霧100ml', 'new product + binding in one save ' + (nP && nP.id));
+er = ''; try { run((I) => I.adminSaveProduct(TK, { name: '測試錯規格', price: 1, type: '預購', unlimited: true, specs: ['黑'], cats: [], vendor: '酷柏', on: false, cb: { proid: 1164, title: 'x', single: true, cspec: '白' } })); } catch (e) { er = String(e.message); }
+ok(/不在這個商品裡/.test(er), 'bad spec in save → error: ' + er);
 console.log(fails ? fails + ' FAILED' : 'ALL PASSED');

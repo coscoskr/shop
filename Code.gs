@@ -824,6 +824,7 @@ function adminSaveProduct(tk, d) {
     put_('商品', old ? old._r : 0, row);
     put_('商品_內部', oi ? oi._r : 0, inn);
     log_(u.acc, old ? '修改商品' : '新增商品', id + ' ' + name, old ? [diff_(old, row), diff_(oi, inn)].filter(function (x) { return x && x !== '新增'; }).join(';') : '新增');
+    if (d.cb && d.cb.proid) cbBindDo_(u, id, d.cb); // 同一次儲存一起綁定酷柏商品(規格不對會整筆不存,畫面會顯示原因)
     return adminProducts_();
   } finally { L.releaseLock(); }
 }
@@ -3344,8 +3345,14 @@ function adminCbBinds(tk, pid) { me_(tk); return { binds: cbBinds_(String(pid)),
 /** 後台綁定:d = {proid, title, single, rows:[{specid, stitle, cspec}]};整個商品沒分款式(single)時用 proid|* 一次綁全部規格 */
 function adminCbBind(tk, pid, d) {
   var u = me_(tk), msg = '';
+  lk_(function () { msg = cbBindDo_(u, pid, d); });
+  var o = adminCbBinds(tk, pid); o.msg = msg; return o;
+}
+/** 綁定酷柏商品(呼叫端負責鎖):回傳提示文字(待對應裡的貨已自動入帳時) */
+function cbBindDo_(u, pid, d) {
+  var msg = '';
   d = d || {};
-  lk_(function () {
+  (function () {
     pid = String(pid || ''); var p = rows_('商品').filter(function (x) { return String(x.商品ID) === pid; })[0];
     if (!p) throw new Error('找不到這個商品');
     var proid = String(Math.floor(Number(d.proid)) || ''); if (!proid || proid === '0') throw new Error('酷柏商品編號不正確');
@@ -3365,8 +3372,8 @@ function adminCbBind(tk, pid, d) {
     RDYN_ = []; var r = cbPendAuto_(); // 待對應裡剛好有這個酷柏商品:立刻入帳並通知客人
     if (r) { cbTell_(r); msg = '待對應裡的這個酷柏商品已自動入帳'; }
     var rr = {}; cbRdyTell_(rr);
-  });
-  var o = adminCbBinds(tk, pid); o.msg = msg; return o;
+  })();
+  return msg;
 }
 /** 清掉一個酷柏商品的對照;sids 有給時只清那些規格編號(以及文字對照與整個商品的對照) */
 function cbClear_(proid, sids) {
