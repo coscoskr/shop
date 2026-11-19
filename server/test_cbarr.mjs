@@ -191,6 +191,8 @@ r = await post({ type: 'poke' });
 ok(r.body.auto === 1 && r.body.pending === 0 && L('O10', 'P295').arrival_status === '已到貨', 'poke auto-applies the pending item ' + JSON.stringify(r.body));
 // 15) 通知對象:到貨管理員＋乙瑄(從會員資料找 LINE ID);多出來的數量 → 現貨;商品已下架/已關團 → 自動上架只賣現貨,通知「有現貨可以販售」
 DB['會員'].push({ line_id: 'UYIXUAN0001', nickname: 'yx', real_name: '乙瑄' });
+DB['會員'].push({ line_id: 'UFAKE000001', nickname: '乙宣', real_name: '乙宣' }); // 客人自己取名「乙宣」:不能因此變成通知對象/管理員
+DB['設定'].push({ key: '酷柏通知對象', value: 'UYIXUAN0001' });
 DB['商品'].push({ id: 'P296', name: 'Kuromi聯名擴香3入禮盒組', categories: '', sale_type: '預購', price: 1100, stock: null, specs: '', on_sale: 'N', brand: 'Hetras', close_date: '2026-11-01' });
 order('O11', '2026-11-10 10:00:00', 'U11'); line('O11', 'P296', 'Kuromi聯名擴香3入禮盒組', '', 1);
 sent.length = 0;
@@ -209,4 +211,5 @@ r = await post({ type: 'arrival', batch: 'b13', items: [{ proid: 9998, specid: 1
 ok(r.body.pending === 1 && (r.body.pendItems || [])[0].indexOf('還沒建立的商品') >= 0 && sent.some(x => x.to === 'UYIXUAN0001' && /找不到對應的商品/.test(x.text)), 'unmatched → reported with item names, 乙瑄 notified');
 a = run((I) => I.arrText_('UYIXUAN0001', '酷柏清除'));
 ok(/已清除 1 項/.test(a.r.reply), '乙瑄 can use the 酷柏 commands too');
+ok(!sent.some(x => x.to === 'UFAKE000001') && run((I) => I.arrText_('UFAKE000001', '酷柏清除')).r === null && run((I) => I.cbTargets_()).r.indexOf('UFAKE000001') < 0, 'a customer who names themselves 乙宣 gets no messages and no admin commands');
 console.log(fails ? fails + ' FAILED' : 'ALL PASSED');

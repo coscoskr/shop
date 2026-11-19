@@ -236,7 +236,8 @@ function rdyCut_(pid, sp, q) {
   while (q > 0 && l.length) { var x = l[l.length - 1], t = Math.min(q, Number(x[0])); x[0] = Number(x[0]) - t; q -= t; if (x[0] <= 0) l.pop(); }
   rdySave_(pid, o);
 }
-var RDYN_ = []; // 這次新增的現貨(通知用)
+var RDYN_ = []; // 這次新增的現貨(通知用);每個酷柏請求開頭都要清空,避免同一個執行個體裡別的請求(後台手動進貨)留下的項目被誤報
+function cbRdyReset_() { RDYN_ = []; }
 /** 把這次新增的現貨通知到貨管理員與通知對象(有現貨可以販售),並清空 */
 function cbRdyTell_(res) {
   if (!RDYN_.length) return;
@@ -2834,18 +2835,12 @@ function setSet_(k, v) {
   put_('設定', ex ? ex._r : 0, { '項目': k, '值': v });
 }
 function arrIsAdmin_(uid) { var a = String(settings_().到貨管理員LINE || ''); return (!!a && a === String(uid)) || (!!uid && cbTargets_().indexOf(String(uid)) >= 0); }
-/** 酷柏到貨的通知對象:到貨管理員＋設定「酷柏通知對象」(預設乙瑄;可填 LINE ID 或姓名,多個用逗號分開)。姓名從會員資料、再從訂單找 LINE ID */
+/** 酷柏到貨的通知對象:到貨管理員＋設定「酷柏通知對象」(只收 LINE ID,多個用逗號分開)。
+    不用姓名/暱稱去找:那兩個欄位客人自己就能填,任何人改名成「乙宣」就會變成到貨管理員、收到成本與客人資料。 */
 function cbTargets_() {
-  var st = settings_(), out = [], add = function (u) { u = String(u || ''); if (/^U[0-9A-Za-z]{4,40}$/.test(u) && out.indexOf(u) < 0) out.push(u); };
+  var st = settings_(), out = [], add = function (u) { u = String(u || '').trim(); if (/^U[0-9A-Za-z]{4,40}$/.test(u) && out.indexOf(u) < 0) out.push(u); };
   add(st.到貨管理員LINE);
-  var want = String(st.酷柏通知對象 === undefined ? '乙瑄,乙宣' : st.酷柏通知對象).split(/[,，、\s]+/).filter(Boolean);
-  want.forEach(function (w) {
-    if (/^U[0-9a-f]{32}$/.test(w)) { add(w); return; }
-    var m = rows_('會員').filter(function (r) { return String(r.姓名) === w || String(r.暱稱) === w; })[0];
-    if (m && m['LINE ID']) { add(m['LINE ID']); return; }
-    var o = rows_('訂單').filter(function (r) { return String(r.姓名) === w && r['LINE ID']; }).sort(function (a, b) { return String(b.下單時間).localeCompare(String(a.下單時間)); })[0];
-    if (o) add(o['LINE ID']);
-  });
+  String(st.酷柏通知對象 || '').split(/[,，、\s]+/).forEach(add);
   return out;
 }
 function cbTell_(text) { var n = 0; cbTargets_().forEach(function (u) { if (pushLine_(u, String(text).slice(0, 4900))) n++; }); return n; }
