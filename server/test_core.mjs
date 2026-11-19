@@ -52,6 +52,14 @@ r = await call('getShop'); ok(r.result.products[0].stock === 3, 'failed order di
   r = await call('getShop'); ok(r.result.products.length === 1, 'back on shop');
   Date.now = real;
 }
+{ // 到貨日期:下單後N週
+  const base = { id: pid, name: '測試鞋', price: 800, stock: 3, type: '預購', tiers: '', cats: ['鞋'], on: true, vendor: 'B', cost: 400, taxIncl: true, source: 'TW', brand: 'Nike' };
+  r = await call('adminSaveProduct', tk, { ...base, arrival: '下單後3週' }); ok(r.ok, 'arrival 下單後3週 saved');
+  r = await call('getShop'); ok(r.result.products[0].arrival === '下單後3週', 'shop shows weeks');
+  r = await call('adminSaveProduct', tk, { ...base, arrival: '下單後0週' }); ok(!r.ok, 'weeks 0 rejected');
+  r = await call('adminSaveProduct', tk, { ...base, arrival: '下單後53週' }); ok(!r.ok, 'weeks 53 rejected');
+  r = await call('adminSaveProduct', tk, { ...base, type: '現貨', arrival: '' }); ok(r.ok, 'reset');
+}
 r = await call('adminOrders', tk, {}); ok(r.ok, 'adminOrders');
 r = await call('nope'); ok(!r.ok, 'unknown fn rejected');
 r = await call('setup'); ok(!r.ok, 'setup not callable');

@@ -265,6 +265,8 @@ function adjStock_(p, sp, delta) {
 }
 var RDYC_ = null; // 這次組前台資料用的現貨表
 function imgs_(v) { return String(v || '').split('|').map(img_).filter(Boolean); }
+/** 到貨日期可以是:日期(yyyy-MM-dd)、排隊中、下單後N週(N=1~52) */
+function etaOk_(v) { v = String(v || ''); return v === '排隊中' || /^\d{4}-\d{2}-\d{2}$/.test(v) || (/^下單後([1-9]\d?)週$/.test(v) && +/\d+/.exec(v)[0] <= 52); }
 /** 關團:關團日期當天台灣時間下午 14:00 起視同下架(資料庫每分鐘也會自動把上架改成 N) */
 function closeAt_(v) {
   var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(v || '').trim()); if (!m) return 0;
@@ -766,7 +768,7 @@ function adminSaveProduct(tk, d) {
       if (!(stock >= 0)) throw new Error('數量不正確');
     }
     if (['現貨', '預購'].indexOf(d.type) < 0) throw new Error('請選擇現貨或預購');
-    if (d.arrival && d.arrival !== '排隊中' && !/^\d{4}-\d{2}-\d{2}$/.test(d.arrival)) throw new Error('到貨日期格式不正確');
+    if (d.arrival && !etaOk_(d.arrival)) throw new Error('到貨日期格式不正確(日期、排隊中,或下單後 1~52 週)');
     tiers_(d.tiers, true);
     var cl = String(d.close || '').trim();
     if (cl && !closeAt_(cl)) throw new Error('關團日期格式不正確');
@@ -1517,7 +1519,7 @@ function adminEditLineFull(tk, oid, pid, d) {
       if (chg && l.廠商付款ID) throw new Error('此品項已記錄廠商付款(' + l.廠商付款ID + '),請先到「進貨付款」刪除該筆付款紀錄,才能改廠商、成本、貨源');
       if (!chg) newInfo = null; else extra += ';廠商/成本/貨源已更新';
       var eta = String(d.eta || '');
-      if (eta && eta !== '排隊中' && !/^\d{4}-\d{2}-\d{2}$/.test(eta)) throw new Error('到貨日期格式不正確');
+      if (eta && !etaOk_(eta)) throw new Error('到貨日期格式不正確(日期、排隊中,或下單後 1~52 週)');
       if (p && eta !== String(p.到貨日期 || '')) { var pn = cp_(p); pn.到貨日期 = eta; put_('商品', p._r, pn); extra += ';到貨日期→' + eta; }
     }
     var n = cp_(l);
