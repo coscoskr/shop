@@ -136,7 +136,7 @@ function busy(d) {
   BUSY += d; if (BUSY < 0) BUSY = 0; clearTimeout(BT);
   if (BUSY > 0) BT = setTimeout(function () { $('#busy').classList.add('on'); }, 400); else $('#busy').classList.remove('on');
 }
-var READFN = /^(admin(Init|Orders|Products|PurchaseList|StockView|Report|Settings|Levels|Vendors|Brands|Cats|Carriers|Members|MemberGrants|Logs|Codes|Activities|LineHistory|LineInfo|ShipHistory|ShipQuote|ProxyQuote|HistBindList|Admins|Login|ShipPrinted)|quote)$/, DQN = 0;
+var READFN = /^(admin(Init|Orders|Products|PurchaseList|StockView|Report|Settings|Levels|Vendors|Brands|Cats|Carriers|Members|MemberGrants|Logs|Codes|Activities|LineHistory|LineInfo|ShipHistory|ShipQuote|ProxyQuote|HistBindList|Admins|Login|ShipPrinted|CbBinds|CbSearch)|quote)$/, DQN = 0;
 function call(fn) {
   var a = [].slice.call(arguments, 1), q = $('#dq'), mine = !READFN.test(fn) && !q.open;
   busy(1);
@@ -649,17 +649,20 @@ function cbBind(p, id) {
     var n = cbNm(name), hit = []; list.forEach(function (x, i) { if (n && x.on && cbNm(x.title).indexOf(n) >= 0) hit.push(i); });
     return hit.length === 1 ? hit[0] : -1;
   };
+  var seq = 0;
   var run = function (q, fromName) {
     if (!q || q === lastQ) return; lastQ = q;
+    var my = ++seq; // 只採用最後一次搜尋的結果(打字中舊的結果晚回來不會蓋掉)
     res.innerHTML = '<p class="m">正在找酷柏商品…</p>';
     call('adminCbSearch', T, q).then(function (l) {
+      if (my !== seq) return;
       if (!l.length && fromName && q.length > 6) return run(q.slice(0, 6), true); // 品名太長找不到:用前面幾個字再找一次
       l.sort(function (a, b) { return (b.on - a.on); }); list = l.slice(0, 6);
       var nm = f.elements.name.value;
       sel = (fromName && auto) ? pickBest(nm) : -1;
       if (sel >= 0 && !f.elements.vendor.value) f.elements.vendor.value = '酷柏';
       drawList(!list.length ? '酷柏找不到相近的商品,可以在上面改關鍵字搜尋。' : sel >= 0 ? '✔ 已自動選出最符合的酷柏商品,請確認;不對就改選。' : '找到 ' + list.length + ' 個相近的酷柏商品,請選一個(按「儲存」時一起綁定)。');
-    }).catch(function (e) { res.innerHTML = '<p class="er">' + esc(e.message) + '</p>'; });
+    }).catch(function (e) { if (my === seq) res.innerHTML = '<p class="er">' + esc(e.message) + '</p>'; });
   };
   var find = function () {
     if (bound.length) return;
@@ -670,7 +673,10 @@ function cbBind(p, id) {
   res.addEventListener('change', function (e) {
     if (e.target.name === 'cbpick') { sel = +e.target.value; auto = false; if (sel >= 0 && !f.elements.vendor.value) f.elements.vendor.value = '酷柏'; drawList(''); }
   });
-  f.elements.name.addEventListener('input', function () { clearTimeout(tmr); tmr = setTimeout(find, 700); });
+  // 背景搜尋:不跳視窗、不搶游標;注音/拼音選字中不搜尋,停止打字 1 秒後才找
+  var kick = function () { clearTimeout(tmr); tmr = setTimeout(find, 1000); };
+  f.elements.name.addEventListener('input', function (e) { if (e.isComposing) return; kick(); });
+  f.elements.name.addEventListener('compositionend', kick);
   f.elements.vendor.addEventListener('change', function () { lastQ = ''; find(); });
   var remap = function () { if (sel >= 0 && list[sel]) { var k = keepNow(), box2 = res.querySelector('.cbsel .cbmap'); if (box2) box2.outerHTML = mapHtml(list[sel], k); } };
   new MutationObserver(remap).observe($('#spl'), { childList: true, subtree: true }); $('#spl').addEventListener('change', remap); // 規格改了,對應選單跟著更新
