@@ -253,6 +253,19 @@ function rdyLine_(p, l) { return rdyIs_(p) && String(l.型態) === '現貨' && S
 function lineBack_(p, l, sp, q) {
   if (rdyLine_(p, l)) rdyAdd_(String(p.商品ID), sp, q, l.成本); else adjStock_(p, sp, q);
 }
+/** 拆單:把一筆訂單品項拆成兩列(同一張訂單、同商品同規格)。原列改成 keep 件,剩下的另開一列。
+    新列的商品ID 是「商品ID~規格~序號」(bp_ 取商品ID、前後台取規格的方式都相容),其他欄位照抄。回傳新列的商品ID;不需要拆回 null */
+function lineSplit_(l, keep) {
+  var q = Number(l.數量), rest = q - keep; if (!(keep >= 1) || !(rest >= 1)) return null;
+  var base = bp_(l.商品ID), sp = String(l.規格 || ''), n = 2, used = {};
+  rows_('訂單明細').forEach(function (x) { if (String(x.訂單ID) === String(l.訂單ID)) used[String(x.商品ID)] = 1; });
+  while (used[base + '~' + sp + '~' + n]) n++;
+  var a = cp_(l); a.數量 = keep; a.小計 = keep * Number(l.單價);
+  var b = {}; H['訂單明細'].forEach(function (k) { b[k] = l[k] === undefined ? '' : l[k]; });
+  b.商品ID = base + '~' + sp + '~' + n; b.數量 = rest; b.小計 = rest * Number(l.單價);
+  put_('訂單明細', l._r, a); put_('訂單明細', 0, b);
+  return b.商品ID;
+}
 /** 增減庫存(delta 負=扣庫存):有設定數量的規格扣該規格,商品總數量也同步 */
 function adjStock_(p, sp, delta) {
   var ps = specParse_(p);
@@ -342,10 +355,16 @@ function placeCore_(want, ctx, o, name, phone, email, who, notePre) {
     var innM = {}; rows_('商品_內部').forEach(function (r) { innM[String(r.商品ID)] = r; });
     c.lines.forEach(function (l) {
       var p = l[0], inStock = p.銷售型態 === '現貨', lpid = l[3] ? String(p.商品ID) + '~' + l[3] : String(p.商品ID);
-      var rc = inStock ? null : rdyTake_(String(p.商品ID), l[3] || '', l[1]); // 預購商品:這個規格的現貨夠這筆的數量,就整筆用現貨(不佔預購名額)
-      if (rc === null) adjStock_(p, l[3] || '', -l[1]); else inStock = true;
-      put_('訂單明細', 0, { '訂單ID': oid, '商品ID': lpid, '規格': l[3] || '', '品名': p.名稱, '數量': l[1], '單價': l[2], '小計': l[1] * l[2], '到貨狀態': inStock ? '已到貨' : '待到貨', '可出貨': inStock ? 'Y' : 'N', '型態': rc !== null ? '現貨' : p.銷售型態,
-        '廠商': (innM[String(p.商品ID)] || {}).廠商 || '', '成本': (rc !== null && rc !== '') ? rc : ((innM[String(p.商品ID)] || {}).成本 === undefined ? '' : (innM[String(p.商品ID)] || {}).成本), '成本含稅': (innM[String(p.商品ID)] || {}).成本含稅 || 'N', '貨源': (innM[String(p.商品ID)] || {}).貨源 || '', '叫貨狀態': inStock ? '已叫貨' : '', '叫貨人': rc !== null ? RDY_WHO_ : inStock ? '系統' : '', '叫貨時間': inStock ? now_() : '' });
+      // 預購商品:這個規格有現貨就先用現貨(已到貨、可出貨、不佔預購名額);現貨不夠這筆的數量就拆成兩列——現貨一列、剩下的預購一列
+      var inn0 = innM[String(p.商品ID)] || {}, sp0 = l[3] || '';
+      var rq = inStock ? 0 : Math.min(l[1], rdyQty_(rdyGet_(String(p.商品ID)), sp0)), pre = l[1] - rq;
+      var mk = function (id, qty, rc) {
+        var st = inStock || rc !== null;
+        put_('訂單明細', 0, { '訂單ID': oid, '商品ID': id, '規格': sp0, '品名': p.名稱, '數量': qty, '單價': l[2], '小計': qty * l[2], '到貨狀態': st ? '已到貨' : '待到貨', '可出貨': st ? 'Y' : 'N', '型態': rc !== null ? '現貨' : p.銷售型態,
+          '廠商': inn0.廠商 || '', '成本': (rc !== null && rc !== '') ? rc : (inn0.成本 === undefined ? '' : inn0.成本), '成本含稅': inn0.成本含稅 || 'N', '貨源': inn0.貨源 || '', '叫貨狀態': st ? '已叫貨' : '', '叫貨人': rc !== null ? RDY_WHO_ : st ? '系統' : '', '叫貨時間': st ? now_() : '' });
+      };
+      if (rq > 0) mk(lpid, rq, rdyTake_(String(p.商品ID), sp0, rq));
+      if (pre > 0) { adjStock_(p, sp0, -pre); mk(rq > 0 ? String(p.商品ID) + '~' + sp0 + '~2' : lpid, pre, null); }
     });
     var detail = c.credit > 0 ? spend_(ctx.lid, c.credit) : {};
     put_('訂單', 0, { '訂單ID': oid, '下單時間': now_(), '姓名': name, '電話': phone, '付款方式': '', '狀態': '已下訂', '商品金額': c.sub, '運費': c.fee, '總額': c.total, '收件資訊': ship, '備註': t_((notePre || '') + (o.note || ''), 200),
@@ -2859,7 +2878,7 @@ function arrCands_() {
 function arrPlan_(items, opt) {
   var prods = {}; rows_('商品').forEach(function (p) { prods[String(p.商品ID)] = p; });
   var pend = arrPend_(), taken = {}, ords = {}, mem = {};
-  pend.forEach(function (pl) { pl.assign.forEach(function (a) { taken[a.oid + '|' + a.pid] = 1; }); });
+  pend.forEach(function (pl) { pl.assign.forEach(function (a) { taken[a.oid + '|' + a.pid] = (taken[a.oid + '|' + a.pid] || 0) + Number(a.qty); }); }); // 待確認預覽已經分掉的件數
   rows_('訂單').forEach(function (o) { ords[String(o.訂單ID)] = o; });
   rows_('會員').forEach(function (m) { mem[String(m['LINE ID'])] = m; });
   var agg = {}, order = [], unk = [], cbSkip = [];
@@ -2885,18 +2904,20 @@ function arrPlan_(items, opt) {
     var a = agg[k], left = a.qty, got = [];
     if (a.lots && a.price !== '') plan.cost[a.pid] = a.price; // 酷柏:商品成本跟著最新進價
     var cand = lines.filter(function (l) {
-      return bp_(l.商品ID) === a.pid && String(l.規格 || '') === a.spec && ['已到貨', '已出貨'].indexOf(String(l.到貨狀態)) < 0 && !l.出貨單ID && !taken[l.訂單ID + '|' + l.商品ID] && ords[String(l.訂單ID)];
+      return bp_(l.商品ID) === a.pid && String(l.規格 || '') === a.spec && ['已到貨', '已出貨'].indexOf(String(l.到貨狀態)) < 0 && !l.出貨單ID && (taken[l.訂單ID + '|' + l.商品ID] || 0) < Number(l.數量) && ords[String(l.訂單ID)];
     }).sort(function (x, y) {
       var tx = String(ords[String(x.訂單ID)].下單時間 || ''), ty = String(ords[String(y.訂單ID)].下單時間 || '');
       return tx < ty ? -1 : tx > ty ? 1 : (String(x.訂單ID) < String(y.訂單ID) ? -1 : 1);
     });
+    // 照下單先後分:先下單的先拿;到貨數不夠這位客人的數量就拆單(先到幾件算幾件,剩下的留在原本的順位繼續等),不會跳給後面的客人
     cand.forEach(function (l) {
-      var q = Number(l.數量), o = ords[String(l.訂單ID)], who = buyerName_(o, mem);
-      if (q <= left) { var tk = a.lots ? cbTake_(a.lots, q) : null; left -= q; taken[l.訂單ID + '|' + l.商品ID] = 1; plan.assign.push({ oid: String(l.訂單ID), pid: String(l.商品ID), name: a.name, spec: a.spec, qty: q, who: who, cost: tk ? tk.cost : '', cw: tk ? tk.parts : [] }); got.push('  ✔ ' + l.訂單ID + ' ' + who + ' ×' + q); }
-      else plan.skip.push(a.name + (a.spec ? '(' + a.spec + ')' : '') + ' ' + l.訂單ID + ' ' + who + ' 要 ' + q + ' 件,到貨數不夠分,先略過');
+      if (left <= 0) return;
+      var k = l.訂單ID + '|' + l.商品ID, q = Number(l.數量) - (taken[k] || 0), o = ords[String(l.訂單ID)], who = buyerName_(o, mem), take = Math.min(q, left);
+      var tk = a.lots ? cbTake_(a.lots, take) : null; left -= take; taken[k] = (taken[k] || 0) + take;
+      plan.assign.push({ oid: String(l.訂單ID), pid: String(l.商品ID), name: a.name, spec: a.spec, qty: take, who: who, cost: tk ? tk.cost : '', cw: tk ? tk.parts : [] });
+      got.push('  ✔ ' + l.訂單ID + ' ' + who + ' ×' + take + (take < q ? '(訂 ' + q + ' 件,先到 ' + take + ' 件,剩 ' + (q - take) + ' 件繼續等)' : ''));
     });
-    if (left > 0 && plan.skip.some(function (x) { return x.indexOf(a.name) === 0; })) got.push('  ❓ 還剩 ' + left + ' 件沒分配(有客人的數量大於剩餘,不能拆單),先不轉庫存,請到後台處理');
-    else if (left > 0) { var ts = a.lots && a.lots.length ? cbTake_(a.lots, left) : null; plan.surplus.push({ pid: a.pid, spec: a.spec, qty: left, price: ts && ts.cost !== '' ? ts.cost : a.price, cw: ts ? ts.parts : [], name: a.name }); got.push('  ➕ 現貨庫存 ×' + left); }
+    if (left > 0) { var ts = a.lots && a.lots.length ? cbTake_(a.lots, left) : null; plan.surplus.push({ pid: a.pid, spec: a.spec, qty: left, price: ts && ts.cost !== '' ? ts.cost : a.price, cw: ts ? ts.parts : [], name: a.name }); got.push('  ➕ 現貨庫存 ×' + left); }
     msg.push('・' + a.name + (a.spec ? '(' + a.spec + ')' : '') + ' 到 ' + a.qty + ' 件' + (a.price !== '' ? ',進價 ' + a.price : '') + '\n' + (got.join('\n') || '  (沒有待到貨的訂單)'));
   });
   var head = (opt && opt.head) || '📦 到貨預覽';
@@ -2910,6 +2931,14 @@ function arrPlan_(items, opt) {
   t += cbNote;
   return t + (opt && opt.auto ? '' : '\n\n回「確認」入帳並通知客人;回「取消」放棄。');
 }
+/** 找到貨要入帳的那一列:原本那列還沒到就用它;已經到了(先前拆過單)就找同一張訂單、同商品同規格、還在等的那一列 */
+function arrLine_(oid, pid) {
+  var ls = rows_('訂單明細').filter(function (x) { return String(x.訂單ID) === oid; }), wait = function (x) { return ['已到貨', '已出貨'].indexOf(String(x.到貨狀態)) < 0 && !x.出貨單ID; };
+  var l = ls.filter(function (x) { return String(x.商品ID) === pid; })[0];
+  if (l && wait(l)) return l;
+  if (!l) return null;
+  return ls.filter(function (x) { return bp_(x.商品ID) === bp_(pid) && String(x.規格 || '') === String(l.規格 || '') && wait(x); })[0] || null;
+}
 /** 套用所有待確認的到貨計畫(plans 有給時只套用指定的計畫,不動待確認清單) */
 function arrApply_(plans, why) {
   var pend = plans || arrPend_(); if (!pend.length) return '目前沒有待確認的到貨(可能已超過 6 小時失效),請重新轉傳。';
@@ -2917,8 +2946,13 @@ function arrApply_(plans, why) {
   var meta = null;
   pend.forEach(function (pl) {
     pl.assign.forEach(function (a) {
-      var l = rows_('訂單明細').filter(function (x) { return String(x.訂單ID) === a.oid && String(x.商品ID) === a.pid; })[0];
-      if (!l || ['已到貨', '已出貨'].indexOf(String(l.到貨狀態)) >= 0 || l.出貨單ID) { miss.push(a.oid + ' ' + a.name); return; }
+      var l = arrLine_(a.oid, a.pid);
+      if (!l) { miss.push(a.oid + ' ' + a.name); return; }
+      if (Number(a.qty) < Number(l.數量)) { // 只到一部分:拆單,到的這幾件留在原列,剩下的另開一列繼續等
+        var rid = lineSplit_(l, Number(a.qty)), lid = String(l.商品ID);
+        log_(WHO, '拆單', a.oid + ' ' + a.name, '訂 ' + l.數量 + ' 件,先到 ' + a.qty + ' 件;剩 ' + (Number(l.數量) - Number(a.qty)) + ' 件另開一列(' + rid + ')繼續等');
+        l = rows_('訂單明細').filter(function (x) { return String(x.訂單ID) === a.oid && String(x.商品ID) === lid; })[0];
+      }
       var n = cp_(l); n.到貨狀態 = '已到貨'; n.可出貨 = 'Y'; n.到貨操作人 = WHO; n.到貨時間 = now_(); ordOk_(n, WHO);
       var cc = cbCost_(n, l, a.cost, meta || (meta = lineMeta_(true))); cbLink_(a.oid + '|' + a.pid, a.cw);
       put_('訂單明細', l._r, n);
@@ -3029,9 +3063,11 @@ function cbCostIn_(d) {
   return res;
 }
 /** 成本同步:把酷柏的成本寫進這筆訂單品項(已記錄廠商付款的不動;廠商、貨源、含稅沿用原本的設定)。回傳要接在操作紀錄後面的文字 */
+var CBST_ = { same: 0, chg: 0 }; // 這次酷柏到貨:成本原本就一致幾筆、被更新幾筆
 function cbCost_(n, l, cost, meta) {
   if (cost === '' || cost === undefined || cost === null || !(Number(cost) > 0) || l.廠商付款ID) return '';
   var m = meta(l);
+  if (String(m.cost) === String(Number(cost))) CBST_.same++; else CBST_.chg++;
   n.廠商 = m.vendor; n.成本 = Number(cost); n.成本含稅 = m.tax ? 'Y' : 'N'; n.貨源 = m.src;
   return String(m.cost) === String(Number(cost)) ? '' : ';成本:' + m.cost + '→' + Number(cost) + '(酷柏實際進價)';
 }
@@ -3089,6 +3125,44 @@ function cbDone_(plans) {
   (plans || []).forEach(function (pl) { (pl.cb || []).forEach(function (m) { cbMapPut_(m); ks[m.k] = 1; n++; }); });
   if (n) cbPendSave_(cbPend_().filter(function (x) { return !ks[cbPk_(x)]; }));
 }
+/* 自動對照(不用人確認):品牌、品名、規格都對得上、而且全店只有一個商品規格符合 → 直接當作對照過,入帳並記住。
+   對不上或有兩個以上可能 → 才交給 AI 配對、請到貨管理員確認。 */
+function cbG_(s) { return String(s || '').replace(/【[^】]*】/g, '').replace(/[\s\-_.,，。、・·\/|｜()（）\[\]#＃+*:：'"「」]/g, '').toLowerCase(); }
+function cbGuess_(it, prods) {
+  var t = cbG_(it.title), ks = cbG_(it.spec), plain = !!it.single, hit = [];
+  if (!t) return null;
+  Object.keys(prods).forEach(function (pid) {
+    var p = prods[pid], nm = cbG_(p.名稱), br = cbG_(p.品牌);
+    if (!nm || nm.length < 3 || t.indexOf(nm) < 0) return;           // 店內品名要完整出現在酷柏品名裡
+    if (br && t.indexOf(br) < 0) return;                              // 有填品牌的話,品牌也要出現
+    var sl = specs_(p);
+    if (!sl.length) { if (plain) hit.push({ pid: pid, spec: '' }); return; }
+    var m = sl.filter(function (x) {
+      var g = cbG_(x); if (!g) return false;
+      if (!plain && ks) return g.indexOf(ks) === 0 || ks.indexOf(g) === 0; // 酷柏規格(例 Hotel Wood)對店內規格(例 Hotel Wood｜NO.7 五星級飯店)
+      return t.indexOf(g) >= 0;                                       // 酷柏沒分規格:顏色等寫在品名裡(例 …老帽-棕色 → 棕色)
+    });
+    if (m.length === 1) hit.push({ pid: pid, spec: m[0] });
+    else if (m.length > 1) hit.push(null, null);                      // 同一個商品有兩個規格都像 → 不猜
+  });
+  return hit.length === 1 && hit[0] ? hit[0] : null;
+}
+/** 待對應清單裡能自動對照的,直接入帳並記住;回傳要傳給到貨管理員的文字(沒有就空字串) */
+function cbPendAuto_() {
+  var pe = cbPend_(); if (!pe.length) return '';
+  var prods = {}; rows_('商品').forEach(function (p) { prods[String(p.商品ID)] = p; });
+  var items = [], cb = [];
+  pe.forEach(function (x) {
+    var g = cbGuess_(x, prods); if (!g) return;
+    items.push({ pid: g.pid, spec: g.spec, qty: x.qty, price: x.price, lots: cbLots_(x), text: x.title });
+    cb.push({ proid: x.proid, specid: x.specid, spec: x.spec, single: x.single, pid: g.pid, cspec: g.spec, k: cbPk_(x) });
+  });
+  if (!items.length) return '';
+  arrSave_(arrPend_().filter(function (pl) { return !(pl.cb && pl.cb.length); })); // 舊的酷柏預覽作廢,避免入帳兩次
+  var opt = { auto: true, cb: cb, head: '📦 酷柏到貨(第一次出現的品項,已自動對照並入帳)' }, pv = arrPlan_(items, opt);
+  if (!opt.plan) return '';
+  return pv + '\n\n' + arrApply_([opt.plan], '酷柏到貨自動入帳');
+}
 /** 酷柏送來一批到貨:對照過的直接入帳並通知客人,其餘記成待對應。回傳 {ok, auto, stock, skip, pending, added, dup} */
 function cbArrIn_(d) {
   d = d || {};
@@ -3103,17 +3177,22 @@ function cbArrIn_(d) {
   });
   var res = { ok: true, auto: 0, stock: 0, skip: 0, pending: 0, added: unk.length }, admin = String(st.到貨管理員LINE || ''), text = '';
   if (auto.length) {
-    var opt = { auto: true, head: '📦 酷柏到貨(已自動入帳)' }, pv = arrPlan_(auto, opt);
+    var opt = { auto: true, head: '📦 酷柏到貨(已自動入帳)' }, pv = arrPlan_(auto, opt); CBST_ = { same: 0, chg: 0 };
     if (opt.plan) {
       text = pv + '\n\n' + arrApply_([opt.plan], '酷柏到貨自動入帳');
-      res.auto = opt.plan.assign.length; res.skip = opt.plan.skip.length;
+      res.auto = opt.plan.assign.length; res.skip = opt.plan.skip.length; res.costSame = CBST_.same; res.costNew = CBST_.chg;
+      res.autoQty = 0; opt.plan.assign.forEach(function (x) { res.autoQty += Number(x.qty); });
       opt.plan.surplus.forEach(function (s) { res.stock += Number(s.qty); });
     } else {
       res.skip = auto.length;
       text = '⚠️ 酷柏到貨沒有自動入帳:\n' + auto.map(function (a) { return '・' + String(prods[a.pid].名稱) + (a.spec ? '(' + a.spec + ')' : '') + ' ×' + a.qty; }).join('\n') + '\n到貨數量不夠分給排隊中的客人(不能拆單),請到後台處理。';
     }
   }
-  if (unk.length) cbPendAdd_(unk);
+  if (unk.length) {
+    cbPendAdd_(unk);
+    var ga = cbPendAuto_(); // 第一次出現、但對得上的:直接入帳(不用等人確認)
+    if (ga) { text = (text ? text + '\n\n' : '') + ga; res.guess = 1; }
+  }
   res.pending = cbPend_().length;
   if (admin && text) pushLine_(admin, text.slice(0, 4900));
   if (d.batch) c.put(bk, JSON.stringify(res), 2592000);
@@ -3192,8 +3271,12 @@ function calc_(want, ctx, wantCredit, code) {
   var ids = Object.keys(want);
   if (!ids.length) throw new Error('購物車是空的');
   var by = {}; rows_('商品').forEach(function (p) { by[String(p.商品ID)] = p; });
-  var lines = [], sub = 0, tot = {};
-  ids.forEach(function (id) { var b = bp_(id); tot[b] = (tot[b] || 0) + want[id]; });
+  var lines = [], sub = 0, tot = {}, preTot = {}, preOf = {};
+  ids.forEach(function (id) {
+    var b = bp_(id), p0 = by[b]; tot[b] = (tot[b] || 0) + want[id];
+    preOf[id] = (p0 && rdyIs_(p0)) ? Math.max(0, want[id] - rdyQty_(rdyGet_(b), spec_(id))) : want[id]; // 扣掉可以用現貨出的,剩下才是預購
+    preTot[b] = (preTot[b] || 0) + preOf[id];
+  });
   ids.forEach(function (id) {
     var p = by[bp_(id)], n = want[id], sp = spec_(id);
     if (p && p.上架 === 'Y' && closed_(p)) throw new Error('「' + p.名稱 + '」已關團,請重新整理頁面');
@@ -3201,9 +3284,9 @@ function calc_(want, ctx, wantCredit, code) {
     var sl = specs_(p);
     if (sl.length && !sp) throw new Error('「' + p.名稱 + '」請先選擇規格');
     if (sp && sl.indexOf(sp) < 0) throw new Error('「' + p.名稱 + '」沒有「' + sp + '」這個規格,請重新整理頁面');
-    var byRdy = rdyIs_(p) && rdyQty_(rdyGet_(String(p.商品ID)), sp || '') >= n; // 現貨夠這筆:直接用現貨,不看預購名額
-    if (!byRdy && p.數量 !== '' && Number(p.數量) < tot[bp_(id)]) throw new Error('「' + p.名稱 + '」數量不足,剩 ' + Number(p.數量) + ' 件');
-    if (sp && !byRdy) { var sq = specQty_(p)[sp]; if (sq !== null && sq !== undefined && sq < n) throw new Error('「' + p.名稱 + '」' + sp + (sq ? ' 數量不足,剩 ' + sq + ' 件' : ' 已售完')); }
+    var pn = preOf[id]; // 這筆要算預購的件數(現貨夠就是 0,不看預購名額)
+    if (pn > 0 && p.數量 !== '' && Number(p.數量) < preTot[bp_(id)]) throw new Error('「' + p.名稱 + '」數量不足,剩 ' + Number(p.數量) + ' 件');
+    if (sp && pn > 0) { var sq = specQty_(p)[sp]; if (sq !== null && sq !== undefined && sq < pn) throw new Error('「' + p.名稱 + '」' + sp + (sq ? ' 數量不足,剩 ' + sq + ' 件' : ' 已售完')); }
     var u = unit_(Number(p.單價), tiers_(p.階梯價), tot[bp_(id)]);
     if (OVR_ && OVR_[id] !== undefined) u = OVR_[id];
     lines.push([p, n, u, sp]); sub += u * n;

@@ -44,11 +44,14 @@ let g = lineOf(O1, HAT + '~灰'), b = lineOf(O1, HAT + '~黑');
 ok(r.ok && g.arrival_status === '已到貨' && g.shippable === 'Y' && g.sale_type === '現貨' && Number(g.cost) === 961, 'enough ready stock → whole line from stock, cost 961: ' + JSON.stringify(r).slice(0, 60));
 ok(b.arrival_status === '待到貨' && b.shippable === 'N' && b.sale_type === '預購' && Number(b.cost) === 900, 'other spec without ready stock stays pre-order');
 ok(JSON.stringify((await shop('貓耳毛帽')).ready) === '{"灰":1}', 'ready 3 → 1');
-// 3) 數量不夠:整筆預購,不拆單,現貨不動
-r = await buy([{ id: HAT + '~灰', qty: 2 }]); const O2 = DB['訂單'][DB['訂單'].length - 1].order_id; g = lineOf(O2, HAT + '~灰');
-ok(r.ok && g.arrival_status === '待到貨' && g.sale_type === '預購' && JSON.stringify((await shop('貓耳毛帽')).ready) === '{"灰":1}', 'not enough → whole line pre-order, ready untouched');
-// 4) 刪訂單:用現貨出的退回現貨(成本跟著回去)
-r = await call('adminDeleteOrder', tk, O1); ok(r.ok && JSON.stringify((await shop('貓耳毛帽')).ready) === '{"灰":3}', 'delete order → ready back to 3: ' + set('現貨 ' + HAT));
+// 3) 現貨不夠這筆的數量:拆單——現貨一列(已到貨、可出貨)、剩下的預購一列(待到貨);訂單金額不變
+r = await buy([{ id: HAT + '~灰', qty: 2 }]); const O2 = DB['訂單'][DB['訂單'].length - 1].order_id; g = lineOf(O2, HAT + '~灰'); let g2 = lineOf(O2, HAT + '~灰~2');
+ok(r.ok && Number(g.qty) === 1 && g.sale_type === '現貨' && g.arrival_status === '已到貨' && g.shippable === 'Y' && Number(g.cost) === 1000, 'split: 1 from stock (arrived, cost 1000)');
+ok(g2 && Number(g2.qty) === 1 && g2.sale_type === '預購' && g2.arrival_status === '待到貨' && g2.spec === '灰' && Number(g2.cost) === 900 && Number(g.line_total) + Number(g2.line_total) === 2560 && r.result.total === DB['訂單'].find(o => o.order_id === O2).total, 'split: the other 1 is a pre-order line, order total unchanged');
+ok((await shop('貓耳毛帽')).ready === null, 'ready 1 → 0');
+// 4) 刪訂單:用現貨出的退回現貨(成本跟著回去);拆出來的預購那一列不會變出現貨
+r = await call('adminDeleteOrder', tk, O1); ok(r.ok && JSON.stringify((await shop('貓耳毛帽')).ready) === '{"灰":2}', 'delete order → ready back to 2: ' + set('現貨 ' + HAT));
+r = await call('adminDeleteOrder', tk, O2); ok(r.ok && JSON.stringify((await shop('貓耳毛帽')).ready) === '{"灰":3}', 'delete the split order → only the stock line returns (ready 3)');
 // 5) 後台改品項:現貨品項改數量,夠就照現貨;不夠會擋;改成預購就只退回
 r = await buy([{ id: HAT + '~灰', qty: 1 }]); const O3 = DB['訂單'][DB['訂單'].length - 1].order_id;
 ok(lineOf(O3, HAT + '~灰').sale_type === '現貨' && JSON.stringify((await shop('貓耳毛帽')).ready) === '{"灰":2}', 'buy 1 from stock (ready 2 left)');
@@ -67,6 +70,9 @@ DB['商品'].find(p => p.id === BOX).stock = 0;
 r = await buy([{ id: BOX, qty: 2 }]); const O4 = DB['訂單'][DB['訂單'].length - 1].order_id;
 ok(r.ok && lineOf(O4, BOX).sale_type === '現貨' && Number(lineOf(O4, BOX).cost) === 650 && DB['商品'].find(p => p.id === BOX).stock === 0, 'quota 0 but ready 2 → order of 2 goes through from stock: ' + JSON.stringify(r).slice(0, 60));
 r = await buy([{ id: BOX, qty: 1 }]); ok(!r.ok, 'no ready stock and no quota → refused: ' + r.error);
+r = await call('adminAddStockIn', tk, { pid: BOX, qty: 1, cost: 650, spec: '', arrived: true });
+r = await buy([{ id: BOX, qty: 2 }]); ok(!r.ok && (await shop('擴香禮盒')).ready[''] === 1, 'ready 1, quota 0, buy 2 → refused (the pre-order part has no quota), ready untouched: ' + r.error);
+r = await buy([{ id: BOX, qty: 1 }]); ok(r.ok && lineOf(DB['訂單'][DB['訂單'].length - 1].order_id, BOX).sale_type === '現貨', 'buy 1 → from stock');
 // 8) 現貨商品下單照舊
 r = await buy([{ id: COOKIE, qty: 2 }]); ok(r.ok && DB['商品'].find(p => p.id === COOKIE).stock === 6, 'in-stock product order still deducts quantity (8 → 6)');
 // 9) 舊資料:下單時商品還是現貨型態、後來改成預購的品項(型態=現貨但不是用現貨出的),刪訂單不能憑空變出現貨

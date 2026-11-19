@@ -241,7 +241,7 @@ function specRoom(p, sp) { var q = sp && p.specQty ? p.specQty[sp] : null; retur
 function maxQ(p) { return p.stock === null ? 99 : Math.min(99, p.stock); }
 /* 預購商品的現貨件數(到貨時多出來的數量):sp 有給=該規格,沒給=全部規格合計 */
 function rdyN(p, sp) { var r = p && p.ready, n = 0; if (!r) return 0; if (sp !== undefined) return r[sp] || 0; for (var k in r) n += r[k]; return n; }
-function rdyNote(n) { return n ? '有現貨 <b>' + n + '</b> 件:一次購買 ' + n + ' 件以內可直接出貨,超過則整筆為預購' : ''; }
+function rdyNote(n) { return n ? '有現貨 <b>' + n + '</b> 件,可直接出貨;超過 ' + n + ' 件的數量為預購' : ''; }
 function tag(p) { return p.type === '預購' ? (rdyN(p) ? '有現貨 ' + rdyN(p) + ' 件・其餘' : '') + '預購' + (p.arrival === '排隊中' ? ',暫不確定,排隊中' : etaW(p.arrival) ? ',下單後約 ' + etaW(p.arrival) + ' 週到貨' : p.arrival ? ',預計' + md(p.arrival) + '左右' : '') : '現貨'; }
 
 function promoChip() { var c = $('#pchip'), f = $('#fab'); c.style.bottom = ((f && !f.hidden ? f.offsetHeight : 0) + 28) + 'px'; }
