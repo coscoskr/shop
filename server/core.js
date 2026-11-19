@@ -361,7 +361,7 @@ export async function handleCoolbau({ rawBody, signature, db, env }) {
     const props = Object.assign({}, env.props || {}, dbProps);
     if (!envSecret || props.COOLBAU_ARR_SECRET !== envSecret) { bad = await cbAuth(props.COOLBAU_ARR_SECRET, rawBody, signature, d); if (bad) return; }
     const rt = createRuntime({ H: code.H, tableData, kv, props, fetchMap: {} });
-    out = withRt(rt, () => (d.type === 'poke' ? (function () { var ga = code.INTERNAL.cbPendAuto_(); var ad = String(code.INTERNAL.settings_().到貨管理員LINE || ''); if (ga && ad) code.INTERNAL.pushLine_(ad, ga.slice(0, 4900)); return { ok: true, poke: true, added: 0, auto: ga ? 1 : 0, pending: code.INTERNAL.cbPend_().length }; })() : d.type === 'cost' ? code.INTERNAL.cbCostIn_(d) : code.INTERNAL.cbArrIn_(d)));
+    out = withRt(rt, () => (d.type === 'poke' ? (function () { var ga = code.INTERNAL.cbPendAuto_(); if (ga) code.INTERNAL.cbTell_(ga); var rr = {}; code.INTERNAL.cbRdyTell_(rr); return { ok: true, poke: true, added: 0, auto: ga ? 1 : 0, pending: code.INTERNAL.cbPend_().length }; })() : d.type === 'cost' ? code.INTERNAL.cbCostIn_(d) : code.INTERNAL.cbArrIn_(d)));
     await tx.commit(rt.collectOps(), rt.kvOps);
     rt.fetchQueue.forEach((f) => after.push({ type: 'fetch', f }));
     rt.mailQueue.forEach((m) => after.push({ type: 'mail', m }));
@@ -377,20 +377,21 @@ export async function handleCoolbau({ rawBody, signature, db, env }) {
 
 /** 把「酷柏待對應」的品項配對到店內商品,存成待確認計畫並傳預覽給到貨管理員(job 有給時回覆該則訊息) */
 async function runCoolbauJob({ db, env, job }) {
-  const { list, n, cands, key, admin, props } = await db.withTx(async (tx) => {
+  const { list, n, cands, key, admins, props } = await db.withTx(async (tx) => {
     const { tableData, kv, props: dbProps } = await tx.loadAll();
     const props = Object.assign({}, env.props || {}, dbProps);
     const rt = createRuntime({ H: code.H, tableData, kv, props, fetchMap: {} });
-    return withRt(rt, () => ({ list: code.INTERNAL.cbPendList_(), n: code.INTERNAL.cbPend_().length, cands: code.INTERNAL.arrCands_(), key: props.ANTHROPIC_API_KEY || '', admin: String(code.INTERNAL.settings_().到貨管理員LINE || ''), props }));
+    return withRt(rt, () => ({ list: code.INTERNAL.cbPendList_(), n: code.INTERNAL.cbPend_().length, cands: code.INTERNAL.arrCands_(), key: props.ANTHROPIC_API_KEY || '', admins: code.INTERNAL.cbTargets_(), props }));
   }, { lock: false });
-  const to = job || { uid: admin };
-  if (!n || !to.uid) return; // 沒有綁定到貨管理員:品項留在待對應,後台設定頁會顯示數量
-  if (!key) { await lineReply(to, '📦 酷柏到貨:有 ' + n + ' 項第一次出現的品項需要對應,但尚未設定 Anthropic 金鑰,無法自動配對。請到後台手動處理到貨後,傳「酷柏清除」。', env, props); return; }
+  const tos = job ? [job] : admins.map((u) => ({ uid: u }));
+  if (!n || !tos.length) return; // 沒有任何通知對象:品項留在待對應,酷柏那邊會私訊 Alfee
+  const say = async (t) => { for (const x of tos) await lineReply(x, t, env, props); };
+  if (!key) { await say('📦 酷柏到貨:有 ' + n + ' 項第一次出現的品項需要對應,但尚未設定 Anthropic 金鑰,無法自動配對。請到後台手動處理到貨後,傳「酷柏清除」。'); return; }
   const ar = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST', headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
     body: JSON.stringify({ model: 'claude-sonnet-5-5', max_tokens: 6000, system: CB_SYSTEM, messages: [{ role: 'user', content: [{ type: 'text', text: '店內商品清單:\n' + cands + '\n\n酷柏這次到貨、需要對照的品項:\n' + list }] }] }),
   });
-  if (!ar.ok) { console.error('anthropic', ar.status, (await ar.text()).slice(0, 200)); await lineReply(to, '📦 酷柏到貨:有 ' + n + ' 項需要對應,但配對服務暫時無法使用(' + ar.status + ')。稍後傳「酷柏」可重新配對。', env, props); return; }
+  if (!ar.ok) { console.error('anthropic', ar.status, (await ar.text()).slice(0, 200)); await say('📦 酷柏到貨:有 ' + n + ' 項需要對應,但配對服務暫時無法使用(' + ar.status + ')。稍後傳「酷柏」可重新配對。'); return; }
   const aj = await ar.json();
   const txt = ((aj.content || []).find((b) => b.type === 'text') || {}).text || '';
   let items = [];
@@ -402,7 +403,7 @@ async function runCoolbauJob({ db, env, job }) {
     await tx.commit(rt.collectOps(), rt.kvOps);
     return t;
   });
-  if (text) await lineReply(to, text, env, props);
+  if (text) await say(text);
 }
 
 

@@ -189,4 +189,24 @@ DB['商品'].push({ id: 'P295', name: '身體乳300ml', categories: '', sale_typ
 order('O10', '2026-11-19 09:30:00', 'U10'); line('O10', 'P295', '身體乳300ml', '', 1);
 r = await post({ type: 'poke' });
 ok(r.body.auto === 1 && r.body.pending === 0 && L('O10', 'P295').arrival_status === '已到貨', 'poke auto-applies the pending item ' + JSON.stringify(r.body));
+// 15) 通知對象:到貨管理員＋乙瑄(從會員資料找 LINE ID);多出來的數量 → 現貨;商品已下架/已關團 → 自動上架只賣現貨,通知「有現貨可以販售」
+DB['會員'].push({ line_id: 'UYIXUAN0001', nickname: 'yx', real_name: '乙瑄' });
+DB['商品'].push({ id: 'P296', name: 'Kuromi聯名擴香3入禮盒組', categories: '', sale_type: '預購', price: 1100, stock: null, specs: '', on_sale: 'N', brand: 'Hetras', close_date: '2026-11-01' });
+order('O11', '2026-11-10 10:00:00', 'U11'); line('O11', 'P296', 'Kuromi聯名擴香3入禮盒組', '', 1);
+sent.length = 0;
+r = await post({ type: 'arrival', batch: 'b12', items: [{ proid: 7105, specid: 23002, title: '【韓國】Hetras x Kuromi聯名擴香3入禮盒組', spec: '標準', qty: 3, price: 850, lots: [[3, 785, 'w173053']], single: 1 }] });
+const P296 = DB['商品'].find(p => p.id === 'P296');
+ok(r.body.auto === 1 && r.body.autoQty === 1 && r.body.stock === 2 && (r.body.relist || []).length === 1, 'first-time item: 1 to the order, 2 surplus, product relisted ' + JSON.stringify(r.body));
+ok(L('O11', 'P296').arrival_status === '已到貨' && sent.some(x => x.to === 'U11'), 'customer notified');
+ok(P296.on_sale === 'Y' && !P296.close_date && Number(P296.stock) === 0, 'off/closed product relisted with pre-order quota 0 (only ready stock)');
+ok(sent.some(x => x.to === 'UYIXUAN0001' && /有現貨可以販售/.test(x.text) && /現貨 2 件/.test(x.text)) && sent.some(x => x.to === 'UADMIN' && /有現貨可以販售/.test(x.text)), '乙瑄 and admin told: 有現貨可以販售');
+const shop = (await (async () => { const rt = createRuntime({ H: code.H, tableData: load(), kv: KV, props: PROPS, fetchMap: {} }); Object.assign(globalThis, rt.globals); code.__reset(); return code.INTERNAL.shopData_(); })());
+const sp = shop.products.find(p => p.id === 'P296');
+ok(sp && JSON.stringify(sp.ready) === '{"":2}' && sp.stock === 2, 'storefront shows it with 2 ready (stock 2, not sold out) ' + JSON.stringify(sp && { ready: sp.ready, stock: sp.stock }));
+// 對不上的例外:乙瑄也會收到
+aiReply = { items: [{ ref: 1, pid: null, spec: '' }] }; sent.length = 0;
+r = await post({ type: 'arrival', batch: 'b13', items: [{ proid: 9998, specid: 1, title: '【韓國】還沒建立的商品', spec: '標準', qty: 1, price: 10, single: 1 }] });
+ok(r.body.pending === 1 && (r.body.pendItems || [])[0].indexOf('還沒建立的商品') >= 0 && sent.some(x => x.to === 'UYIXUAN0001' && /找不到對應的商品/.test(x.text)), 'unmatched → reported with item names, 乙瑄 notified');
+a = run((I) => I.arrText_('UYIXUAN0001', '酷柏清除'));
+ok(/已清除 1 項/.test(a.r.reply), '乙瑄 can use the 酷柏 commands too');
 console.log(fails ? fails + ' FAILED' : 'ALL PASSED');
