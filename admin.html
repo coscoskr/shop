@@ -338,14 +338,16 @@ function orderRows() { if (tab === 'o') purchView(); }
 /* ---------- 追蹤未出貨:已到貨超過 30 天,客人還沒建立出貨單 ---------- */
 var STUCK_DAYS = 30;
 function stuckList() {
-  var out = [], now = Date.now();
+  var out = [], now = Date.now(), wait = {}; // wait[客人] = 還沒到貨的品項數(同一位客人:有 LINE 用 LINE,沒有用電話)
+  var ck = function (o) { return o.lid ? 'L' + o.lid : 'P' + String(o.phone || '').replace(/\D/g, ''); };
+  (O || []).forEach(function (o) { o.items.forEach(function (i) { if (!i.sid && i.arr === '待到貨') wait[ck(o)] = (wait[ck(o)] || 0) + 1; }); });
   (O || []).forEach(function (o) {
     o.items.forEach(function (i) {
       if (i.arr !== '已到貨' || i.sid) return;
       var base = i.arrAt || o.at, t = Date.parse(String(base).replace(' ', 'T') + '+08:00');
       if (!t) return;
       var days = Math.floor((now - t) / 86400000);
-      if (days >= STUCK_DAYS) out.push({ o: o, i: i, days: days, base: String(base).slice(0, 10), guess: !i.arrAt });
+      if (days >= STUCK_DAYS) out.push({ o: o, i: i, days: days, base: String(base).slice(0, 10), guess: !i.arrAt, wait: wait[ck(o)] || 0 });
     });
   });
   return out.sort(function (a, b) { return b.days - a.days; });
@@ -356,10 +358,10 @@ function stuckView() {
     var rows = stuckList(), who = {}, amt = 0;
     rows.forEach(function (r) { who[r.o.lid || r.o.phone || r.o.name] = 1; amt += Number(r.i.sub) || 0; });
     $('#v').innerHTML = '<h2 style="margin-top:0">追蹤未出貨</h2><p class="m">商品已到貨超過 ' + STUCK_DAYS + ' 天,客人還沒建立出貨單的品項(由久到近排序)。點一列可開啟訂單。</p>' +
-      (rows.length ? '<p><b>' + rows.length + '</b> 項 · <b>' + Object.keys(who).length + '</b> 位客人 · 金額合計 <b>' + money(amt) + '</b></p>' +
+      (rows.length ? '<p><b>' + rows.length + '</b> 項 · <b>' + Object.keys(who).length + '</b> 位客人 · 金額合計 <b>' + money(amt) + '</b>' + (rows.some(function (r) { return r.wait; }) ? '<br><span class="m">標「部分未到貨」的客人還有其他商品沒到貨,可能在等全部到齊再一起出貨。</span>' : '') + '</p>' +
         '<div style="overflow:auto"><table class="sht" style="min-width:900px"><thead><tr><th>已到貨</th><th>到貨日</th><th>客人</th><th>電話</th><th>LINE</th><th>訂單</th><th>品名</th><th class="n">數量</th><th class="n">金額</th></tr></thead><tbody>' +
         rows.map(function (r) {
-          return '<tr data-a="ord" data-id="' + esc(r.o.id) + '" style="cursor:pointer"><td><b' + (r.days >= 60 ? ' style="color:#d64545"' : '') + '>' + r.days + ' 天</b></td><td>' + esc(r.base) + (r.guess ? '<br><small class="m">(無到貨紀錄,以下單日計)</small>' : '') + '</td><td>' + esc(r.o.name) + '</td><td>' + esc(r.o.phone) + '</td><td>' + (r.o.lid ? '已綁定' : '<span class="m">—</span>') + '</td><td>' + esc(r.o.id) + '</td><td>' + esc(r.i.name) + (r.i.spec ? '<br><small class="m">' + esc(r.i.spec) + '</small>' : '') + '</td><td class="n">' + r.i.qty + '</td><td class="n">' + money(r.i.sub) + '</td></tr>';
+          return '<tr data-a="ord" data-id="' + esc(r.o.id) + '" style="cursor:pointer"><td><b' + (r.days >= 60 ? ' style="color:#d64545"' : '') + '>' + r.days + ' 天</b></td><td>' + esc(r.base) + (r.guess ? '<br><small class="m">(無到貨紀錄,以下單日計)</small>' : '') + '</td><td>' + esc(r.o.name) + (r.wait ? '<br><span class="chip" style="background:#FCEBD9;color:#A95B4D" title="這位客人還有 ' + r.wait + ' 項商品沒到貨">部分未到貨(' + r.wait + ' 項)</span>' : '') + '</td><td>' + esc(r.o.phone) + '</td><td>' + (r.o.lid ? '已綁定' : '<span class="m">—</span>') + '</td><td>' + esc(r.o.id) + '</td><td>' + esc(r.i.name) + (r.i.spec ? '<br><small class="m">' + esc(r.i.spec) + '</small>' : '') + '</td><td class="n">' + r.i.qty + '</td><td class="n">' + money(r.i.sub) + '</td></tr>';
         }).join('') + '</tbody></table></div>'
       : '<p>目前沒有到貨超過 ' + STUCK_DAYS + ' 天還沒出貨的商品。</p>');
   });
