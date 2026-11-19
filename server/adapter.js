@@ -6,7 +6,7 @@ import { createHash, randomUUID } from 'node:crypto';
 // 試算表分頁 → 資料表、欄位(順序和原本試算表標題列一致)、數值欄位
 const T = (table, cols, o) => Object.assign({ table, cols }, o);
 export const TABLES = {
-  '商品': T('products', ['id','name','categories','sale_type','price','stock','arrival','description','tiers','images','on_sale','specs','brand'], { pk: 'id', num: ['price','stock'] }),
+  '商品': T('products', ['id','name','categories','sale_type','price','stock','arrival','description','tiers','images','on_sale','specs','brand','close_date'], { pk: 'id', num: ['price','stock'] }),
   '商品_內部': T('product_internal', ['product_id','vendor','cost','cost_tax_incl','source','locked'], { pk: 'product_id', num: ['cost'] }),
   '類別': T('categories', ['name'], { pk: 'name' }),
   '品牌': T('brands', ['name'], { pk: 'name' }),

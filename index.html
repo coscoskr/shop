@@ -225,6 +225,7 @@ function busy(d, now) { BUSY = Math.max(0, BUSY + d); clearTimeout(BT); var bb =
 })();
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 function money(n) { return 'NT$ ' + Number(n).toLocaleString('en-US'); }
+function clTxt(p) { return p && p.close ? md(p.close) + ' 中午12:00 關團' : ''; }
 function md(s) { return s ? (+s.slice(5, 7)) + '/' + (+s.slice(8, 10)) : ''; }
 function byId(id) { return D.products.filter(function (p) { return p.id === id; })[0]; }
 function unit(p, n) { n = baseQty(p.id) || n; var u = p.price; p.tiers.forEach(function (t) { if (n >= t.min) u = t.price; }); return u; }
@@ -350,7 +351,7 @@ function grid() {
   $('#grid').innerHTML = l.length ? l.map(function (p) {
     var so = p.stock === 0;
     return '<div class="c ' + (so ? 'so' : '') + '" data-a="open" data-id="' + esc(p.id) + '"><div class="im">' + (p.img ? '<img src="' + esc(p.img) + '" alt="' + esc(p.name) + '" referrerpolicy="no-referrer" decoding="async" onerror="this.remove()">' : '🛍') + '</div>' +
-      '<div class="nm">' + bn(p) + '</div><div><span class="pr">' + money(p.price) + '</span></div><div class="tg">' + (so ? '已售完' : tag(p)) + '</div>' +
+      '<div class="nm">' + bn(p) + '</div><div><span class="pr">' + money(p.price) + '</span></div><div class="tg">' + (so ? '已售完' : tag(p)) + '</div>' + (clTxt(p) && !so ? '<div class="tg" style="color:#d64545">' + clTxt(p) + '</div>' : '') +
       (p.tiers.length ? '<div class="tg">' + p.tiers[0].min + ' 件起 ' + money(p.tiers[0].price) + '/件</div>' : '') + '</div>';
   }).join('') : '<p>找不到符合的商品,換個關鍵字或篩選條件試試。</p>';
   drawTl(all.length); drawPg(pages);
@@ -513,7 +514,7 @@ function detail(p) {
   SPC = ''; SPZ = '';
   var t = p.tiers.map(function (x) { return '買 ' + x.min + ' 件以上,每件 ' + money(x.price); }).join('<br>');
   return '<div class="tb">' + (!LT && D.line && D.line.on ? '<button type="button" class="lgb" data-a="lgd">LINE 登入</button>' : '') + '<button type="button" class="xb" data-a="x" aria-label="關閉">✕</button></div><h2>' + bn(p) + '</h2>' + (p.imgs && p.imgs.length ? '<img class="big" id="bigimg" src="' + esc(p.imgs[0]) + '" alt="" referrerpolicy="no-referrer">' + (p.imgs.length > 1 ? '<div class="th">' + p.imgs.map(function (u, k) { return '<img src="' + esc(u) + '" referrerpolicy="no-referrer" alt="商品圖片 ' + (k + 1) + '" data-a="bigimg" data-u="' + esc(u) + '" class="' + (k ? '' : 'on') + '">'; }).join('') + '</div>' : '') : '') +
-    '<p><span class="pr">' + money(p.price) + '</span> <span class="tg">' + tag(p) + '</span></p>' + (t ? '<p class="tg">' + t + '</p>' : '') +
+    '<p><span class="pr">' + money(p.price) + '</span> <span class="tg">' + tag(p) + '</span></p>' + (clTxt(p) ? '<p class="tg" style="color:#d64545;font-weight:700">' + clTxt(p) + ',關團後就不能下單了</p>' : '') + (t ? '<p class="tg">' + t + '</p>' : '') +
     '<p class="ds">' + esc(p.desc) + '</p>' +
     (p.stock === 0 ? '<p>這項商品已售完。</p><p><button class="btn l shb" data-a="shr">分享給朋友</button></p>' : (p.specs && p.specs.length ? '<input type="hidden" id="spsel" value=""><div id="spw">' + specPick(p) + '</div><p id="spn" class="m" style="margin:4px 0">請選擇規格查看剩餘數量</p>' : (p.stock !== null ? '<p class="m" style="margin:4px 0">剩餘數量:<b>' + p.stock + '</b> 件</p>' : '') + (rdyN(p, '') ? '<p class="m" style="margin:4px 0">' + rdyNote(rdyN(p, '')) + '</p>' : '')) + '<p id="dte" class="tg" role="alert"></p><div class="r"><button class="btn l" data-a="dn">−</button><b id="qn">1</b><button class="btn l" data-a="up">+</button><button class="btn a" data-a="add">加入購物車</button><button type="button" class="btn l shb" data-a="shr">分享給朋友</button></div>') +
     '';

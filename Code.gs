@@ -8,7 +8,7 @@ function catHit_(pcats, vs) {
 var MH_STORE = '(門市在賣貨便下單時填寫)';
 var PAY = { '刷卡': '待刷卡', '匯款': '待匯款', '賣貨便': '待出貨', '付現金': '待自取' };
 var H = {
-  '商品': ['商品ID', '名稱', '類別', '銷售型態', '單價', '數量', '到貨日期', '說明', '階梯價', '圖片', '上架', '規格', '品牌'],
+  '商品': ['商品ID', '名稱', '類別', '銷售型態', '單價', '數量', '到貨日期', '說明', '階梯價', '圖片', '上架', '規格', '品牌', '關團日期'],
   '商品_內部': ['商品ID', '廠商', '成本', '成本含稅', '貨源', '鎖定'],
   '類別': ['類別'],
   '品牌': ['品牌'],
@@ -265,17 +265,24 @@ function adjStock_(p, sp, delta) {
 }
 var RDYC_ = null; // 這次組前台資料用的現貨表
 function imgs_(v) { return String(v || '').split('|').map(img_).filter(Boolean); }
+/** 關團:關團日期當天台灣時間中午 12:00 起視同下架(資料庫每分鐘也會自動把上架改成 N) */
+function closeAt_(v) {
+  var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(v || '').trim()); if (!m) return 0;
+  return Date.UTC(+m[1], +m[2] - 1, +m[3], 4, 0, 0); // 12:00 台灣(UTC+8)= 04:00 UTC
+}
+function closed_(p) { var t = closeAt_(p && p.關團日期); return !!t && Date.now() >= t; }
+function onSale_(p) { return !!p && p.上架 === 'Y' && !closed_(p); }
 function pub_(p) {
   var rd = rdyIs_(p) ? (RDYC_ || (RDYC_ = rdyAll_()))[String(p.商品ID)] : null;
   return {
     id: p.商品ID, name: p.名稱, cats: cs_(p.類別), type: p.銷售型態, price: Number(p.單價),
     stock: p.數量 === '' ? null : Number(p.數量), arrival: p.到貨日期, desc: p.說明,
-    tiers: tiers_(p.階梯價), img: imgs_(p.圖片)[0] || '', imgs: imgs_(p.圖片), specs: specs_(p), specQty: specQty_(p), brand: String(p.品牌 || ''), ready: rd || null
+    tiers: tiers_(p.階梯價), img: imgs_(p.圖片)[0] || '', imgs: imgs_(p.圖片), specs: specs_(p), specQty: specQty_(p), brand: String(p.品牌 || ''), ready: rd || null, close: String(p.關團日期 || '')
   };
 }
 function getShop() {
   var c = CacheService.getScriptCache();
-  try { var hit = c.get('shop1'); if (hit) return JSON.parse(hit); } catch (e) {}
+  try { var hit = c.get('shop1'); if (hit) { var h = JSON.parse(hit); h.products = (h.products || []).filter(function (p) { return !closed_({ 關團日期: p.close }); }); return h; } } catch (e) {}
   var r = shopData_();
   try { var js = JSON.stringify(r); if (js.length < 90000) c.put('shop1', js, 120); } catch (e) {}
   return r;
@@ -286,7 +293,7 @@ function shopData_() {
     store: st.店名 || '', notice: st.公告 || '', creditNote: st.購物金注意事項 === undefined ? defSet_('購物金注意事項') : String(st.購物金注意事項 || ''), free: Number(st.免運門檻) || 0, fee: Number(st.宅配運費) || 0, feeCvs: Number(st.店到店運費) || 0,
     line: { on: lineOn_(), liff: prop_('LIFF_ID'), friend: String(st.加好友連結 || ''), community: String(st.LINE社群連結 || '') },
     biz: { name: String(st.公司名稱 || ''), addr: String(st.公司地址 || ''), tax: /^\d+$/.test(String(st.統一編號 || '')) ? ('00000000' + st.統一編號).slice(-8) : String(st.統一編號 || ''), ig: String(st.IG連結 || '') },
-    cats: cats_(), products: rows_('商品').filter(function (p) { return p.上架 === 'Y'; }).map(pub_)
+    cats: cats_(), products: rows_('商品').filter(onSale_).map(pub_)
   };
 }
 function placeOrder(o) {
@@ -471,7 +478,7 @@ function adminProducts_() {
     return {
       id: p.商品ID, name: p.名稱, cats: cs_(p.類別), type: p.銷售型態, price: Number(p.單價),
       stock: p.數量 === '' ? '' : Number(p.數量), arrival: p.到貨日期, desc: p.說明, tiers: String(p.階梯價 || ''),
-      img: String(p.圖片 || ''), on: p.上架 === 'Y', brand: String(p.品牌 || ''), vendor: String(i.廠商 || ''),
+      img: String(p.圖片 || ''), on: p.上架 === 'Y', close: String(p.關團日期 || ''), closed: closed_(p), brand: String(p.品牌 || ''), vendor: String(i.廠商 || ''),
       cost: (i.成本 === undefined || i.成本 === '') ? '' : Number(i.成本), taxIncl: i.成本含稅 === 'Y',
       source: String(i.貨源 || ''), locked: i.鎖定 === 'Y', specs: specs_(p), specQty: specQty_(p)
     };
@@ -761,6 +768,9 @@ function adminSaveProduct(tk, d) {
     if (['現貨', '預購'].indexOf(d.type) < 0) throw new Error('請選擇現貨或預購');
     if (d.arrival && d.arrival !== '排隊中' && !/^\d{4}-\d{2}-\d{2}$/.test(d.arrival)) throw new Error('到貨日期格式不正確');
     tiers_(d.tiers, true);
+    var cl = String(d.close || '').trim();
+    if (cl && !closeAt_(cl)) throw new Error('關團日期格式不正確');
+    if (d.on && closed_({ 關團日期: cl })) throw new Error('關團日期 ' + cl + ' 中午 12:00 已經過了,要上架請先改關團日期或清空');
     var ps = rows_('商品'), id = d.id;
     var old = id ? ps.filter(function (p) { return p.商品ID === id; })[0] : null;
     if (!old) {
@@ -770,7 +780,7 @@ function adminSaveProduct(tk, d) {
     }
     var oi = rows_('商品_內部').filter(function (r) { return r.商品ID === id; })[0] || null;
     var inn = { '商品ID': id, '廠商': t_(d.vendor, 60), '成本': (d.cost === '' || d.cost == null) ? '' : Number(d.cost), '成本含稅': d.taxIncl ? 'Y' : 'N', '貨源': t_(d.source, 60), '鎖定': 'N' };
-    var row = { '商品ID': id, '名稱': name, '類別': (d.cats || []).join(','), '銷售型態': d.type, '單價': price, '數量': stock, '到貨日期': d.arrival || '', '說明': t_(d.desc, 1000), '階梯價': String(d.tiers || '').trim(), '圖片': imgList_(d.img), '上架': d.on ? 'Y' : 'N', '規格': specs.join('|'), '品牌': brandResolve_(u, d) };
+    var row = { '商品ID': id, '名稱': name, '類別': (d.cats || []).join(','), '銷售型態': d.type, '單價': price, '數量': stock, '到貨日期': d.arrival || '', '說明': t_(d.desc, 1000), '階梯價': String(d.tiers || '').trim(), '圖片': imgList_(d.img), '上架': d.on ? 'Y' : 'N', '規格': specs.join('|'), '品牌': brandResolve_(u, d), '關團日期': cl };
     put_('商品', old ? old._r : 0, row);
     put_('商品_內部', oi ? oi._r : 0, inn);
     log_(u.acc, old ? '修改商品' : '新增商品', id + ' ' + name, old ? [diff_(old, row), diff_(oi, inn)].filter(function (x) { return x && x !== '新增'; }).join(';') : '新增');
@@ -812,6 +822,7 @@ function adminBatchProducts(tk, ids, op) {
       } else {
         var want = op === 'on' ? 'Y' : 'N';
         if (String(p.上架) === want) { skip.push(id + ' 已經是' + (op === 'on' ? '上架' : '下架')); return; }
+        if (op === 'on' && closed_(p)) { skip.push(id + ' 已過關團日期 ' + p.關團日期 + '(請先改關團日期)'); return; }
         var n = cp_(p); n.上架 = want; put_('商品', p._r, n);
         log_(u.acc, op === 'on' ? '上架商品' : '下架商品', id + ' ' + p.名稱, '(批次)');
       }
@@ -3183,7 +3194,8 @@ function calc_(want, ctx, wantCredit, code) {
   ids.forEach(function (id) { var b = bp_(id); tot[b] = (tot[b] || 0) + want[id]; });
   ids.forEach(function (id) {
     var p = by[bp_(id)], n = want[id], sp = spec_(id);
-    if (!p || p.上架 !== 'Y') throw new Error('有商品已下架,請重新整理頁面');
+    if (p && p.上架 === 'Y' && closed_(p)) throw new Error('「' + p.名稱 + '」已關團,請重新整理頁面');
+    if (!onSale_(p)) throw new Error('有商品已下架,請重新整理頁面');
     var sl = specs_(p);
     if (sl.length && !sp) throw new Error('「' + p.名稱 + '」請先選擇規格');
     if (sp && sl.indexOf(sp) < 0) throw new Error('「' + p.名稱 + '」沒有「' + sp + '」這個規格,請重新整理頁面');
