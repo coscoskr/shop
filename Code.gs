@@ -175,10 +175,11 @@ function img_(u) {
 
 /* ---------- 前台 API ---------- */
 /** 圖片欄可存多張,用 | 分隔,第一張為封面 */
-function imgList_(v) {
-  var l = String(v || '').split('|').map(function (x) { return x.trim(); }).filter(Boolean).slice(0, 8);
+function imgList_(v, max) { // max 省略 = 不限張數(商品圖片);其他地方可指定上限
+  var l = String(v || '').split('|').map(function (x) { return x.trim(); }).filter(Boolean);
+  if (max) l = l.slice(0, max);
   l.forEach(function (u) { if (!img_(u)) throw new Error('圖片網址需為 https:// 開頭,或 Google 雲端硬碟分享連結'); });
-  var out = l.join('|'); if (out.length > 4000) throw new Error('圖片太多或網址太長');
+  var out = l.join('|');
   return out;
 }
 function bp_(x) { return String(x).split('~')[0]; }
@@ -1274,7 +1275,7 @@ function adminUpdatePayment(tk, pid, d) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('付款日期格式不正確');
     if (!(amt > 0)) throw new Error('請填寫付款金額');
     var n = cp_(p); n.付款日期 = date; n.金額 = amt; n.匯款備註 = t_(d.note, 300);
-    if (d.imgs) n.圖片 = imgList_([].concat(d.imgs).join('|'));
+    if (d.imgs) n.圖片 = imgList_([].concat(d.imgs).join('|'), 8);
     put_('廠商付款', p._r, n);
     log_(u.acc, '修改廠商付款', pid, diff_(p, n));
   });

@@ -592,7 +592,7 @@ function editProd(id) {
       '<label class="ck" style="margin-top:4px">或 下單後 <input name="arrw" type="number" min="1" max="52" step="1" style="width:64px" value="' + etaW(p.arrival) + '"' + (p.arrival === '排隊中' ? ' disabled' : '') + '> 週到貨</label>' +
       '<label class="ck" style="margin-top:4px"><input type="checkbox" name="arrivalq"' + (p.arrival === '排隊中' ? ' checked' : '') + '> 暫不確定,排隊中</label></div>' +
     '<div><label>關團日期(當天下午 14:00 自動下架)<input name="close" type="date" value="' + esc(p.close || '') + '"></label><span class="m" style="font-size:12px">不關團就留空。前台會顯示「x/x 14:00 關團」</span></div>' +
-    '<div class="f"><span class="m">商品圖片(第一張是封面,最多 8 張)</span><div id="imgs" class="ig"></div><input type="file" id="imf" multiple accept="image/jpeg,image/png,image/webp"> <span id="ims" class="m"></span>' + fld('或貼上圖片網址(按 Enter 加入)', 'imgurl', '') + '<input type="hidden" name="img" value="' + esc(p.img) + '"></div>' +
+    '<div class="f"><span class="m">商品圖片(第一張是封面,張數不限)</span><div id="imgs" class="ig"></div><input type="file" id="imf" multiple accept="image/jpeg,image/png,image/webp"> <span id="ims" class="m"></span>' + fld('或貼上圖片網址(按 Enter 加入)', 'imgurl', '') + '<input type="hidden" name="img" value="' + esc(p.img) + '"></div>' +
     '<label class="f">說明<textarea name="desc" rows="3">' + esc(p.desc) + '</textarea></label>' +
     '<div class="f"><span class="m">類別(可複選)</span>' + catGroups(p.cats) + '</div>' +
     '<label class="f"><input type="checkbox" name="on"' + (p.on ? ' checked' : '') + '> 上架(前台可見)</label></div>' +
@@ -890,11 +890,11 @@ function shrink(file, mx) {
     rd.readAsDataURL(file);
   });
 }
-function upImages(files, count, add, doneMsg) {
+function upImages(files, count, add, doneMsg, max) {
   var k = 0, n = 0;
   (function next() {
     if (k >= files.length) { tell('✓ 圖片上傳完成(共 ' + n + ' 張)。' + (doneMsg.indexOf('儲存') >= 0 ? '\n記得按「儲存商品」。' : '')); return; }
-    if (count() >= 8) { tell('最多 8 張' + (n ? ',已上傳 ' + n + ' 張' : '')); return; }
+    if (max && count() >= max) { tell('最多 ' + max + ' 張' + (n ? ',已上傳 ' + n + ' 張' : '')); return; }
     wait('圖片上傳中 ' + (k + 1) + ' / ' + files.length + ',請稍候…');
     shrink(files[k]).then(function (b64) { return call('adminUploadImage', T, files[k].name, 'image/jpeg', b64); })
       .then(function (u) { add(u); n++; k++; next(); })
@@ -918,7 +918,6 @@ document.addEventListener('keydown', function (e) {
   if (e.key !== 'Enter' || !e.target.name || e.target.name !== 'imgurl') return;
   e.preventDefault();
   var v = e.target.value.trim(); if (!v) return;
-  if (imgGet().length >= 8) { tell('最多 8 張'); return; }
   imgSet(imgGet().concat([v])); e.target.value = '';
 });
 document.addEventListener('submit', function (e) {
@@ -1694,7 +1693,7 @@ document.addEventListener('click', function (e) {
 document.addEventListener('change', function (e) {
   if (e.target.id !== 'pvimf' || !e.target.files.length) return;
   var files = [].slice.call(e.target.files); e.target.value = '';
-  upImages(files, function () { return PIMG.length; }, function (u) { PIMG.push(u); pimDraw(); }, '上傳完成');
+  upImages(files, function () { return PIMG.length; }, function (u) { PIMG.push(u); pimDraw(); }, '上傳完成', 8);
 });
 /* ---------- 訂購單 ---------- */
 var STC = { '待匯款': ['#fdf0d5', '#8a5a00'], '待刷卡': ['#fdf0d5', '#8a5a00'], '已匯款待查帳': ['#dbeafe', '#1d4ed8'], '已查帳待出貨': ['#ede4fb', '#6d3fc0'], '待出貨': ['#ede4fb', '#6d3fc0'], '可自取': ['#fde4ec', '#b0306a'], '待自取': ['#ffe6d5', '#b24a0a'], '已出貨待送達': ['#d5f3f1', '#0f766e'], '已出貨待收貨': ['#d5f3f1', '#0f766e'], '已出貨': ['#d8f3e0', '#1f7a3d'], '已退回': ['#fde0dc', '#b3261e'], '已收貨付款': ['#d8f3e0', '#1f7a3d'], '已自取付款': ['#d8f3e0', '#1f7a3d'] };
