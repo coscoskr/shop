@@ -3161,8 +3161,10 @@ function cbPendAuto_() {
   arrSave_(arrPend_().filter(function (pl) { return !(pl.cb && pl.cb.length); })); // 舊的酷柏預覽作廢,避免入帳兩次
   var opt = { auto: true, cb: cb, head: '📦 酷柏到貨(第一次出現的品項,已自動對照並入帳)' }, pv = arrPlan_(items, opt);
   if (!opt.plan) return '';
+  CBGA_ = { n: opt.plan.assign.length, q: 0, s: 0 }; opt.plan.assign.forEach(function (x) { CBGA_.q += Number(x.qty); }); opt.plan.surplus.forEach(function (x) { CBGA_.s += Number(x.qty); });
   return pv + '\n\n' + arrApply_([opt.plan], '酷柏到貨自動入帳');
 }
+var CBGA_ = null; // 自動對照這次入帳的數字(回報給酷柏)
 /** 酷柏送來一批到貨:對照過的直接入帳並通知客人,其餘記成待對應。回傳 {ok, auto, stock, skip, pending, added, dup} */
 function cbArrIn_(d) {
   d = d || {};
@@ -3190,8 +3192,8 @@ function cbArrIn_(d) {
   }
   if (unk.length) {
     cbPendAdd_(unk);
-    var ga = cbPendAuto_(); // 第一次出現、但對得上的:直接入帳(不用等人確認)
-    if (ga) { text = (text ? text + '\n\n' : '') + ga; res.guess = 1; }
+    CBGA_ = null; var ga = cbPendAuto_(); // 第一次出現、但對得上的:直接入帳(不用等人確認)
+    if (ga) { text = (text ? text + '\n\n' : '') + ga; res.guess = 1; if (CBGA_) { res.auto += CBGA_.n; res.autoQty = (res.autoQty || 0) + CBGA_.q; res.stock += CBGA_.s; } }
   }
   res.pending = cbPend_().length;
   if (admin && text) pushLine_(admin, text.slice(0, 4900));

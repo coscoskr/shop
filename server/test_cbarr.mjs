@@ -173,7 +173,7 @@ DB['商品'].push({ id: 'P293', name: '沐浴乳1013ml', categories: '', sale_ty
 order('O9', '2026-11-19 09:00:00', 'U9'); line('O9', 'P293', '沐浴乳1013ml', 'Hotel Wood｜NO.7 五星級飯店', 1);
 sent.length = 0; const ai0 = aiCalls;
 r = await post({ type: 'arrival', batch: 'b9', items: [{ proid: 7383, specid: 23963, title: '【韓國】hetras沐浴乳1013ml系列', spec: 'Hotel Wood', qty: 1, price: 216, lots: [[1, 216, 'w173043']], single: 0 }] });
-ok(r.body.auto === 0 && r.body.guess === 1 && r.body.pending === 0 && aiCalls === ai0, 'first-time but unambiguous → applied without AI/confirmation ' + JSON.stringify(r.body));
+ok(r.body.auto === 1 && r.body.autoQty === 1 && r.body.guess === 1 && r.body.pending === 0 && aiCalls === ai0, 'first-time but unambiguous → applied without AI/confirmation ' + JSON.stringify(r.body));
 ok(L('O9', 'P293').arrival_status === '已到貨' && Number(L('O9', 'P293').cost) === 216 && sent.some(x => x.to === 'U9') && sent.some(x => x.to === 'UADMIN' && /已自動對照並入帳/.test(x.text)), 'O9 arrived, customer notified, admin told');
 ok(setv('酷柏對照 7383|23963') === 'P293|Hotel Wood｜NO.7 五星級飯店', 'mapping remembered');
 // 兩個規格都像 → 不猜,照舊交給配對/確認
