@@ -16,6 +16,22 @@ const LINE_FRIEND_URL = 'https://api.line.me/friendship/v1/status';
 
 // 需要非同步(網路、檔案)的功能,在這裡處理;其餘全部交給原本的函式
 const SPECIAL = {
+  // 後台「酷柏商品綁定」:向酷柏查商品(品名/規格/編號),用同步金鑰簽章;只有登入的管理員能用
+  async adminCbSearch({ rt, args, props }) {
+    const [tk, q, ids] = args;
+    withRt(rt, () => code.INTERNAL.me_(tk));
+    const secret = String(props.COOLBAU_ARR_SECRET || '');
+    if (secret.length < 16) throw new Error('還沒設定酷柏同步金鑰');
+    const body = JSON.stringify({ v: 1, ts: Math.floor(Date.now() / 1000), type: 'cbq', q: String(q || '').slice(0, 60), ids: Array.isArray(ids) ? ids.slice(0, 100) : [] });
+    const url = props.COOLBAU_CATALOG_URL || 'https://www.coolbaubeauty.com/g-ajax?ajax=pageOrder&cbline=cosq';
+    let j = null;
+    try {
+      const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', 'x-coolbau-signature': await hmacHex(secret, body) }, body });
+      j = await r.json();
+    } catch (e) { throw new Error('連不到酷柏,請稍後再試'); }
+    if (!j || !j.ok) throw new Error('酷柏查詢失敗:' + String((j && j.err) || '未知錯誤').slice(0, 80));
+    return withRt(rt, () => code.INTERNAL.cbBindOf_(j.list || []));
+  },
   // 信用卡:組綠界全方位金流付款表單(前端送出到綠界)
   async memberPayStart({ rt, args, props, env }) {
     const [tk, sid, kind] = args;
@@ -140,7 +156,7 @@ const SPECIAL = {
  * 回傳 { body, after }:body 是給前端的 JSON,after 是交易完成後再做的事(寄信、LINE 推播)
  */
 // 純讀取的功能不用排隊等寫入鎖(畫面載入、報價、後台列表)
-const NOLOCK = /^(memberMapStart|getShop|shopData|quote|memberOrders|memberShipQuote|admin(Init|Orders|Products|PurchaseList|StockView|Report|Settings|Levels|Vendors|Brands|Cats|Carriers|Members|MemberGrants|Logs|Codes|Activities|LineHistory|LineInfo|ShipHistory|ShipQuote|ProxyQuote|HistBindList|Admins))$/;
+const NOLOCK = /^(memberMapStart|getShop|shopData|quote|memberOrders|memberShipQuote|admin(Init|Orders|Products|PurchaseList|StockView|Report|Settings|Levels|Vendors|Brands|Cats|Carriers|Members|MemberGrants|Logs|Codes|Activities|LineHistory|LineInfo|ShipHistory|ShipQuote|ProxyQuote|HistBindList|Admins|CbBinds|CbSearch))$/;
 export async function execute({ fn, args, db, env }) {
   const isPublic = Object.prototype.hasOwnProperty.call(code.API, fn) || Object.prototype.hasOwnProperty.call(SPECIAL, fn);
   if (!isPublic) return { body: { ok: false, error: '不存在的功能:' + String(fn).slice(0, 40) }, after: [] };
@@ -386,16 +402,21 @@ async function runCoolbauJob({ db, env, job }) {
   const tos = job ? [job] : admins.map((u) => ({ uid: u }));
   if (!n || !tos.length) return; // 沒有任何通知對象:品項留在待對應,酷柏那邊會私訊 Alfee
   const say = async (t) => { for (const x of tos) await lineReply(x, t, env, props); };
-  if (!key) { await say('📦 酷柏到貨:有 ' + n + ' 項第一次出現的品項需要對應,但尚未設定 Anthropic 金鑰,無法自動配對。請到後台手動處理到貨後,傳「酷柏清除」。'); return; }
-  const ar = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST', headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-    body: JSON.stringify({ model: 'claude-sonnet-5-5', max_tokens: 6000, system: CB_SYSTEM, messages: [{ role: 'user', content: [{ type: 'text', text: '店內商品清單:\n' + cands + '\n\n酷柏這次到貨、需要對照的品項:\n' + list }] }] }),
-  });
-  if (!ar.ok) { console.error('anthropic', ar.status, (await ar.text()).slice(0, 200)); await say('📦 酷柏到貨:有 ' + n + ' 項需要對應,但配對服務暫時無法使用(' + ar.status + ')。稍後傳「酷柏」可重新配對。'); return; }
-  const aj = await ar.json();
-  const txt = ((aj.content || []).find((b) => b.type === 'text') || {}).text || '';
+  // AI 只提供「建議候選」,不會直接決定入帳;沒有金鑰或服務失敗也照樣列出品名相近的候選讓管理員選
   let items = [];
-  try { const m = txt.match(/\{[\s\S]*\}/); items = (JSON.parse(m ? m[0] : '{}').items || []).slice(0, 200); } catch (e) { items = []; }
+  if (key) {
+    try {
+      const ar = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST', headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+        body: JSON.stringify({ model: 'claude-sonnet-5-5', max_tokens: 6000, system: CB_SYSTEM, messages: [{ role: 'user', content: [{ type: 'text', text: '店內商品清單:\n' + cands + '\n\n酷柏這次到貨、需要對照的品項:\n' + list }] }] }),
+      });
+      if (ar.ok) {
+        const aj = await ar.json();
+        const txt = ((aj.content || []).find((b) => b.type === 'text') || {}).text || '';
+        const m = txt.match(/\{[\s\S]*\}/); items = (JSON.parse(m ? m[0] : '{}').items || []).slice(0, 200);
+      } else console.error('anthropic', ar.status, (await ar.text()).slice(0, 200));
+    } catch (e) { console.error('anthropic', e); items = []; }
+  }
   const text = await db.withTx(async (tx) => {
     const { tableData, kv, props: dbProps } = await tx.loadAll();
     const rt = createRuntime({ H: code.H, tableData, kv, props: Object.assign({}, env.props || {}, dbProps), fetchMap: {} });

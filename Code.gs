@@ -2881,6 +2881,7 @@ function arrText_(uid, text) {
     if (cn) log_('到貨助理', '清除酷柏待對應', '', cn + ' 項(沒有入帳)');
     return { reply: cn ? '已清除 ' + cn + ' 項待對應的酷柏到貨(這些沒有入帳,請確認已在後台手動處理)。' : '目前沒有待對應的酷柏到貨。' };
   }
+  if (/^([A-Za-z]\s*\d{1,2}[\s,，、]*)+$/.test(text) && cbPend_().length) return { reply: cbPick_(text, '到貨助理') };
   if (/^(確認|確定|ok|OK|Ok)$/.test(text)) return { reply: arrApply_() };
   if (cbOn_() && /酷柏|coolbau/i.test(text) && /到貨|到货|入庫|已到/.test(text)) return { reply: '🔄 這看起來是酷柏的到貨通知。酷柏到貨現在會自動同步入帳並通知客人,不需要再轉傳,這次沒有做任何變更。\n(其他廠商的到貨通知照常轉傳即可)' };
   if (/^取消$/.test(text)) { var n = arrPend_().length; arrSave_([]); return { reply: n ? '已取消,沒有任何變更。' : '目前沒有待確認的到貨。' }; }
@@ -3159,7 +3160,7 @@ function cbPendAdd_(items) {
 /** 計畫入帳後:記住對照,並把已處理的品項從待對應移除 */
 function cbDone_(plans) {
   var ks = {}, n = 0;
-  (plans || []).forEach(function (pl) { (pl.cb || []).forEach(function (m) { cbMapPut_(m); ks[m.k] = 1; n++; }); });
+  (plans || []).forEach(function (pl) { (pl.cb || []).forEach(function (m) { cbMapPut_(m); if (m.title) setSet_('酷柏品名 ' + m.proid, t_(m.title, 120)); ks[m.k] = 1; n++; }); });
   if (n) cbPendSave_(cbPend_().filter(function (x) { return !ks[cbPk_(x)]; }));
 }
 /* 自動對照(不用人確認):品牌、品名、規格都對得上、而且全店只有一個商品規格符合 → 直接當作對照過,入帳並記住。
@@ -3193,15 +3194,15 @@ function cbGuess_(it, prods) {
 function cbPendAuto_() {
   var pe = cbPend_(); if (!pe.length) return '';
   var prods = {}; rows_('商品').forEach(function (p) { prods[String(p.商品ID)] = p; });
-  var items = [], cb = [];
+  var items = [], cb = [], st = settings_();
   pe.forEach(function (x) {
-    var g = cbGuess_(x, prods); if (!g) return;
+    var g = cbMapGet_(x, st, prods) || cbGuess_(x, prods); if (!g) return; // 已綁定(後台或 LINE 選過)優先;沒綁定才用嚴格自動對照
     items.push({ pid: g.pid, spec: g.spec, qty: x.qty, price: x.price, lots: cbLots_(x), text: x.title });
-    cb.push({ proid: x.proid, specid: x.specid, spec: x.spec, single: x.single, pid: g.pid, cspec: g.spec, k: cbPk_(x) });
+    cb.push({ proid: x.proid, specid: x.specid, spec: x.spec, single: x.single, pid: g.pid, cspec: g.spec, k: cbPk_(x), title: x.title });
   });
   if (!items.length) return '';
   arrSave_(arrPend_().filter(function (pl) { return !(pl.cb && pl.cb.length); })); // 舊的酷柏預覽作廢,避免入帳兩次
-  var opt = { auto: true, cb: cb, head: '📦 酷柏到貨(第一次出現的品項,已自動對照並入帳)' }, pv = arrPlan_(items, opt);
+  var opt = { auto: true, cb: cb, head: '📦 酷柏到貨(已綁定或只有唯一對應的品項,已自動對照並入帳)' }, pv = arrPlan_(items, opt);
   if (!opt.plan) return '';
   CBGA_ = { n: opt.plan.assign.length, q: 0, s: 0 }; opt.plan.assign.forEach(function (x) { CBGA_.q += Number(x.qty); }); opt.plan.surplus.forEach(function (x) { CBGA_.s += Number(x.qty); });
   return pv + '\n\n' + arrApply_([opt.plan], '酷柏到貨自動入帳');
@@ -3254,25 +3255,150 @@ function cbArrIn_(d) {
 }
 /** 給配對用:待對應的酷柏品項(每列:#編號|品名|規格|件數) */
 function cbPendList_() { return cbPend_().map(function (x, i) { return '#' + (i + 1) + '|' + x.title + '|' + x.spec + '|' + x.qty; }).join('\n'); }
-/** 配對結果 [{ref, pid, spec}] → 建立待確認計畫(取代之前的酷柏預覽),回傳要傳給到貨管理員的文字 */
+/* 對不上的酷柏品項:絕不自動選一個入帳。列出候選商品(AI 建議＋品牌/品名相近的),到貨管理員回代號(例 A1)或到後台商品「酷柏商品綁定」選,
+   選了就永久綁定(酷柏商品編號 → 店內商品＋規格),之後同品項到貨直接入帳。 */
+function cbBig_(s) { var o = {}; for (var i = 0; i + 1 < s.length; i++) o[s.substr(i, 2)] = 1; return o; }
+function cbWait_() {
+  var w = {};
+  rows_('訂單明細').forEach(function (l) {
+    if (String(l.到貨狀態) === '已到貨' || String(l.到貨狀態) === '已出貨' || l.出貨單ID) return;
+    var k = bp_(l.商品ID) + '|' + String(l.規格 || ''); w[k] = (w[k] || 0) + Number(l.數量);
+  });
+  return w;
+}
+function cbCand_(x, prods, sugg) {
+  var t = cbG_(x.title), ks = cbG_(x.spec), tb = cbBig_(t), out = [], seen = {};
+  var add = function (pid, sp, sc) { var k = pid + '|' + sp; if (seen[k] || !cbTarget_(k, prods)) return; seen[k] = 1; out.push({ pid: pid, spec: sp, sc: sc }); };
+  (sugg || []).forEach(function (g) { if (g && g.pid) add(String(g.pid), String(g.spec || ''), 9); });
+  Object.keys(prods).forEach(function (pid) {
+    var p = prods[pid], nm = cbG_(p.名稱), br = cbG_(p.品牌);
+    if (!nm || nm.length < 2) return;
+    if (br && t.indexOf(br) < 0) return;
+    var nb = cbBig_(nm), tot = 0, hit = 0; Object.keys(nb).forEach(function (b) { tot++; if (tb[b]) hit++; });
+    var sc = t.indexOf(nm) >= 0 ? 1 : (tot ? hit / tot : 0);
+    if (sc < 0.5) return;
+    var sl = specs_(p);
+    if (!sl.length) { add(pid, '', sc); return; }
+    var m = sl.filter(function (y) { var g = cbG_(y); if (!g) return false; return ks && !x.single ? (g.indexOf(ks) === 0 || ks.indexOf(g) === 0) : t.indexOf(g) >= 0; });
+    if (m.length) m.slice(0, 3).forEach(function (y) { add(pid, y, sc); });
+    else if (sl.length === 1) add(pid, sl[0], sc - 0.01);
+  });
+  return out.sort(function (a, b) { return b.sc - a.sc; }).slice(0, 5).map(function (c) { return [c.pid, c.spec]; });
+}
+var CB_L_ = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+/** ai:[{ref, pid, spec}](可以是空的)→ 每個待對應品項存好候選,回傳要傳給到貨管理員的選擇訊息 */
 function cbPendPlan_(ai) {
   var pe = cbPend_(); if (!pe.length) return '';
   var prods = {}; rows_('商品').forEach(function (p) { prods[String(p.商品ID)] = p; });
-  var items = [], cb = [], link = [], bad = [], seen = {};
-  (ai || []).forEach(function (r) {
-    var i = Math.floor(Number(r && r.ref)) - 1, x = pe[i]; if (!x || seen[i] || !r.pid) return;
-    var t = cbTarget_(String(r.pid) + '|' + String(r.spec || '').trim(), prods); if (!t) return;
-    seen[i] = 1;
-    items.push({ pid: t.pid, spec: t.spec, qty: x.qty, price: x.price, lots: cbLots_(x), text: x.title });
-    cb.push({ proid: x.proid, specid: x.specid, spec: x.spec, single: x.single, pid: t.pid, cspec: t.spec, k: cbPk_(x) });
-    link.push('・' + x.title + (x.spec ? '(' + x.spec + ')' : '') + '\n   → ' + String(prods[t.pid].名稱) + (t.spec ? '(' + t.spec + ')' : ''));
+  var sg = {}; (ai || []).forEach(function (r) { var i = Math.floor(Number(r && r.ref)) - 1; if (i >= 0 && r.pid) (sg[i] = sg[i] || []).push({ pid: r.pid, spec: String(r.spec || '').trim() }); });
+  var w = cbWait_(), msg = [], used = {};
+  pe.forEach(function (x) { if (x.code) used[x.code] = 1; });
+  pe.forEach(function (x, i) {
+    x.cand = cbCand_(x, prods, sg[i]);
+    if (!x.code) { for (var c = 0; c < CB_L_.length; c++) if (!used[CB_L_.charAt(c)]) { x.code = CB_L_.charAt(c); used[x.code] = 1; break; } } // 代號固定跟著品項,之前的品項入帳後也不會錯位
+    if (!x.code) { msg.push('・' + x.title + ' ×' + x.qty + ':待對應太多,請到後台商品編輯「酷柏商品綁定」處理'); return; }
+    var L = x.code;
+    msg.push(L + '｜' + x.title + (x.spec && !x.single ? '(' + x.spec + ')' : '') + ' ×' + x.qty + '(酷柏編號 ' + x.proid + ')');
+    if (!x.cand.length) msg.push('   找不到相近的店內商品:請先建立商品,再到後台商品編輯「酷柏商品綁定」選這個酷柏商品');
+    x.cand.forEach(function (c, k) { msg.push('   ' + L + (k + 1) + ' → ' + c[0] + ' ' + String(prods[c[0]].名稱) + (c[1] ? '(' + c[1] + ')' : '') + '・' + (w[c[0] + '|' + c[1]] || 0) + ' 件在等'); });
+    msg.push('   ' + L + '0 → 都不是(先不入帳)');
   });
-  pe.forEach(function (x, i) { if (!seen[i]) bad.push('・' + x.title + (x.spec ? '(' + x.spec + ')' : '') + ' ×' + x.qty); });
-  arrSave_(arrPend_().filter(function (pl) { return !(pl.cb && pl.cb.length); })); // 舊的酷柏預覽作廢,避免同一批到貨入帳兩次
-  var t = '';
-  if (items.length) t = '🔗 酷柏到貨:這些品項第一次出現,請確認對應(確認後會記住,下次自動入帳)\n' + link.join('\n') + '\n\n' + arrPlan_(items, { cb: cb, head: '📦 酷柏到貨預覽' });
-  if (bad.length) t += (t ? '\n\n' : '📦 酷柏到貨\n') + '⚠️ 這些品項在店內找不到對應的商品,沒有入帳:\n' + bad.join('\n') + '\n請先建立商品後傳「酷柏」重新配對;已在後台手動處理的話傳「酷柏清除」。';
-  return t;
+  cbPendSave_(pe);
+  arrSave_(arrPend_().filter(function (pl) { return !(pl.cb && pl.cb.length); })); // 舊版「回確認入帳」的酷柏預覽作廢
+  return '📦 酷柏到貨:下面品項還沒綁定 COS 商品,先不入帳(不會自動猜)。\n請回覆代號選擇正確的商品,例如「A1」;多項用空格分開,例如「A1 B2」。選了就永久綁定,之後同品項到貨自動入帳。\n\n' + msg.join('\n') + '\n\n也可以到後台商品編輯 →「酷柏商品綁定」搜尋酷柏商品綁定。';
+}
+/** 到貨管理員回代號(例 A1、A1 B2、A0):綁定並把已綁定的待對應品項入帳 */
+function cbPick_(text, who) {
+  var pe = cbPend_(); if (!pe.length) return '目前沒有待對應的酷柏到貨。';
+  var prods = {}; rows_('商品').forEach(function (p) { prods[String(p.商品ID)] = p; });
+  var re = /([A-Za-z])\s*(\d{1,2})/g, m, done = [], bad = [], skip = [];
+  while ((m = re.exec(text))) {
+    var L = m[1].toUpperCase(), n = Number(m[2]), x = pe.filter(function (y) { return y.code === L; })[0];
+    if (!x) { bad.push(m[0]); continue; }
+    if (n === 0) { skip.push(L); continue; }
+    var c = (x.cand || [])[n - 1], t = c && cbTarget_(c[0] + '|' + c[1], prods);
+    if (!t) { bad.push(m[0]); continue; }
+    cbMapPut_({ proid: x.proid, specid: x.specid, spec: x.spec, single: x.single, pid: t.pid, cspec: t.spec });
+    setSet_('酷柏品名 ' + x.proid, t_(x.title, 120));
+    log_(who || '到貨助理', '綁定酷柏商品', t.pid + (t.spec ? ' ' + t.spec : ''), '酷柏 ' + x.proid + ' ' + t_(x.title, 60));
+    done.push(L + ' → ' + t.pid + ' ' + String(prods[t.pid].名稱) + (t.spec ? '(' + t.spec + ')' : ''));
+  }
+  if (!done.length && !skip.length) return '代號不正確' + (bad.length ? ':' + bad.join('、') : '') + '。請照上一則訊息的代號回覆,例如「A1」。';
+  RDYN_ = []; var r = done.length ? cbPendAuto_() : '';
+  var rr = {}; cbRdyTell_(rr);
+  return (done.length ? '✅ 已綁定:\n' + done.join('\n') + '\n\n' + (r || '(沒有可入帳的件數)') : '') + (skip.length ? (done.length ? '\n\n' : '') + skip.join('、') + ' 先不入帳,仍留在待對應。' : '') + (bad.length ? '\n⚠️ 代號不正確:' + bad.join('、') : '');
+}
+/** 後台:這個商品目前綁定的酷柏商品 */
+function cbBinds_(pid) {
+  var st = settings_(), out = [];
+  Object.keys(st).forEach(function (k) {
+    if (k.indexOf(CB_MAP_) !== 0) return;
+    var v = String(st[k] || ''), i = v.indexOf('|'); if (i < 1 || v.slice(0, i) !== String(pid)) return;
+    var key = k.slice(CB_MAP_.length), j = key.indexOf('|'), proid = key.slice(0, j), sp = key.slice(j + 1);
+    if (sp.indexOf('t:') === 0) return; // 文字鍵是舊的輔助對照,不列出
+    out.push({ key: key, proid: proid, spec: sp, cspec: v.slice(i + 1), title: String(st['酷柏品名 ' + proid] || '') });
+  });
+  return out.sort(function (a, b) { return a.key < b.key ? -1 : 1; });
+}
+function adminCbBinds(tk, pid) { me_(tk); return { binds: cbBinds_(String(pid)), pend: cbPend_().map(function (x) { return { proid: x.proid, title: x.title, spec: x.spec, qty: x.qty }; }) }; }
+/** 後台綁定:d = {proid, title, single, rows:[{specid, stitle, cspec}]};整個商品沒分款式(single)時用 proid|* 一次綁全部規格 */
+function adminCbBind(tk, pid, d) {
+  var u = me_(tk), msg = '';
+  d = d || {};
+  lk_(function () {
+    pid = String(pid || ''); var p = rows_('商品').filter(function (x) { return String(x.商品ID) === pid; })[0];
+    if (!p) throw new Error('找不到這個商品');
+    var proid = String(Math.floor(Number(d.proid)) || ''); if (!proid || proid === '0') throw new Error('酷柏商品編號不正確');
+    var sl = specs_(p), chk = function (c) { c = String(c == null ? '' : c); if (sl.length ? sl.indexOf(c) < 0 : c !== '') throw new Error('規格「' + c + '」不在這個商品裡'); return c; };
+    var n = 0;
+    if (d.single) chk(d.cspec);
+    cbClear_(proid, d.single ? null : (d.rows || []).map(function (r) { return String(Math.floor(Number(r.specid)) || ''); })); // 同一個酷柏商品之前的對照(含舊的文字對照)先清掉,避免舊的錯誤對照優先
+    if (d.single) { setSet_(CB_MAP_ + proid + '|*', pid + '|' + chk(d.cspec)); n = 1; }
+    else (d.rows || []).slice(0, 100).forEach(function (r) {
+      var sid = String(Math.floor(Number(r.specid)) || ''); if (!sid || sid === '0') return;
+      if (r.cspec === null || r.cspec === undefined || r.cspec === '__none') { setSet_(CB_MAP_ + proid + '|' + sid, ''); return; }
+      setSet_(CB_MAP_ + proid + '|' + sid, pid + '|' + chk(r.cspec)); n++;
+    });
+    if (!n) throw new Error('沒有選任何規格');
+    setSet_('酷柏品名 ' + proid, t_(d.title, 120));
+    log_(u.acc, '綁定酷柏商品', pid, '酷柏 ' + proid + ' ' + t_(d.title, 60) + '(' + n + ' 項)');
+    RDYN_ = []; var r = cbPendAuto_(); // 待對應裡剛好有這個酷柏商品:立刻入帳並通知客人
+    if (r) { cbTell_(r); msg = '待對應裡的這個酷柏商品已自動入帳'; }
+    var rr = {}; cbRdyTell_(rr);
+  });
+  var o = adminCbBinds(tk, pid); o.msg = msg; return o;
+}
+/** 清掉一個酷柏商品的對照;sids 有給時只清那些規格編號(以及文字對照與整個商品的對照) */
+function cbClear_(proid, sids) {
+  var st = settings_(), pre = CB_MAP_ + proid + '|';
+  Object.keys(st).forEach(function (k) {
+    if (k.indexOf(pre) !== 0 || !String(st[k] || '')) return;
+    var sp = k.slice(pre.length);
+    if (sids && /^\d+$/.test(sp) && sids.indexOf(sp) < 0) return;
+    setSet_(k, '');
+  });
+}
+function adminCbUnbind(tk, pid, key) {
+  var u = me_(tk);
+  lk_(function () {
+    key = String(key || ''); if (!/^\d+\|(\*|\d+)$/.test(key)) throw new Error('綁定代號不正確');
+    var v = String(settings_()[CB_MAP_ + key] || ''); if (v.indexOf(String(pid) + '|') !== 0) throw new Error('這個綁定不屬於此商品');
+    setSet_(CB_MAP_ + key, '');
+    var st = settings_(), pre = CB_MAP_ + key.split('|')[0] + '|t:';
+    Object.keys(st).forEach(function (k) { if (k.indexOf(pre) === 0 && String(st[k] || '').indexOf(String(pid) + '|') === 0) setSet_(k, ''); });
+    log_(u.acc, '解除酷柏商品綁定', String(pid), '酷柏 ' + key);
+  });
+  return adminCbBinds(tk, pid);
+}
+/** 後台搜尋酷柏商品(由伺服器向酷柏查詢,見 server/core.js adminCbSearch):標上每個酷柏規格目前綁到哪個店內商品 */
+function cbBindOf_(list) {
+  var st = settings_(), prods = {}; rows_('商品').forEach(function (p) { prods[String(p.商品ID)] = p; });
+  var nm = function (v) { v = String(v || ''); var i = v.indexOf('|'); if (i < 1) return ''; var p = prods[v.slice(0, i)]; return p ? v.slice(0, i) + ' ' + String(p.名稱) + (v.slice(i + 1) ? '(' + v.slice(i + 1) + ')' : '') : ''; };
+  (list || []).forEach(function (x) {
+    x.bound = nm(st[CB_MAP_ + x.id + '|*']);
+    (x.specs || []).forEach(function (s) { s.bound = nm(st[CB_MAP_ + x.id + '|' + s.id]); });
+  });
+  return list;
 }
 
 /* --- 購物金 --- */

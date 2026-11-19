@@ -62,7 +62,8 @@ ok(r.status === 200 && r.body.ok && r.body.auto === 0 && r.body.pending === 2 &&
 ok(L('O1', 'P072').arrival_status === '未到貨', 'first time: order lines untouched');
 ok(aiCalls === 1 && /#1\|【韓國】MLB 貓耳造型毛帽-灰色/.test(aiPrompt) && /P072\|蝴蝶結貓耳毛帽/.test(aiPrompt), 'matcher got both lists');
 const pv = sent.filter(s => s.to === 'UADMIN').pop();
-ok(pv && /請確認對應/.test(pv.text) && /→ 蝴蝶結貓耳毛帽\(灰\)/.test(pv.text) && /回「確認」/.test(pv.text), 'admin got mapping preview');
+ok(pv && /先不入帳/.test(pv.text) && /A1 → P072 蝴蝶結貓耳毛帽\(灰\)/.test(pv.text) && /B1 → P008 /.test(pv.text) && /A0 → 都不是/.test(pv.text) && !/回「確認」/.test(pv.text), 'admin got candidate list (no auto pick) ' + (pv && pv.text));
+ok(run((I) => I.arrText_('UADMIN', '確認')).r.reply.indexOf('目前沒有待確認') === 0 && L('O1', 'P072').arrival_status === '未到貨', '「確認」 no longer applies an AI guess');
 
 // 3) 同一批重送:不重複
 r = await post({ type: 'arrival', batch: 'b1', items: [GREY, KITTY] });
@@ -70,8 +71,10 @@ ok(r.body.dup === true && JSON.parse(setv('酷柏待對應')).reduce((s, x) => s
 
 // 4) 管理員回「確認」:入帳、通知客人、記住對照、清掉待對應
 sent.length = 0;
-let a = run((I) => I.arrText_('UADMIN', '確認'));
-ok(/已入帳:客訂到貨 3 筆/.test(a.r.reply), 'confirm applies: ' + a.r.reply.split('\n')[0]);
+let a = run((I) => I.arrText_('UADMIN', 'Z9'));
+ok(/代號不正確/.test(a.r.reply) && L('O1', 'P072').arrival_status === '未到貨', 'wrong code changes nothing');
+a = run((I) => I.arrText_('UADMIN', 'a1 B1'));
+ok(/已綁定/.test(a.r.reply) && /已入帳:客訂到貨 3 筆/.test(a.r.reply), 'pick binds + applies: ' + a.r.reply.split('\n').slice(0, 4).join(' / '));
 ok(L('O1', 'P072').arrival_status === '已到貨' && L('O2', 'P072').arrival_status === '已到貨' && L('O3', 'P072').arrival_status === '未到貨' && L('O1', 'P008').arrival_status === '已到貨', 'FIFO: O1,O2 灰 + O1 擴香 arrived, O3 still waiting');
 ok(setv('酷柏對照 6717|22371') === 'P072|灰' && setv('酷柏對照 6717|*') === 'P072|灰' && setv('酷柏對照 7104|*') === 'P008|', 'mapping remembered');
 ok(JSON.parse(setv('酷柏待對應')).length === 0, 'pending cleared');
@@ -95,7 +98,7 @@ ok(run((I) => I.arrPend_().length).r === 0, 'no leftover preview');
 aiReply = { items: [{ ref: 1, pid: null, spec: '' }] };
 sent.length = 0;
 r = await post({ type: 'arrival', batch: 'b3', items: [{ proid: 9999, specid: 1, title: '【韓國】沒有上架的商品', spec: '標準', qty: 1, price: 100, single: 1 }] });
-ok(r.body.pending === 1 && sent.some(s => s.to === 'UADMIN' && /找不到對應的商品/.test(s.text)), 'unmatched item reported to admin');
+ok(r.body.pending === 1 && sent.some(s => s.to === 'UADMIN' && /找不到相近的店內商品/.test(s.text)), 'unmatched item reported to admin');
 r = await post({ type: 'poke' });
 ok(r.body.poke && r.body.pending === 1 && aiCalls === 3, 'daily poke re-runs matching while something is pending');
 a = run((I) => I.arrText_('UADMIN', '酷柏清除'));
@@ -104,7 +107,7 @@ ok(/已清除 1 項/.test(a.r.reply) && JSON.parse(setv('酷柏待對應')).leng
 ok(run((I) => I.arrText_('UOTHER', '酷柏清除')).r === null, 'non-admin ignored');
 aiReply = { items: [{ ref: 1, pid: 'P072', spec: '紫' }] };
 r = await post({ type: 'arrival', batch: 'b4', items: [{ proid: 6710, specid: 22370, title: '【韓國】MLB 蝴蝶結貓耳毛帽-紫色', spec: '標準', qty: 1, price: 983, single: 1 }] });
-ok(r.body.pending === 1 && !setv('酷柏對照 6710|*') && run((I) => I.arrPend_().length).r === 0, 'invalid spec from matcher is not planned');
+ok(r.body.pending === 1 && !setv('酷柏對照 6710|*') && run((I) => I.arrPend_().length).r === 0 && !sent.some(s => /P072 蝴蝶結貓耳毛帽\(紫\)/.test(s.text)), 'invalid spec from matcher is not offered');
 // 8) 原本的「LINE 轉傳到貨通知」流程不受影響
 line('O3', 'P008', 'Hello Kitty聯名款擴香3入禮盒組', '', 1);
 a = run((I) => I.arrPlan_([{ pid: 'P008', spec: '', qty: 1, price: null, text: '擴香' }]));
@@ -138,9 +141,9 @@ run((I) => I.arrText_('UADMIN', '酷柏清除'));
 order('O5', '2026-11-05 10:00:00', 'U5'); line('O5', 'P008', 'Hello Kitty聯名款擴香3入禮盒組', '', 1);
 aiReply = { items: [{ ref: 1, pid: 'P008', spec: '' }] };
 r = await post({ type: 'arrival', batch: 'b5', items: [{ proid: 8000, specid: 5, title: '【韓國】Hetras 擴香禮盒(新包裝)', spec: '標準', qty: 1, price: 500, lots: [[1, 500, 'w9']], single: 1 }] });
-ok(r.body.pending === 1 && run((I) => I.arrPend_().length).r === 1, 'new item waits for confirmation');
+ok(r.body.pending === 1 && L('O5', 'P008').arrival_status === '未到貨' && JSON.parse(setv('酷柏待對應'))[0].code === 'A', 'new item waits for a pick (code A)');
 r = await post({ type: 'cost', items: [{ wid: 'w9', cost: 550 }] });
-a = run((I) => I.arrText_('UADMIN', '確認'));
+a = run((I) => I.arrText_('UADMIN', 'A1'));
 ok(L('O5', 'P008').arrival_status === '已到貨' && Number(L('O5', 'P008').cost) === 550, 'correction before confirmation is used when confirmed: cost ' + L('O5', 'P008').cost);
 r = await post({ type: 'cost', items: [{ wid: 'w9', cost: 560 }] });
 ok(r.body.updated === 1 && Number(L('O5', 'P008').cost) === 560, 'and still linked afterwards');
@@ -208,7 +211,7 @@ ok(sp && JSON.stringify(sp.ready) === '{"":2}' && sp.stock === 2, 'storefront sh
 // 對不上的例外:乙瑄也會收到
 aiReply = { items: [{ ref: 1, pid: null, spec: '' }] }; sent.length = 0;
 r = await post({ type: 'arrival', batch: 'b13', items: [{ proid: 9998, specid: 1, title: '【韓國】還沒建立的商品', spec: '標準', qty: 1, price: 10, single: 1 }] });
-ok(r.body.pending === 1 && (r.body.pendItems || [])[0].indexOf('還沒建立的商品') >= 0 && sent.some(x => x.to === 'UYIXUAN0001' && /找不到對應的商品/.test(x.text)), 'unmatched → reported with item names, 乙瑄 notified');
+ok(r.body.pending === 1 && (r.body.pendItems || [])[0].indexOf('還沒建立的商品') >= 0 && sent.some(x => x.to === 'UYIXUAN0001' && /找不到相近的店內商品/.test(x.text)), 'unmatched → reported with item names, 乙瑄 notified');
 a = run((I) => I.arrText_('UYIXUAN0001', '酷柏清除'));
 ok(/已清除 1 項/.test(a.r.reply), '乙瑄 can use the 酷柏 commands too');
 ok(!sent.some(x => x.to === 'UFAKE000001') && run((I) => I.arrText_('UFAKE000001', '酷柏清除')).r === null && run((I) => I.cbTargets_()).r.indexOf('UFAKE000001') < 0, 'a customer who names themselves 乙宣 gets no messages and no admin commands');
@@ -223,4 +226,38 @@ ok(r.status === 200 && r.body.already === 1 && r.body.auto === 0 && r.body.stock
 l12.arrival_status = '未到貨';
 r = await post({ type: 'arrival', batch: 'b22', items: [Object.assign({}, FP, { lots: [[1, 216, 'w500']] })] });
 ok(r.body.auto === 1 && l12.arrival_status === '已到貨', 'COS had reverted it → re-KEY applies again ' + JSON.stringify(r.body));
+// 17) 今天的情況:兩個 Hetras 商品都有「12水仙花」→ 絕不自動選;AI 建議錯的也只是候選,管理員選對的(B2)才綁定入帳
+DB['商品'].push({ id: 'P073', name: '固體擴香膏', categories: '', sale_type: '預購', price: 547, stock: null, specs: '07五星級|12水仙花', on_sale: 'Y', brand: 'Hetras' });
+DB['商品'].push({ id: 'P088', name: '空間固體擴香', categories: '', sale_type: '預購', price: 600, stock: null, specs: '07五星級|12水仙花', on_sale: 'Y', brand: 'Hetras' });
+order('O20', '2026-09-17 12:00:00', 'U20'); line('O20', 'P088', '空間固體擴香', '12水仙花', 1);
+order('O21', '2026-11-19 11:39:00', 'U21'); line('O21', 'P073', '固體擴香膏', '12水仙花', 1);
+run((I) => I.arrText_('UADMIN', '酷柏清除'));
+aiReply = { items: [{ ref: 1, pid: 'P088', spec: '12水仙花' }] }; sent.length = 0;
+r = await post({ type: 'arrival', batch: 'b30', items: [{ proid: 6900, specid: 24001, title: '【韓國】Hetras 室內固體擴香', spec: '12水仙花', qty: 1, price: 300, lots: [[1, 300, 'w900']], single: 0 }] });
+const msg17 = (sent.filter(x => x.to === 'UADMIN').pop() || {}).text || '';
+ok(r.body.auto === 0 && r.body.pending === 1 && L('O20', 'P088').arrival_status === '未到貨' && L('O21', 'P073').arrival_status === '未到貨', 'ambiguous → nothing applied ' + JSON.stringify(r.body));
+ok(/A1 → P088 空間固體擴香\(12水仙花\)・1 件在等/.test(msg17) && /A2 → P073 固體擴香膏\(12水仙花\)・1 件在等/.test(msg17), 'both candidates listed with waiting counts:\n' + msg17);
+a = run((I) => I.arrText_('UADMIN', 'A2'));
+ok(L('O21', 'P073').arrival_status === '已到貨' && L('O20', 'P088').arrival_status === '未到貨' && setv('酷柏對照 6900|24001') === 'P073|12水仙花', 'picked P073 → right customer, mapping saved');
+r = await post({ type: 'arrival', batch: 'b31', items: [{ proid: 6900, specid: 24001, title: '【韓國】Hetras 室內固體擴香', spec: '12水仙花', qty: 1, price: 300, lots: [[1, 300, 'w901']], single: 0 }] });
+ok(r.body.auto === 0 && r.body.stock === 1 && r.body.pending === 0, 'next time: bound → straight in (surplus to stock) ' + JSON.stringify(r.body));
+// 18) 後台綁定:先登入,綁定整個商品(single)→ 舊的錯誤對照(含文字對照)被清掉;待對應裡的會立刻入帳;解除綁定
+run((I) => I.saveAdmin_('admin', '管理員', 'Passw0rd!', true)); const tk = run((I) => I.adminLogin('admin', 'Passw0rd!')).r;
+const TK = tk && tk.token;
+ok(!!TK, 'admin login for binding');
+run((I) => { I.setSet_('酷柏對照 7700|t:標準', 'P088|07五星級'); I.setSet_('酷柏對照 7700|55', 'P088|07五星級'); });
+order('O22', '2026-11-01 12:00:00', 'U22'); line('O22', 'P073', '固體擴香膏', '07五星級', 1);
+r = await post({ type: 'arrival', batch: 'b32', items: [{ proid: 7701, specid: 56, title: '【韓國】Hetras 固體擴香膏 五星級', spec: '標準', qty: 1, price: 300, lots: [[1, 300, 'w902']], single: 1 }] });
+ok(r.body.pending === 1, 'unbound item waits');
+a = run((I) => I.adminCbBind(TK, 'P073', { proid: 7701, title: '【韓國】Hetras 固體擴香膏 五星級', single: true, cspec: '07五星級' }));
+ok(L('O22', 'P073').arrival_status === '已到貨' && /自動入帳/.test(a.r.msg) && a.r.binds.some(b => b.key === '7701|*'), 'admin bind applies the pending item at once ' + JSON.stringify(a.r.binds));
+a = run((I) => I.adminCbBind(TK, 'P073', { proid: 7700, title: 'x', single: true, cspec: '07五星級' }));
+ok(setv('酷柏對照 7700|t:標準') === '' && setv('酷柏對照 7700|55') === '' && setv('酷柏對照 7700|*') === 'P073|07五星級', 'rebinding clears old wrong mappings');
+let er = ''; try { run((I) => I.adminCbBind(TK, 'P073', { proid: 7700, title: 'x', single: true, cspec: '不存在' })); } catch (e) { er = String(e.message); }
+ok(/不在這個商品裡/.test(er), 'unknown spec rejected');
+a = run((I) => I.adminCbUnbind(TK, 'P073', '7700|*'));
+ok(setv('酷柏對照 7700|*') === '' && !a.r.binds.some(b => b.key === '7700|*'), 'unbind');
+er = ''; try { run((I) => I.adminCbUnbind(TK, 'P088', '7701|*')); } catch (e) { er = String(e.message); } ok(/不屬於/.test(er), 'cannot unbind another product binding');
+const lst = run((I) => I.cbBindOf_([{ id: 7701, title: 't', specs: [{ id: 56, title: '標準' }] }])).r;
+ok(/^P073 固體擴香膏\(07五星級\)/.test(lst[0].bound), 'search result shows current binding ' + lst[0].bound);
 console.log(fails ? fails + ' FAILED' : 'ALL PASSED');
