@@ -869,7 +869,7 @@ function sfState(ch) {
   var mf = f.pay.value === '賣貨便' && !logiOn(), fo = f.cvs.querySelector('option[value="全家"],option:nth-child(2)');
   if (mf && f.cvs.value !== '7-11') { f.cvs.value = '7-11'; if (f.cvsid) { f.cvsid.value = ''; f.store.value = ''; var cn0 = $('#cvsn'); if (cn0) cn0.textContent = '尚未選擇門市(賣貨便只能選 7-11)'; } } if (fo) fo.disabled = mf;
   f.store.placeholder = mf ? '賣貨便只能寄 7-11,請填 7-11 店名或店號' : '';
-  var mh = $('#mfh'); if (mh) { mh.hidden = !mf; mh.textContent = '賣貨便只能寄 7-11 門市'; mh.style.color = 'var(--acc)'; }
+  var mfe = $('#mfh'); if (mfe) { mfe.hidden = !mf; mfe.textContent = '賣貨便只能寄 7-11 門市'; mfe.style.color = 'var(--acc)'; }
   return { method: mh ? '店到店' : f.method.value, pay: f.pay.value, credit: f.credit ? Number(f.credit.value) || 0 : 0 };
 }
 var SQT = 0;

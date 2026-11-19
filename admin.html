@@ -409,7 +409,7 @@ function recvToggle() {
   // 付款方式跟著配送方式:超商取貨付款只限店到店、付現金只限自取
   if (f.pay) [].forEach.call(f.pay.options, function (o) { if (o.value === '賣貨便' && !LOGI && m === '店到店' && f.rcvs && f.rcvs.value !== '7-11') { o.disabled = true; o.hidden = true; if (o.selected) f.pay.value = '匯款'; return; } var ok = o.value === '賣貨便' ? m === '店到店' : o.value === '付現金' ? m === '自取' : true; o.disabled = !ok; o.hidden = !ok; if (!ok && o.selected) f.pay.value = '匯款'; });
 }
-document.addEventListener('change', function (e) { if (e.target && (e.target.name === 'rm' || e.target.name === 'rcvs')) recvToggle(); });
+document.addEventListener('change', function (e) { if (e.target && (e.target.name === 'rm' || e.target.name === 'rcvs')) recvToggle(); if (e.target && e.target.name === 'rm' && e.target.value === '自取' && e.target.form && e.target.form.fee) e.target.form.fee.value = 0; });
 // 賣貨便:付款方式改成賣貨便時,配送方式自動改成店到店 7-11(和前台一樣兩邊連動)
 document.addEventListener('change', function (e) { var f = e.target && e.target.form; if (!f || f.id !== 'shf' || e.target.name !== 'pay' || e.target.value !== '賣貨便' || LOGI || !f.rm) return; f.rm.value = '店到店'; if (f.rcvs) f.rcvs.value = '7-11'; recvToggle(); });
 function etaD(v) { return /^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) ? v : ''; }

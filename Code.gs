@@ -1682,6 +1682,7 @@ function adminUpdateShip(tk, sid, d) {
       if (payNew === '賣貨便' && rc.cvs !== '7-11' && !logiOn_()) throw new Error('賣貨便只能寄 7-11');
       if (mNew !== String(s.配送方式 || '') && fee === Number(s.運費)) fee = feeFor_(mNew, payNew, Number(s.商品金額) - Number(s.優惠折抵 || 0)); // 改了配送方式但沒動運費 → 依設定重算
     }
+    if (mNew === '自取') fee = 0; // 到店自取一律免運費
     if (!ship) throw new Error('請填寫收件資訊');
     if (String(s.綠界物流ID || '')) { // 已產生綠界物流單:收件資訊、物流單號以綠界為準
       if (ship !== String(s.收件資訊 || '') || mNew !== String(s.配送方式 || '')) throw new Error('這張出貨單已產生綠界物流單號,不能再改收件資訊。要改請先到綠界後台取消該物流單,再按出貨單裡的「清除物流單」後重新產生');
