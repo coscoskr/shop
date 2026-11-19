@@ -265,10 +265,10 @@ function adjStock_(p, sp, delta) {
 }
 var RDYC_ = null; // 這次組前台資料用的現貨表
 function imgs_(v) { return String(v || '').split('|').map(img_).filter(Boolean); }
-/** 關團:關團日期當天台灣時間中午 12:00 起視同下架(資料庫每分鐘也會自動把上架改成 N) */
+/** 關團:關團日期當天台灣時間下午 14:00 起視同下架(資料庫每分鐘也會自動把上架改成 N) */
 function closeAt_(v) {
   var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(v || '').trim()); if (!m) return 0;
-  return Date.UTC(+m[1], +m[2] - 1, +m[3], 4, 0, 0); // 12:00 台灣(UTC+8)= 04:00 UTC
+  return Date.UTC(+m[1], +m[2] - 1, +m[3], 6, 0, 0); // 14:00 台灣(UTC+8)= 06:00 UTC
 }
 function closed_(p) { var t = closeAt_(p && p.關團日期); return !!t && Date.now() >= t; }
 function onSale_(p) { return !!p && p.上架 === 'Y' && !closed_(p); }
@@ -770,7 +770,7 @@ function adminSaveProduct(tk, d) {
     tiers_(d.tiers, true);
     var cl = String(d.close || '').trim();
     if (cl && !closeAt_(cl)) throw new Error('關團日期格式不正確');
-    if (d.on && closed_({ 關團日期: cl })) throw new Error('關團日期 ' + cl + ' 中午 12:00 已經過了,要上架請先改關團日期或清空');
+    if (d.on && closed_({ 關團日期: cl })) throw new Error('關團日期 ' + cl + ' 下午 14:00 已經過了,要上架請先改關團日期或清空');
     var ps = rows_('商品'), id = d.id;
     var old = id ? ps.filter(function (p) { return p.商品ID === id; })[0] : null;
     if (!old) {

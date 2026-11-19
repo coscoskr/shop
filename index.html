@@ -225,7 +225,7 @@ function busy(d, now) { BUSY = Math.max(0, BUSY + d); clearTimeout(BT); var bb =
 })();
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 function money(n) { return 'NT$ ' + Number(n).toLocaleString('en-US'); }
-function clTxt(p) { return p && p.close ? md(p.close) + ' 中午12:00 關團' : ''; }
+function clTxt(p) { return p && p.close ? md(p.close) + ' 14:00 關團' : ''; }
 function md(s) { return s ? (+s.slice(5, 7)) + '/' + (+s.slice(8, 10)) : ''; }
 function byId(id) { return D.products.filter(function (p) { return p.id === id; })[0]; }
 function unit(p, n) { n = baseQty(p.id) || n; var u = p.price; p.tiers.forEach(function (t) { if (n >= t.min) u = t.price; }); return u; }

@@ -32,16 +32,16 @@ ok(r.ok && r.result.total === 1600, 'placeOrder total 1600: ' + JSON.stringify(r
 r = await call('getShop'); ok(r.result.products[0].stock === 3, 'stock decremented to 3 (persisted)');
 r = await call('placeOrder', { email: 'a@b.co', name: '王', phone: '0912345678', items: [{ id: pid, qty: 99 }] }); ok(!r.ok, 'oversell rejected: ' + r.error);
 r = await call('getShop'); ok(r.result.products[0].stock === 3, 'failed order did not change stock');
-{ // 關團日期:當天中午 12:00(台灣)起視同下架
-  const real = Date.now, T = Date.UTC(2026, 10, 21, 4, 0, 0);
+{ // 關團日期:當天14:00(台灣)起視同下架
+  const real = Date.now, T = Date.UTC(2026, 10, 21, 6, 0, 0);
   r = await call('adminSaveProduct', tk, { id: pid, name: '測試鞋', price: 800, stock: 3, type: '現貨', tiers: '', cats: ['鞋'], on: true, vendor: 'B', cost: 400, taxIncl: true, source: 'TW', brand: 'Nike', close: '2026/11/21' });
   ok(!r.ok && /格式/.test(r.error), 'bad close format: ' + r.error);
   Date.now = () => T - 60000;
   r = await call('adminSaveProduct', tk, { id: pid, name: '測試鞋', price: 800, stock: 3, type: '現貨', tiers: '', cats: ['鞋'], on: true, vendor: 'B', cost: 400, taxIncl: true, source: 'TW', brand: 'Nike', close: '2026-11-21' });
   ok(r.ok, 'save with close date');
-  r = await call('getShop'); ok(r.result.products.length === 1 && r.result.products[0].close === '2026-11-21', '11:59 still on sale');
+  r = await call('getShop'); ok(r.result.products.length === 1 && r.result.products[0].close === '2026-11-21', '13:59 still on sale');
   Date.now = () => T;
-  r = await call('getShop'); ok(r.result.products.length === 0, '12:00 hidden from shop (even cached)');
+  r = await call('getShop'); ok(r.result.products.length === 0, '14:00 hidden from shop (even cached)');
   r = await call('placeOrder', { email: 'a@b.co', name: '王', phone: '0912345678', items: [{ id: pid, qty: 1 }] }); ok(!r.ok && /關團/.test(r.error), 'order after close rejected: ' + r.error);
   r = await call('adminInit', tk); const ap = r.result.products.find(x => x.id === pid); ok(ap && ap.closed === true, 'admin sees closed');
   r = await call('adminBatchProducts', tk, [pid], 'off'); r = await call('adminBatchProducts', tk, [pid], 'on'); ok(r.ok && /關團/.test(r.result.msg), 'batch on skips closed: ' + (r.result && r.result.msg));
