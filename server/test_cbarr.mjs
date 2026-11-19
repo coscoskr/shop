@@ -267,4 +267,9 @@ const nP = DB['商品'].find(x => x.name === '無極限控油定妝噴霧100ml')
 ok(DB['商品'].length === nP0 + 1 && nP && setv('酷柏對照 1163|*') === nP.id + '|' && setv('酷柏品名 1163') === '【美妝】SHU UEMURA植村秀無極限控油定妝噴霧100ml', 'new product + binding in one save ' + (nP && nP.id));
 er = ''; try { run((I) => I.adminSaveProduct(TK, { name: '測試錯規格', price: 1, type: '預購', unlimited: true, specs: ['黑'], cats: [], vendor: '酷柏', on: false, cb: { proid: 1164, title: 'x', single: true, cspec: '白' } })); } catch (e) { er = String(e.message); }
 ok(/不在這個商品裡/.test(er), 'bad spec in save → error: ' + er);
+// 20) 整個酷柏商品一起解除
+a = run((I) => I.adminCbBind(TK, 'P073', { proid: 7800, title: 'y', single: false, rows: [{ specid: 1, cspec: '07五星級' }, { specid: 2, cspec: '12水仙花' }] }));
+ok(setv('酷柏對照 7800|1') === 'P073|07五星級' && setv('酷柏對照 7800|2') === 'P073|12水仙花', 'bound 2 specs');
+a = run((I) => I.adminCbUnbind(TK, 'P073', '7800|all'));
+ok(setv('酷柏對照 7800|1') === '' && setv('酷柏對照 7800|2') === '' && !a.r.binds.some(b => b.proid === '7800'), 'unbind all specs of one 酷柏 product');
 console.log(fails ? fails + ' FAILED' : 'ALL PASSED');

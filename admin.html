@@ -618,8 +618,11 @@ function cbBind(p, id) {
   var specSel = function (cur, none) { var l = sl(); return '<select class="cbsp">' + (none ? '<option value="__none">不綁定</option>' : '') + (l.length ? l.map(function (n) { return '<option value="' + esc(n) + '"' + (n === cur ? ' selected' : '') + '>' + esc(n) + '</option>'; }).join('') : '<option value="">(這個商品沒有規格)</option>') + '</select>'; };
   var drawBound = function (d) {
     bound = d.binds || [];
-    box.innerHTML = (bound.length ? bound.map(function (x) {
-      return '<div style="display:flex;gap:8px;align-items:center;margin:4px 0"><span style="flex:1">✅ 酷柏 ' + esc(x.proid) + ' ' + esc(x.title || '') + '<br><span class="m">' + (x.spec === '*' ? '整個商品' : '酷柏規格編號 ' + esc(x.spec)) + ' → ' + esc(x.cspec || '(無規格)') + '</span></span><button type="button" class="btn l s" data-cbu="' + esc(x.key) + '">解除</button></div>';
+    // 同一個酷柏商品合併成一列(酷柏的交期、在倉庫的等規格很多,逐筆列出太長)
+    var gp = {}, go = []; bound.forEach(function (x) { if (!gp[x.proid]) { gp[x.proid] = { proid: x.proid, title: x.title, to: {} }; go.push(gp[x.proid]); } var g0 = gp[x.proid]; g0.to[x.cspec || '(無規格)'] = (g0.to[x.cspec || '(無規格)'] || 0) + (x.spec === '*' ? 0 : 1); g0.all = g0.all || x.spec === '*'; });
+    box.innerHTML = (go.length ? go.map(function (g) {
+      var t = Object.keys(g.to).map(function (c) { return (g.all && Object.keys(g.to).length === 1 ? '整個商品' : g.to[c] + ' 個酷柏規格') + ' → ' + esc(c); }).join('、');
+      return '<div style="display:flex;gap:8px;align-items:center;margin:4px 0"><span style="flex:1">✅ 酷柏 ' + esc(g.proid) + ' ' + esc(g.title || '') + '<br><span class="m">' + t + '</span></span><button type="button" class="btn l s" data-cbu="' + esc(g.proid) + '|all">解除</button></div>';
     }).join('') : '<span class="er" style="display:inline">⚠ 還沒綁定酷柏商品:酷柏到貨時會先停在「待對應」,不會入帳。</span>') +
       ((d.pend || []).length ? '<p class="m" style="margin:6px 0 0">目前待對應的酷柏到貨:' + d.pend.map(function (x) { return esc(x.title) + ' ×' + x.qty + '(酷柏 ' + esc(x.proid) + ')'; }).join('、') + '</p>' : '');
     if (!bound.length) find(); // 還沒綁定:直接用品名找候選,不用自己搜尋

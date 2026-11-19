@@ -3389,9 +3389,15 @@ function cbClear_(proid, sids) {
 function adminCbUnbind(tk, pid, key) {
   var u = me_(tk);
   lk_(function () {
-    key = String(key || ''); if (!/^\d+\|(\*|\d+)$/.test(key)) throw new Error('綁定代號不正確');
+    key = String(key || ''); if (!/^\d+\|(\*|\d+|all)$/.test(key)) throw new Error('綁定代號不正確');
+    if (/\|all$/.test(key)) { // 整個酷柏商品一起解除(這個商品綁到的所有規格)
+      var st0 = settings_(), pre0 = CB_MAP_ + key.split('|')[0] + '|', n0 = 0;
+      Object.keys(st0).forEach(function (k) { if (k.indexOf(pre0) === 0 && String(st0[k] || '').indexOf(String(pid) + '|') === 0) { setSet_(k, ''); n0++; } });
+      if (!n0) throw new Error('這個綁定不屬於此商品');
+    } else {
     var v = String(settings_()[CB_MAP_ + key] || ''); if (v.indexOf(String(pid) + '|') !== 0) throw new Error('這個綁定不屬於此商品');
     setSet_(CB_MAP_ + key, '');
+    }
     var st = settings_(), pre = CB_MAP_ + key.split('|')[0] + '|t:';
     Object.keys(st).forEach(function (k) { if (k.indexOf(pre) === 0 && String(st[k] || '').indexOf(String(pid) + '|') === 0) setSet_(k, ''); });
     log_(u.acc, '解除酷柏商品綁定', String(pid), '酷柏 ' + key);
