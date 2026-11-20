@@ -154,7 +154,7 @@ html,body{max-width:100%;overflow-x:hidden}img{max-width:100%}
 .li{display:grid;grid-template-columns:28px 1fr auto;gap:4px 10px;align-items:start;padding:10px 0;border-top:1px solid var(--line)}.li input.sk{width:24px;height:24px;margin:0}.li .t{font-weight:700;word-break:break-word}.li .s{font-size:13px;color:var(--mute)}.li .p{text-align:right;font-weight:700;white-space:nowrap}.li.pk{cursor:pointer}
 .po{border:1px solid var(--ink);padding:14px;background:#fff}.po h3{text-align:center;margin:0 0 4px;letter-spacing:6px}.po table{width:100%;border-collapse:collapse;font-size:14px}.po th,.po td{border-bottom:1px solid var(--line);padding:6px 2px;text-align:left}.po td.n,.po th.n{text-align:right;white-space:nowrap}.po td{word-break:break-word}
 .bd{color:var(--acc)}
-dialog{padding:14px 16px}dialog h2{font-size:17px;margin:0 0 8px}#dlg p{margin:6px 0}#dlg .ds{font-size:13px;max-height:5.2em;overflow:auto}#dlg .dsx .ds{max-height:none;overflow:visible}#dlg .th{margin:6px 0 2px}#dlg .btn{padding:8px 14px;font-size:14px}#dlg .r{gap:8px;margin:8px 0}
+dialog{padding:14px 16px}dialog h2{font-size:17px;margin:0 0 8px}#dlg p{margin:6px 0}#dlg .ds{font-size:13px;max-height:5.2em;overflow:auto}#dlg .dsx .ds{max-height:none;overflow:visible}#dlg .dsh{font-weight:700;margin:12px 0 2px}#dlg .th{margin:6px 0 2px}#dlg .btn{padding:8px 14px;font-size:14px}#dlg .r{gap:8px;margin:8px 0}
 .bkc{border:1px solid var(--pink);border-radius:12px;background:var(--soft);padding:10px 12px;margin:8px 0}.bkc .am{font-size:13px;color:var(--mute)}.bkc .am b{color:var(--acc);font-size:18px}
 .bk{display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px dashed var(--pink);font-size:14px}.bk .k{flex:none;width:3.2em;color:var(--mute);font-size:13px}.bk .v{flex:1;min-width:0;font-weight:700;word-break:break-all;letter-spacing:.3px}
 .cp{flex:none;border:1px solid var(--acc);background:#fff;color:var(--acc);border-radius:999px;padding:2px 12px;font-size:12px;cursor:pointer;min-height:26px}.cp.ok{background:var(--acc);color:#fff}
@@ -167,6 +167,14 @@ dialog{padding:14px 16px}dialog h2{font-size:17px;margin:0 0 8px}#dlg p{margin:6
 #ft .fc{margin-top:18px;font-size:11px;letter-spacing:1px;opacity:.8}
 #fab{position:fixed;right:10px;bottom:20px;z-index:4;display:flex;flex-direction:column;gap:8px}#fab a{display:grid;place-items:center;width:58px;height:58px;border-radius:50%;background:#06C755;color:#fff;font-size:13px;font-weight:700;text-decoration:none;line-height:1.1;text-align:center;box-shadow:0 2px 10px rgba(75,59,55,.28)}#fab a.cm{background:var(--acc);position:relative}#fab .bub{position:absolute;right:calc(100% + 10px);top:50%;transform:translateY(-50%);white-space:nowrap;overflow:hidden;background:linear-gradient(135deg,#E9A596,#CF7F6E);color:#fff;border-radius:14px;padding:5px 12px;font-size:12px;font-weight:700;letter-spacing:.5px;box-shadow:0 2px 8px rgba(75,59,55,.25)}#fab .bub::after{content:'';position:absolute;top:-10%;left:-70%;width:45%;height:120%;background:linear-gradient(100deg,rgba(255,255,255,0) 0,rgba(255,255,255,.95) 50%,rgba(255,255,255,0) 100%);transform:skewX(-20deg);animation:shn 2.6s ease-in-out infinite}@keyframes shn{0%{left:-70%}55%,100%{left:140%}}@media(prefers-reduced-motion:reduce){#fab .bub::after{animation:none;display:none}}
 @media(min-width:700px){dialog{width:min(480px,94vw)}.big{max-height:40vh}}
+
+/* 商品圖片放大檢視 */
+.big{cursor:zoom-in}.zh{text-align:center;font-size:12px;color:var(--mute,#9a8a80);margin:2px 0 4px}
+#lbx{position:fixed;inset:0;z-index:100000;background:#161010;display:flex;align-items:center;justify-content:center;touch-action:none;user-select:none;-webkit-user-select:none}
+#lbx img{max-width:100vw;max-height:100vh;object-fit:contain;transform-origin:0 0;will-change:transform;-webkit-user-drag:none}
+#lbx button{position:absolute;display:flex;align-items:center;justify-content:center;border:0;background:rgba(0,0,0,.45);color:#fff;border-radius:50%;width:44px;height:44px;font-size:22px;line-height:44px;padding:0;cursor:pointer}
+#lbx .lx{top:max(12px,env(safe-area-inset-top));right:12px}#lbx .lp{left:10px;top:50%;margin-top:-22px}#lbx .ln{right:10px;top:50%;margin-top:-22px}
+#lbx .lc{position:absolute;bottom:max(14px,env(safe-area-inset-bottom));left:0;right:0;text-align:center;color:#fff;font-size:13px;opacity:.85;pointer-events:none}
 </style>
 </head>
 <body>
@@ -537,11 +545,11 @@ document.addEventListener('click', function (e) { var b = e.target.closest && e.
 function detail(p) {
   SPC = ''; SPZ = '';
   var t = p.tiers.map(function (x) { return '買 ' + x.min + ' 件以上,每件 ' + money(x.price); }).join('<br>');
-  return '<div class="tb">' + (!LT && D.line && D.line.on ? '<button type="button" class="lgb" data-a="lgd">LINE 登入</button>' : '') + '<button type="button" class="xb" data-a="x" aria-label="關閉">✕</button></div><h2>' + bn(p) + '</h2>' + (p.imgs && p.imgs.length ? '<img class="big" id="bigimg" src="' + esc(p.imgs[0]) + '" alt="" referrerpolicy="no-referrer">' + (p.imgs.length > 1 ? '<div class="th">' + p.imgs.map(function (u, k) { return '<img src="' + esc(u) + '" referrerpolicy="no-referrer" alt="商品圖片 ' + (k + 1) + '" data-a="bigimg" data-u="' + esc(u) + '" class="' + (k ? '' : 'on') + '">'; }).join('') + '</div>' : '') : '') +
+  return '<div class="tb">' + (!LT && D.line && D.line.on ? '<button type="button" class="lgb" data-a="lgd">LINE 登入</button>' : '') + '<button type="button" class="xb" data-a="x" aria-label="關閉">✕</button></div><h2>' + bn(p) + '</h2>' + (p.imgs && p.imgs.length ? '<img class="big" id="bigimg" src="' + esc(p.imgs[0]) + '" alt="點圖片可放大" data-a="zoom" data-i="0" referrerpolicy="no-referrer"><div class="zh">點圖片可放大</div>' + (p.imgs.length > 1 ? '<div class="th">' + p.imgs.map(function (u, k) { return '<img src="' + esc(u) + '" referrerpolicy="no-referrer" alt="商品圖片 ' + (k + 1) + '" data-a="bigimg" data-i="' + k + '" data-u="' + esc(u) + '" class=""' + (k ? '' : 'on') + '">'; }).join('') + '</div>' : '') : '') +
     '<p><span class="pr">' + money(p.price) + '</span> <span class="tg">' + tag(p) + '</span></p>' + (clTxt(p) ? '<p class="tg" style="color:#d64545;font-weight:700">' + clTxt(p) + ',關團後就不能下單了</p>' : '') + (t ? '<p class="tg">' + t + '</p>' : '') +
     (p.stock === 0 ? '<p>這項商品已售完。</p><p><button class="btn l shb" data-a="shr">分享給朋友</button></p>' : (p.specs && p.specs.length ? '<input type="hidden" id="spsel" value=""><div id="spw">' + specPick(p) + '</div><p id="spn" class="m" style="margin:4px 0">請選擇規格查看剩餘數量</p>' : (p.stock !== null ? '<p class="m" style="margin:4px 0">剩餘數量:<b>' + p.stock + '</b> 件</p>' : '') + (rdyN(p, '') ? '<p class="m" style="margin:4px 0">' + rdyNote(rdyN(p, '')) + '</p>' : '')) + '<p id="dte" class="tg" role="alert"></p><div class="r"><button class="btn l" data-a="dn">−</button><b id="qn">1</b><button class="btn l" data-a="up">+</button><button class="btn a" data-a="add">加入購物車</button><button type="button" class="btn l shb" data-a="shr">分享給朋友</button></div>') +
     // 商品說明放在規格/購買按鈕下方,整段展開(跟著整個視窗一起捲動,不單獨捲動)
-    (String(p.desc || '').trim() ? '<div class="dsx"><div class="th">商品說明</div><p class="ds">' + esc(p.desc) + '</p></div>' : '') +
+    (String(p.desc || '').trim() ? '<div class="dsx"><div class="dsh">商品說明</div><p class="ds">' + esc(p.desc) + '</p></div>' : '') +
     '';
 }
 /* 購物車/下單:商品明細列(品牌、品名、規格、單價、數量、小計) */
@@ -670,7 +678,8 @@ document.addEventListener('click', function (e) {
   }
   else if (a === 'pg') { PAGE = +b.dataset.p || 1; grid(); toTop(); }
   else if (a === 'open') { cur = byId(id); dq = 1; show(detail(cur)); }
-  else if (a === 'bigimg') { $('#bigimg').src = b.dataset.u; [].slice.call(document.querySelectorAll('.th img')).forEach(function (n) { n.classList.toggle('on', n === b); }); }
+  else if (a === 'zoom') { if (cur && cur.imgs && cur.imgs.length) lbOpen(cur.imgs, +b.dataset.i || 0); }
+  else if (a === 'bigimg') { $('#bigimg').src = b.dataset.u; $('#bigimg').dataset.i = b.dataset.i || 0; [].slice.call(document.querySelectorAll('.th img')).forEach(function (n) { n.classList.toggle('on', n === b); }); }
   else if (a === 'up') { var sv = $('#spsel') ? $('#spsel').value : '', lim = Math.min(room(cur), sv ? specRoom(cur, sv) : 99); if (dq < lim) dq++; else $('#dte').textContent = '最多只能買 ' + Math.max(lim, 0) + ' 件(庫存上限)'; $('#qn').textContent = dq; }
   else if (a === 'dn') { if (dq > 1) dq--; $('#qn').textContent = dq; }
   else if (a === 'add') {
@@ -1096,6 +1105,61 @@ function liffBoot() {
     }).catch(function () {});
   };
   document.head.appendChild(sc);
+}
+
+/* ---------- 商品圖片放大檢視:點開全螢幕;點兩下/雙指縮放、拖曳移動;左右滑或箭頭切換 ---------- */
+function lbOpen(imgs, i) {
+  var old = $('#lbx'); if (old) old.remove();
+  var w = document.createElement('div'); w.id = 'lbx'; w.setAttribute('role', 'dialog'); w.setAttribute('aria-label', '圖片放大');
+  w.innerHTML = '<img alt="商品圖片" referrerpolicy="no-referrer"><button type="button" class="lx" aria-label="關閉">✕</button>' + (imgs.length > 1 ? '<button type="button" class="lp" aria-label="上一張">‹</button><button type="button" class="ln" aria-label="下一張">›</button>' : '') + '<div class="lc"></div>';
+  (($('#dlg') && $('#dlg').open) ? $('#dlg') : document.body).appendChild(w);
+  var im = w.querySelector('img'), lc = w.querySelector('.lc'), S = 1, X = 0, Y = 0, ptr = {}, st = null, moved = false, lastTap = 0;
+  function apply() { im.style.transform = 'translate(' + X + 'px,' + Y + 'px) scale(' + S + ')'; }
+  function base() { var r = im.getBoundingClientRect(); return { l: r.left - X, t: r.top - Y, w: r.width / S, h: r.height / S }; }
+  function clamp() {
+    if (S <= 1) { S = 1; X = 0; Y = 0; return; }
+    var b = base(), vw = innerWidth, vh = innerHeight, W = b.w * S, H = b.h * S;
+    var minX = W > vw ? vw - b.l - W : (vw - W) / 2 - b.l, maxX = W > vw ? -b.l : minX;
+    var minY = H > vh ? vh - b.t - H : (vh - H) / 2 - b.t, maxY = H > vh ? -b.t : minY;
+    X = Math.min(maxX, Math.max(minX, X)); Y = Math.min(maxY, Math.max(minY, Y));
+  }
+  function zoomAt(ns, cx, cy) { var b = base(); ns = Math.max(1, Math.min(5, ns)); X = cx - b.l - (cx - b.l - X) * ns / S; Y = cy - b.t - (cy - b.t - Y) * ns / S; S = ns; clamp(); apply(); }
+  function go(k) { i = (i + k + imgs.length) % imgs.length; S = 1; X = 0; Y = 0; apply(); im.src = imgs[i]; lc.textContent = imgs.length > 1 ? (i + 1) + ' / ' + imgs.length : '雙指或點兩下可放大'; }
+  function close() { w.remove(); document.removeEventListener('keydown', key, true); }
+  function key(e) { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); } else if (e.key === 'ArrowLeft') go(-1); else if (e.key === 'ArrowRight') go(1); }
+  document.addEventListener('keydown', key, true);
+  w.querySelector('.lx').onclick = close;
+  if (imgs.length > 1) { w.querySelector('.lp').onclick = function () { go(-1); }; w.querySelector('.ln').onclick = function () { go(1); }; }
+  w.addEventListener('wheel', function (e) { e.preventDefault(); zoomAt(S * (e.deltaY < 0 ? 1.2 : 1 / 1.2), e.clientX, e.clientY); }, { passive: false });
+  w.addEventListener('pointerdown', function (e) {
+    if (e.target.tagName === 'BUTTON') return;
+    w.setPointerCapture(e.pointerId); ptr[e.pointerId] = { x: e.clientX, y: e.clientY }; moved = false;
+    var ks = Object.keys(ptr);
+    if (ks.length === 2) { var a = ptr[ks[0]], c = ptr[ks[1]]; st = { d: Math.hypot(a.x - c.x, a.y - c.y), s: S, cx: (a.x + c.x) / 2, cy: (a.y + c.y) / 2 }; }
+    else st = { x: e.clientX, y: e.clientY, X: X, Y: Y };
+  });
+  w.addEventListener('pointermove', function (e) {
+    if (!ptr[e.pointerId] || !st) return; ptr[e.pointerId] = { x: e.clientX, y: e.clientY };
+    var ks = Object.keys(ptr);
+    if (ks.length === 2 && st.d) { var a = ptr[ks[0]], c = ptr[ks[1]]; zoomAt(st.s * Math.hypot(a.x - c.x, a.y - c.y) / st.d, st.cx, st.cy); moved = true; return; }
+    var dx = e.clientX - st.x, dy = e.clientY - st.y; if (Math.abs(dx) + Math.abs(dy) > 6) moved = true;
+    if (S > 1) { X = st.X + dx; Y = st.Y + dy; clamp(); apply(); }
+  });
+  function up(e) {
+    if (!ptr[e.pointerId]) return; var ks = Object.keys(ptr), one = ks.length === 1;
+    if (one && st && !st.d) {
+      var dx = e.clientX - st.x, dy = e.clientY - st.y;
+      if (S === 1 && imgs.length > 1 && Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) go(dx < 0 ? 1 : -1);
+      else if (!moved) {
+        var now = Date.now();
+        if (now - lastTap < 300) { zoomAt(S > 1 ? 1 : 2.5, e.clientX, e.clientY); lastTap = 0; }
+        else { lastTap = now; if (S === 1 && e.target === w) setTimeout(function () { if (lastTap === now) close(); }, 300); }
+      }
+    }
+    delete ptr[e.pointerId]; st = Object.keys(ptr).length === 1 ? (function () { var p = ptr[Object.keys(ptr)[0]]; return { x: p.x, y: p.y, X: X, Y: Y }; })() : null;
+  }
+  w.addEventListener('pointerup', up); w.addEventListener('pointercancel', up);
+  go(0);
 }
 </script>
 </body>
