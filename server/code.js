@@ -1585,9 +1585,19 @@ function adminEditLineFull(tk, oid, pid, d) {
     if (rdyL && (delta !== 0 || newSp !== oldSp || toPre)) { // 用現貨出的預購商品品項:先退回現貨,再照新的規格/數量取;改成預購就只退回
       rdyAdd_(String(p.商品ID), oldSp, Number(l.數量), l.成本);
       if (!toPre && rdyTake_(String(p.商品ID), newSp, q) === null) throw new Error('「' + p.名稱 + (newSp ? ' ' + newSp : '') + '」現貨不足,只有 ' + rdyQty_(rdyGet_(String(p.商品ID)), newSp) + ' 件(含這筆原本的)。要讓它變成預購,請把型態改成「預購」');
+    } else if (p && rdyIs_(p) && arr === '已到貨' && (delta !== 0 || newSp !== oldSp)) { // 預購商品、已到貨的品項:多加的件數從現貨扣,減少的退回現貨(不動預購名額)
+      var id0 = String(p.商品ID), wasIn = String(l.到貨狀態) === '已到貨';
+      var noRdy = function (sp) { return new Error('「' + p.名稱 + (sp ? ' ' + sp : '') + '」現貨不足,只剩 ' + rdyQty_(rdyGet_(id0), sp) + ' 件'); };
+      if (newSp === oldSp) {
+        if (delta > 0 && rdyTake_(id0, oldSp, delta) === null) throw noRdy(oldSp);
+        if (delta < 0 && wasIn) rdyAdd_(id0, oldSp, -delta, l.成本);
+      } else {
+        if (wasIn) rdyAdd_(id0, oldSp, Number(l.數量), l.成本);
+        if (rdyTake_(id0, newSp, q) === null) throw noRdy(newSp);
+      }
     } else if (p && (delta !== 0 || newSp !== oldSp)) {
       var av = availOf_(p, newSp);
-      if (av !== null && newSp === oldSp && delta > 0 && av - delta < 0) throw new Error('商品庫存不足,最多還能加 ' + av + ' 件');
+      if (av !== null && newSp === oldSp && delta > 0 && av - delta < 0) throw new Error(rdyIs_(p) ? '預購名額不足,最多還能加 ' + av + ' 件(已到貨的品項會改從現貨扣)' : '商品庫存不足,最多還能加 ' + av + ' 件');
       if (av !== null && newSp !== oldSp && av < q) throw new Error('「' + newSp + '」庫存不足,只剩 ' + av + ' 件');
       adjStock_(p, oldSp, Number(l.數量)); adjStock_(p, newSp, -q);
     }
