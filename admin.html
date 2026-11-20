@@ -482,7 +482,7 @@ function prodView() {
     '<label>型態<select data-k="type">' + opts(['現貨', '預購'], PF.type, '全部') + '</select></label>' +
     '<label>上架<select data-k="on"><option value="">全部</option><option value="Y"' + (PF.on === 'Y' ? ' selected' : '') + '>上架中</option><option value="N"' + (PF.on === 'N' ? ' selected' : '') + '>已下架</option></select></label>' +
     '<button class="btn a" data-a="np">新增商品</button></div>' +
-    '<div class="bt"><span class="m">已勾選 <b id="sn">' + selIds().length + '</b> 項:</span><button class="btn l" data-a="pon">批次上架</button><button class="btn l" data-a="poff">批次下架</button><button class="btn l" data-a="pdel">批次刪除</button></div>' +
+    '<div class="bt"><span class="m">已勾選 <b id="sn">' + selIds().length + '</b> 項:</span><button class="btn l" data-a="pon">批次上架</button><button class="btn l" data-a="poff">批次下架</button><button class="btn l" data-a="pdate">批次改日期</button><button class="btn l" data-a="pdel">批次刪除</button></div>' +
 
     '<table><thead><tr><th><input type="checkbox" id="pall" aria-label="全選目前清單"></th><th>編號</th><th>品牌</th><th>品名</th><th>大分類</th><th>小分類</th><th>型態</th><th>單價</th><th>數量</th><th>到貨日</th><th>關團日</th><th>上架</th><th>廠商</th><th>成本</th><th>貨源</th></tr></thead><tbody>' +
     rows.map(function (p) {
@@ -1100,6 +1100,35 @@ document.addEventListener('click', function (e) {
     var rv = ($('#rnn').value || '').trim(), rid = HB && HB._nick[rv];
     if (!rid) { tell('請從清單選一位 LINE 會員的暱稱'); return; }
     ask('要補發「綁定成功」通知給「' + rv + '」嗎?', function () { wait('發送中…請稍候'); call('adminHistRenotify', T, rid).then(function (r) { var d = $('#dq'); d.oncancel = null; if (d.open) d.close(); histBindDraw(r); tell(r.msg); }).catch(function (e) { var d = $('#dq'); d.oncancel = null; if (d.open) d.close(); tell(e.message); }); }); return;
+  }
+  if (a === 'pdate') {
+    var pdi = selIds().filter(function (x) { return P.some(function (p) { return p.id === x; }); }); if (!pdi.length) { tell('請先勾選商品'); return; }
+    var dq = $('#dq'); dq.dataset.mine = ''; dq.dataset.tok = ''; dq.oncancel = null;
+    dq.innerHTML = '<form id="pdf" style="min-width:300px"><h3 style="margin-top:0">批次改日期(' + pdi.length + ' 項商品)</h3>' +
+      '<p class="m" style="margin-top:0">只會修改有勾「修改」的欄位,沒勾的維持原本設定。</p>' +
+      '<fieldset style="border:1px solid var(--line);border-radius:8px;margin:0 0 10px"><legend><label class="ck"><input type="checkbox" name="dc"> 修改關團日期</label></legend>' +
+      '<label>關團日期(當天下午 14:00 自動下架)<input type="date" name="close" disabled></label><span class="m" style="font-size:12px">留空 = 清除關團日期(不關團)</span></fieldset>' +
+      '<fieldset style="border:1px solid var(--line);border-radius:8px;margin:0 0 10px"><legend><label class="ck"><input type="checkbox" name="da"> 修改到貨日期</label></legend>' +
+      '<label>預計到貨日<input type="date" name="arrival" disabled></label>' +
+      '<label class="ck" style="margin-top:4px">或 下單後 <input name="arrw" type="number" min="1" max="52" step="1" style="width:64px" disabled> 週到貨</label>' +
+      '<label class="ck" style="margin-top:4px"><input type="checkbox" name="arrivalq" disabled> 暫不確定,排隊中</label><span class="m" style="font-size:12px;display:block">三個都不填 = 清除到貨日期</span></fieldset>' +
+      '<p id="pde" class="err" style="color:#d64545"></p><p style="margin-bottom:0"><button class="btn a" type="submit">套用</button> <button class="btn l" type="button" id="dqn">取消</button></p></form>';
+    dq.showModal(); $('#dqn').onclick = function () { dq.close(); };
+    var pf = $('#pdf');
+    pf.dc.onchange = function () { pf.close.disabled = !pf.dc.checked; };
+    pf.da.onchange = function () { var on = pf.da.checked; pf.arrivalq.disabled = !on; pf.arrw.disabled = !on || pf.arrivalq.checked; pf.arrival.disabled = !on || pf.arrivalq.checked || +pf.arrw.value > 0; };
+    pf.onsubmit = function (ev) {
+      ev.preventDefault();
+      if (!pf.dc.checked && !pf.da.checked) { $('#pde').textContent = '請至少勾一個要修改的欄位'; return; }
+      var dd = {}, sum = [];
+      if (pf.dc.checked) { dd.close = pf.close.value; sum.push('關團日期 → ' + (dd.close ? dd.close + ' 14:00' : '清除')); }
+      if (pf.da.checked) { dd.arrival = pf.arrivalq.checked ? '排隊中' : +pf.arrw.value > 0 ? '下單後' + Math.round(+pf.arrw.value) + '週' : pf.arrival.value; sum.push('到貨日期 → ' + (dd.arrival || '清除')); }
+      dq.close();
+      ask('確定修改勾選的 ' + pdi.length + ' 項商品?\n' + sum.join('\n'), function () {
+        call('adminBatchProductDates', T, pdi, dd).then(function (r) { P = r.products; SEL = {}; prodView(); tell(r.msg); }).catch(function (er) { tell(er.message); });
+      });
+    };
+    return;
   }
   if (a === 'pon' || a === 'poff' || a === 'pdel') {
     var pids = selIds().filter(function (x) { return P.some(function (p) { return p.id === x; }); }); if (!pids.length) { tell('請先勾選商品'); return; }

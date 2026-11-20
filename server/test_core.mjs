@@ -52,6 +52,15 @@ r = await call('getShop'); ok(r.result.products[0].stock === 3, 'failed order di
   r = await call('getShop'); ok(r.result.products.length === 1, 'back on shop');
   Date.now = real;
 }
+{ // 批次改日期
+  r = await call('adminBatchProductDates', tk, [pid], { close: '2099-12-31', arrival: '下單後2週' }); ok(r.ok && /已修改 1 項/.test(r.result.msg), 'batch dates ' + (r.error || ''));
+  r = await call('getShop'); ok(r.result.products[0].close === '2099-12-31' && r.result.products[0].arrival === '下單後2週', 'batch dates saved');
+  r = await call('adminBatchProductDates', tk, [pid], { close: '' }); ok(r.ok, 'clear close');
+  r = await call('getShop'); ok(r.result.products[0].close === '' && r.result.products[0].arrival === '下單後2週', 'only close cleared');
+  r = await call('adminBatchProductDates', tk, [pid], { close: '2000-01-01' }); ok(!r.ok && /已經過了/.test(r.error), 'past close rejected');
+  r = await call('adminBatchProductDates', tk, [pid], { arrival: '亂填' }); ok(!r.ok, 'bad arrival rejected');
+  r = await call('adminBatchProductDates', tk, [pid], { arrival: '' }); ok(r.ok, 'clear arrival');
+}
 { // 到貨日期:下單後N週
   const base = { id: pid, name: '測試鞋', price: 800, stock: 3, type: '預購', tiers: '', cats: ['鞋'], on: true, vendor: 'B', cost: 400, taxIncl: true, source: 'TW', brand: 'Nike' };
   r = await call('adminSaveProduct', tk, { ...base, arrival: '下單後3週' }); ok(r.ok, 'arrival 下單後3週 saved');
