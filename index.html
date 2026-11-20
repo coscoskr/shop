@@ -255,7 +255,7 @@ function promo(t) {
 }
 
 google.script.run.withSuccessHandler(function (d) {
-  D = d; restoreCart(); drawFt(); $('#store').textContent = d.store || 'coscos韓國選物店'; document.title = d.store || 'coscos韓國選物店';
+  D = d; DLOAD = Date.now(); restoreCart(); drawFt(); $('#store').textContent = d.store || 'coscos韓國選物店'; document.title = d.store || 'coscos韓國選物店';
   if (d.notice) promo(String(d.notice));
   if (BOOT.err) { $('#notice').hidden = false; $('#notice').textContent = BOOT.err; }
   if (LT && !BOOT.token) {
@@ -274,6 +274,24 @@ google.script.run.withSuccessHandler(function (d) {
   liffBoot();
   resumeDraft();
 }).withFailureHandler(function (e) { $('#grid').innerHTML = '<p>載入失敗:' + esc(e.message) + '</p>'; }).getShop();
+/* 商品資料自動更新:手機瀏覽器(特別是 Safari)常把分頁留在背景好幾天,回來時還是舊的商品清單。
+   回到頁面或開著超過 5 分鐘,就重新抓一次商品(有開著視窗時先不動,避免打斷下單) */
+var DLOAD = 0, DBUSY = false;
+function refreshShop() {
+  if (!D || DBUSY || document.hidden || Date.now() - DLOAD < 5 * 60000) return;
+  if (($('#dlg') && $('#dlg').open) || $('#wbox')) return;
+  DBUSY = true;
+  google.script.run.withSuccessHandler(function (d) {
+    DBUSY = false; if (!d || !d.products) return;
+    D = d; DLOAD = Date.now();
+    if (cat && !(D.cats.some(function (x) { return x === cat || x.indexOf(cat + '/') === 0; }) || (cat.charAt(0) === '@' && D.products.some(function (p) { return catHit(p.cats, cat, p); })))) cat = '';
+    nav(); grid();
+  }).withFailureHandler(function () { DBUSY = false; }).getShop();
+}
+document.addEventListener('visibilitychange', refreshShop);
+window.addEventListener('pageshow', function (e) { if (e.persisted) refreshShop(); });
+window.addEventListener('focus', refreshShop);
+setInterval(refreshShop, 60000);
 
 function credNote() { var t = String((D && D.creditNote) || '').trim(); return t ? '<p class="ds" style="white-space:pre-line;font-size:.85em">' + esc(t) + '</p>' : ''; }
 function catHit(pc, v, p) { if (v === '@現貨' || v === '@預購') return !!p && p.type === v.slice(1); if (v === '@品牌') return !!p && !!p.brand; if (v.indexOf('@品牌/') === 0) return !!p && p.brand === v.slice(4); return !v || pc.some(function (c) { return c === v || c.indexOf(v + '/') === 0; }); }
