@@ -498,7 +498,7 @@ function brOpts(cur) { return '<option value="">(不指定品牌)</option>' + BL
 function brandAdd() {
   var inp = $('#brnew'), v = inp.value.trim(), msg = $('#brmsg'); if (!v) { msg.className = 'er'; msg.textContent = '請先輸入新品牌'; return; }
   var k = v.replace(/\s+/g, '').toLowerCase(), hit = BL.filter(function (x) { return x.replace(/\s+/g, '').toLowerCase() === k; })[0];
-  function ok(name, text) { $('#brsel').innerHTML = brOpts(name); inp.value = ''; msg.className = 'tg'; msg.textContent = text; }
+  function ok(name, text) { $('#brsel').innerHTML = brOpts(name); inp.value = ''; msg.className = 'tg'; msg.textContent = text; brandAutoSizes(name); }
   if (hit) { ok(hit, '清單已有「' + hit + '」,已幫你選好'); return; }
   call('adminAddBrand', T, v).then(function (r) { BR = r.sort(function(a, b) { var x = String(a.name || a).toLowerCase(), y = String(b.name || b).toLowerCase(); return x < y ? -1 : x > y ? 1 : 0; }); BL = r.map(function (x) { return x.name; }); var nm = BL.filter(function (x) { return x.replace(/\s+/g, '').toLowerCase() === k; })[0] || v; ok(nm, '新增成功,已選取「' + nm + '」'); }).catch(function (er) { msg.className = 'er'; msg.textContent = er.message; });
 }
@@ -573,6 +573,16 @@ var SPSEP = ' / ';
 var SPG = { c: [], s: [] };
 document.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.isComposing && (e.target.id === 'spgc' || e.target.id === 'spgs')) { e.preventDefault(); spgAdd(e.target.id === 'spgc' ? 'c' : 's'); } });
 function spgFill() { SPG = { c: [], s: [] }; spgDraw(); }
+/* 品牌預設尺寸:選到這些品牌、而且商品還沒有規格時,自動帶入尺寸 */
+var BRAND_SIZES = { UGG: ['EU35', 'EU36', 'EU37', 'EU38', 'EU39', 'EU40'] };
+function brandSizes(b) { var k = String(b || '').trim().toUpperCase(); return BRAND_SIZES[k] || null; }
+function brandAutoSizes(b) {
+  var z = brandSizes(b); if (!z) return;
+  if (SPL.some(function (x) { return String(x.n).trim(); })) return; // 已經有規格就不動
+  SPG.s = z.slice(); spgDraw();
+  SPL = z.map(function (n) { return { n: n, q: '' }; }); drawSpecs();
+}
+document.addEventListener('change', function (e) { if (e.target && e.target.id === 'brsel') brandAutoSizes(e.target.value); });
 function spgDraw() {
   ['c', 's'].forEach(function (k) { var el = $(k === 'c' ? '#spgcl' : '#spgsl'); if (el) el.innerHTML = SPG[k].map(function (v, i) { return '<span class="spgt">' + esc(v) + '<button type="button" data-a="spgx" data-k="' + k + '" data-i="' + i + '" aria-label="移除">✕</button></span>'; }).join(''); });
 }
@@ -593,7 +603,7 @@ function spgGen() {
   var c = SPG.c, z = SPG.s, names = [];
   if (!c.length && !z.length) { tell('請先加入顏色或尺寸'); return; }
   if (c.length && z.length) c.forEach(function (a) { z.forEach(function (b) { names.push(a + SPSEP + b); }); }); else names = c.length ? c : z;
-  SPL = SPL.filter(function (x) { return String(x.n).trim(); });
+  SPL = SPL.filter(function (x) { return String(x.n).trim() && !(c.length && z.indexOf(String(x.n).trim()) >= 0 && String(x.q).trim() === ''); }); // 有顏色時,原本只有尺寸、沒填數量的列由「顏色 / 尺寸」取代
   var have = SPL.map(function (x) { return String(x.n).trim(); }), add = 0;
   names.forEach(function (n) { if (have.indexOf(n) < 0) { SPL.push({ n: n, q: '' }); add++; } });
   drawSpecs(); if (!add) tell('這些組合都已經有了');
@@ -636,7 +646,7 @@ function editProd(id) {
       '<div style="display:flex;gap:8px;margin-top:8px"><input id="cbq" placeholder="找不到時可改搜尋:酷柏品名關鍵字、貨號或酷柏商品編號" style="flex:1"><button type="button" class="btn l s" id="cbqb">搜尋</button></div><div id="cbr"></div></fieldset>' +
     '<p class="er" id="pe" role="alert"></p><button class="btn a">儲存</button> <button type="button" class="btn l" data-a="x">取消</button>' +
     (id ? ' <button type="button" class="btn l" data-a="dp" data-id="' + esc(id) + '">刪除</button>' : '') + '</form>';
-  SPL = (p.specs || []).map(function (n) { var q = (p.specQty || {})[n]; return { n: n, q: q == null ? '' : q }; }); spgFill(); if (innerWidth > 860) d.style.width = 'min(760px,96vw)'; d.addEventListener('close', function () { d.style.width = ''; }, { once: true }); d.showModal(); drawImgs(); drawCats();
+  SPL = (p.specs || []).map(function (n) { var q = (p.specQty || {})[n]; return { n: n, q: q == null ? '' : q }; }); spgFill(); if (!p.id) brandAutoSizes(p.brand); if (innerWidth > 860) d.style.width = 'min(760px,96vw)'; d.addEventListener('close', function () { d.style.width = ''; }, { once: true }); d.showModal(); drawImgs(); drawCats();
   var f = $('#pf');
   f.elements.unlimited.onchange = function () { f.elements.stock.disabled = this.checked; if (this.checked) f.elements.stock.value = ''; };
   drawSpecs();
