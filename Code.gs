@@ -1270,6 +1270,20 @@ function adminLineInfo(tk, keys, d) {
   if (d.notify && Object.keys(arrived).length) { var nt = notifyArrival_(arrived); r.msg += '\n通知:成功 ' + nt.sent + '、無 LINE/Email ' + nt.noLine + '、失敗 ' + nt.failed; }
   return r;
 }
+/** 勾選的已到貨品項(還沒建立出貨單)重新發 LINE/Email 到貨通知(每張訂單一則) */
+function adminArrivalRenotify(tk, keys) {
+  var u = me_(tk), arrived = {}, n = 0, skip = 0;
+  pickPurchase_(keys).forEach(function (l) {
+    if ((l._sh || '訂單明細') !== '訂單明細' || String(l.到貨狀態) !== '已到貨' || l.出貨單ID) { skip++; return; }
+    (arrived[String(l.訂單ID)] = arrived[String(l.訂單ID)] || []).push(String(l.品名)); n++;
+  });
+  if (!n) throw new Error('勾選的品項中沒有「已到貨、還沒建立出貨單」的客人訂單');
+  var nt = notifyArrival_(arrived);
+  log_(u.acc, '發送到貨通知', '', Object.keys(arrived).length + ' 張訂單(' + n + ' 個品項):成功 ' + nt.sent + '、無 LINE/Email ' + nt.noLine + '、失敗 ' + nt.failed);
+  var r = purchaseList_();
+  r.msg = '到貨通知:' + Object.keys(arrived).length + ' 張訂單\n成功 ' + nt.sent + '、沒有 LINE/Email ' + nt.noLine + '、失敗 ' + nt.failed + (skip ? '\n(略過 ' + skip + ' 項:不是已到貨的客人品項或已建立出貨單)' : '');
+  return r;
+}
 /** 湊成一筆總額付給同一家廠商:記錄日期、金額、匯款備註,並標記這些品項已付款 */
 function adminRecordPayment(tk, keys, d) {
   var u = me_(tk), pid = '';
