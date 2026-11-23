@@ -3647,9 +3647,8 @@ function adminMembers(tk) {
 }
 function adminMemberGrants(tk, lid) {
   me_(tk);
-  var voided = {}; rows_('操作紀錄').forEach(function (x) { if (String(x.動作) === '作廢購物金') voided[String(x.對象)] = String(x.時間); });
   return rows_('購物金').filter(function (g) { return String(g['LINE ID']) === lid; }).reverse().map(function (g) {
-    return { seq: String(g.序號), at: String(g.發放時間), amt: Number(g.金額), rem: Number(g.剩餘), exp: String(g.到期日), src: String(g.來源), note: String(g.備註), by: String(g.操作人), oid: String(g.訂單ID), voided: voided[String(g.序號)] || '' };
+    return { seq: String(g.序號), at: String(g.發放時間), amt: Number(g.金額), rem: Number(g.剩餘), exp: String(g.到期日), src: String(g.來源), note: String(g.備註), by: String(g.操作人), oid: String(g.訂單ID), voided: /【已作廢/.test(String(g.備註 || '')) };
   });
 }
 function adminSetLevel(tk, lid, level, note) {
@@ -3685,7 +3684,8 @@ function adminVoidGrant(tk, seq) {
   var u = me_(tk);
   lk_(function () {
     var g = rows_('購物金').filter(function (x) { return String(x.序號) === seq; })[0]; if (!g) throw new Error('找不到這筆購物金');
-    var n = cp_(g); n.剩餘 = 0; put_('購物金', g._r, n);
+    if (Number(g.剩餘) <= 0) throw new Error('這筆購物金剩餘 0 元,不需要作廢');
+    var n = cp_(g); n.剩餘 = 0; n.備註 = (String(g.備註 || '') + ' 【已作廢 ' + g.剩餘 + ' 元 ' + u.acc + ' ' + now_().slice(5, 16) + '】').trim(); put_('購物金', g._r, n);
     log_(u.acc, '作廢購物金', seq, '剩餘 ' + g.剩餘 + ' 元');
   });
   return adminMembers(tk);
