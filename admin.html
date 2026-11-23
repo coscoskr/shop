@@ -804,7 +804,8 @@ function loadGrants(lid) {
   call('adminMemberGrants', T, lid).then(function (r) {
     var t = new Date().toISOString().slice(0, 10);
     $('#gl').innerHTML = r.length ? '<table><thead><tr><th>時間</th><th>來源</th><th>金額</th><th>剩餘</th><th>到期日</th><th>備註</th><th></th></tr></thead><tbody>' + r.map(function (g) {
-      return '<tr><td>' + esc(g.at.slice(0, 16)) + '</td><td>' + esc(g.src) + '</td><td>' + nf(g.amt) + '</td><td>' + nf(g.rem) + (g.rem > 0 && g.exp < t ? ' <span class="m">(已過期)</span>' : '') + '</td><td>' + esc(g.exp) + '</td><td style="white-space:normal">' + esc(g.note) + (g.oid ? ' ' + esc(g.oid) : '') + '</td><td>' + (g.rem > 0 ? '<button class="btn l s" data-a="gvoid" data-id="' + esc(g.seq) + '" data-lid="' + esc(lid) + '">作廢</button>' : '') + '</td></tr>';
+      var vd = g.voided && g.rem === 0;
+      return '<tr' + (vd ? ' style="color:#aaa"' : '') + '><td>' + esc(g.at.slice(0, 16)) + '</td><td>' + esc(g.src) + '</td><td>' + (vd ? '<s>' + nf(g.amt) + '</s>' : nf(g.amt)) + '</td><td>' + nf(g.rem) + (vd ? ' <span class="chip" style="background:#eee;color:#888">已作廢</span>' : g.rem === 0 ? ' <span class="m">(已用完)</span>' : g.exp < t ? ' <span class="m">(已過期)</span>' : '') + '</td><td>' + esc(g.exp) + '</td><td style="white-space:normal">' + esc(g.note) + (g.oid ? ' ' + esc(g.oid) : '') + '</td><td>' + (g.rem > 0 ? '<button class="btn l s" data-a="gvoid" data-id="' + esc(g.seq) + '" data-lid="' + esc(lid) + '">作廢</button>' : '') + '</td></tr>';
     }).join('') + '</tbody></table>' : '<p class="m">還沒有購物金紀錄。</p>';
   }).catch(function (e) { $('#gl').innerHTML = '<p class="er">' + esc(e.message) + '</p>'; });
 }

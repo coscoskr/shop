@@ -3647,8 +3647,9 @@ function adminMembers(tk) {
 }
 function adminMemberGrants(tk, lid) {
   me_(tk);
+  var voided = {}; rows_('操作紀錄').forEach(function (x) { if (String(x.動作) === '作廢購物金') voided[String(x.對象)] = String(x.時間); });
   return rows_('購物金').filter(function (g) { return String(g['LINE ID']) === lid; }).reverse().map(function (g) {
-    return { seq: String(g.序號), at: String(g.發放時間), amt: Number(g.金額), rem: Number(g.剩餘), exp: String(g.到期日), src: String(g.來源), note: String(g.備註), by: String(g.操作人), oid: String(g.訂單ID) };
+    return { seq: String(g.序號), at: String(g.發放時間), amt: Number(g.金額), rem: Number(g.剩餘), exp: String(g.到期日), src: String(g.來源), note: String(g.備註), by: String(g.操作人), oid: String(g.訂單ID), voided: voided[String(g.序號)] || '' };
   });
 }
 function adminSetLevel(tk, lid, level, note) {
