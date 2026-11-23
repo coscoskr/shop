@@ -1467,11 +1467,11 @@ var FLOW = {
   '刷卡': ['待刷卡', '已刷卡待出貨', '可自取', '已出貨'],
   '匯款': ['待匯款', '已匯款待查帳', '已查帳待出貨', '可自取', '已出貨'],
   '賣貨便': ['待出貨', '已出貨', '已退回'],
-  '付現金': ['待自取', '已自取付款']
+  '付現金': ['待自取', '可自取', '已自取付款']
 };
 function lk_(fn) { var L = LockService.getScriptLock(); L.waitLock(20000); try { return fn(); } finally { L.releaseLock(); } }
 function ri_(pay) { return (pay === '賣貨便' || pay === '付現金') ? 0 : pay === '匯款' ? 2 : 1; }   // 可出貨的狀態位置
-function si_(pay) { return (pay === '賣貨便' || pay === '付現金') ? 1 : pay === '匯款' ? 4 : 3; }   // 已出貨的狀態位置
+function si_(pay) { return pay === '賣貨便' ? 1 : pay === '付現金' ? 2 : pay === '匯款' ? 4 : 3; }   // 已出貨的狀態位置
 function paidOk_(o) { var f = FLOW[o.付款方式]; return !!f && f.indexOf(o.狀態) >= ri_(o.付款方式); }
 /** 已到貨的品項自動視為已叫貨(叫貨人/時間已有就保留) */
 function ordOk_(n, who) {
@@ -1811,7 +1811,7 @@ function adminRemitMissing(tk, sid) {
 function shipNotice_(oldS, n, f) {
   var oi = f.indexOf(String(oldS.狀態)), ni = f.indexOf(String(n.狀態)), si = si_(n.付款方式), out = [];
   var ret = String(n.狀態) === '已退回';
-  var pick = String(oldS.狀態) === '可自取';   // 客人自取後改成已出貨,不再發出貨通知
+  var pick = String(oldS.狀態) === '可自取' || String(n.配送方式 || '') === '自取';   // 自取的出貨單(含直接改成已自取付款)不發「已出貨」通知
   if (String(n.狀態) === '可自取' && oi !== ni) out.push(notifyShipped_(n, '可自取通知內容', '商品可自取'));
   // 變成已出貨:出貨卡片後面接一則「購物分享回饋」(同一次推播,不多算 LINE 則數);自取完成則單獨發分享訊息
   if (ni >= si && oi < si && !ret && !pick) out.push(notifyShipped_(n, undefined, undefined, false, shareText_()));

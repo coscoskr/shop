@@ -31,3 +31,13 @@ ok(!r.ok, '賣貨便 needs 7-11: ' + r.error);
 r = await call('adminUpdateShip', tk, 'S1', Object.assign({}, base, { fee: '0', pay: '賣貨便', method: '店到店', cvs: '7-11', store: '竹中', rname: '王小明' }));
 ok(r.ok && S().pay_method === '賣貨便' && S().status === '待出貨', 'to 賣貨便 ' + (r.error || S().receiver + ' fee=' + S().shipping));
 console.log(fails ? fails + ' FAILED' : 'ALL PASSED');
+{ // 付現金自取:待自取 → 可自取 → 已自取付款
+  DB['出貨單'].push({ ship_id: 'S9', order_id: 'O1', status: '待自取', name: '王', phone: '0912345678', pay_method: '付現金', receiver: '【自取】取貨人 王小明', ship_method: '自取', subtotal: 500, promo_discount: 0, credit_used: 0, shipping: 0, total: 500, line_id: '' });
+  const S9 = () => DB['出貨單'].find(x => x.ship_id === 'S9');
+  const b9 = { co: '', no: '', fee: '0', phone: '0912345678', link: '', ship: '', note: '', method: '自取', rname: '王小明' };
+  let r9 = await call('adminUpdateShip', tk, 'S9', Object.assign({}, b9, { st: '可自取' }));
+  ok(r9.ok && S9().status === '可自取' && !S9().shipped_at, 'cash → 可自取 ' + (r9.error || ''));
+  r9 = await call('adminUpdateShip', tk, 'S9', Object.assign({}, b9, { st: '已自取付款' }));
+  ok(r9.ok && S9().status === '已自取付款' && !!S9().shipped_at, 'cash → 已自取付款 ' + (r9.error || ''));
+  if (fails) process.exit(1);
+}
