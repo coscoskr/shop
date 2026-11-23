@@ -31,4 +31,12 @@ r = await edit(3); ok(r.ok && Number(L().qty) === 3 && rdy() === 24, '已到貨�
 r = await edit(30); ok(!r.ok && /現貨不足,只剩 24 件/.test(r.error) && rdy() === 24 && Number(L().qty) === 3, '超過現貨擋下:' + r.error);
 r = await edit(2); ok(r.ok && rdy() === 25, '減 1 退回現貨:' + rdy());
 r = await edit(4, '待到貨', '預購'); ok(!r.ok && /預購名額不足/.test(r.error), '待到貨照預購名額:' + r.error);
+// LINE 會員下單也要填姓名+電話;會員資料沒有的會存起來
+DB['登入階段'].push({ hash: code.INTERNAL.sha_('Lmem1'), line_id: 'UM1', expires: '2099-01-01 00:00:00' });
+DB['會員'].push({ line_id: 'UM1', nickname: '小美', friend: 'Y', level: '一般會員', real_name: '', phone: '' });
+r = await call('placeOrder', { token: 'Lmem1', items: [{ id: PID, qty: 1 }] }); ok(!r.ok && /姓名/.test(r.error), 'LINE 會員沒填姓名擋下:' + r.error);
+r = await call('placeOrder', { token: 'Lmem1', name: '王小美', phone: '12', items: [{ id: PID, qty: 1 }] }); ok(!r.ok && /電話/.test(r.error), 'LINE 會員電話不對擋下:' + r.error);
+r = await call('placeOrder', { token: 'Lmem1', name: '王小美', phone: '0912345678', items: [{ id: PID, qty: 1 }] });
+const M = DB['會員'].find(m => m.line_id === 'UM1'), O = DB['訂單'].find(o => o.line_id === 'UM1');
+ok(r.ok && O && O.name === '王小美' && O.phone === '0912345678' && M.real_name === '王小美' && M.phone === '0912345678', 'LINE 會員填了就能下單,資料存進會員:' + (r.error || JSON.stringify([O && O.name, M.real_name, M.phone])));
 console.log(fails ? fails + ' FAILED' : 'ALL PASSED');

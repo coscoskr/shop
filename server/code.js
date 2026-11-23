@@ -346,7 +346,14 @@ function placeOrder0_(o) {
   if (o.token) { try { ctx = mem_(o.token); } catch (e) { ctx = null; } }
   if (ctx && !ctx.lid) ctx = null;
   var name = t_(o.name, 40), phone = t_(o.phone, 20), ship = '', pay = '', email = t_(o.email, 80);
-  if (ctx) { var mi_ = meInfo_(ctx.lid); name = name || mi_.pname || mi_.name || 'LINE會員'; if (phone && !/^[0-9+\-\s]{8,20}$/.test(phone)) throw new Error('請填寫正確的聯絡電話'); }
+  if (ctx) { // LINE 會員也要填姓名+聯絡電話才能下單;會員資料還沒有的話順便存起來,下次自動帶入
+    if (!name) throw new Error('請填寫姓名');
+    if (!/^[0-9+\-\s]{8,20}$/.test(phone)) throw new Error('請填寫正確的聯絡電話');
+    lk_(function () { var mr = memberRow_(ctx.lid); if (!mr) return; var mn = cp_(mr), ch = false;
+      if (!String(mr.姓名 || '')) { try { mn.姓名 = realName_(name); ch = true; } catch (e) {} }
+      if (!String(mr.電話 || '')) { mn.電話 = phone; ch = true; }
+      if (ch) put_('會員', mr._r, mn); });
+  }
   else {
     if (!name) throw new Error('請填寫姓名');
     if (!/^[0-9+\-\s]{8,20}$/.test(phone)) throw new Error('請填寫正確的聯絡電話');

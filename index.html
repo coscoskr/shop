@@ -622,7 +622,11 @@ function checkoutHtml() {
   var q = QT && QT.ok ? QT : null;
   if (CODE && q) h += q.codeOk ? '<p class="tg">折扣碼已套用</p>' : '<p class="tg">' + (q.codeMin ? '此折扣碼需商品金額滿 NT$ ' + Number(q.codeMin).toLocaleString('en-US') + ' 才能使用' : '折扣碼不正確或已失效') + '</p>';
   h += q ? sumBox(q.sub, q.discount ? [[q.dname, q.discount]] : [], q.total, ids) : sumBox(csub, [], csub, ids);
-  if (LT) h += '<p id="er" class="tg" role="alert"></p><div class="cta"><button class="btn a" data-a="pn" id="pnb">確認下訂</button><button type="button" class="btn l" data-a="cart">← 返回購物車</button></div>';
+  if (LT) { // LINE 會員也要先填姓名+聯絡電話才能下單(會帶入會員資料,第一次填完會存起來下次自動帶)
+    var me0 = (window.MD && MD.me) || {};
+    h += '<p class="ds">請填寫姓名與聯絡電話,方便我們聯絡你。付款方式與收件資料,等商品到貨要結帳時再填。</p><form id="f"><label>姓名<input name="name" required maxlength="40" autocomplete="name" value="' + esc(me0.pname || '') + '" placeholder="例如:王小明"></label><label>聯絡電話<input name="phone" required inputmode="tel" autocomplete="tel" maxlength="20" value="' + esc(me0.phone || '') + '" placeholder="例如:0912345678"></label>' +
+      '<p id="er" class="tg" role="alert"></p><div class="cta"><button class="btn a" id="sb">確認下訂</button><button type="button" class="btn l" data-a="cart">← 返回購物車</button></div></form>';
+  }
   else h += '<p class="ds">請留下姓名、電話與電子郵件。到貨、出貨通知會寄到你的電子郵件。付款方式與收件資料,等商品到貨要結帳時再填。</p><form id="f"><label>姓名<input name="name" required maxlength="40"></label><label>聯絡電話<input name="phone" required inputmode="tel"></label><label>電子郵件(必填,用來通知與聯絡)<input name="email" type="email" required maxlength="80" autocomplete="email"></label><p id="er" class="tg" role="alert"></p><button class="btn a" id="sb">確認下訂</button> <button type="button" class="btn l" data-a="cart">返回購物車</button></form>';
   h += '</div>'; if (!q) refreshQuote();
   return h;
@@ -709,7 +713,10 @@ document.addEventListener('submit', function (e) {
   e.preventDefault();
   if ($('#cdi') && $('#cdi').value.trim() !== CODE) { cdWarn(); return; }
   var f = e.target, sb = $('#sb'); sb.disabled = true; $('#er').textContent = '';
-  placeNow({ name: f.name.value, phone: f.phone.value, email: f.email.value }, sb);
+  var nm = f.name.value.trim(), ph = f.phone.value.trim();
+  if (!nm) { sb.disabled = false; showErr('#er', '請填寫姓名'); f.name.focus(); return; }
+  if (!/^[0-9+\-\s]{8,20}$/.test(ph)) { sb.disabled = false; showErr('#er', '請填寫正確的聯絡電話'); f.phone.focus(); return; }
+  placeNow({ name: nm, phone: ph, email: f.email ? f.email.value : '' }, sb);
 });
 $('#q').addEventListener('input', function () {
   q = this.value.trim(); PAGE = 1; grid();
