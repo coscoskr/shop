@@ -1615,6 +1615,12 @@ function adminEditLineFull(tk, oid, pid, d) {
     }
     var n = cp_(l);
     if (!d.keep && d.spec !== undefined) n.規格 = t_(d.spec, 60);
+    if (newSp !== oldSp) { // 規格改了:品項代碼(商品ID~規格)也要跟著改,前台、到貨分配、現貨都是看這個
+      var base0 = bp_(pid), key = base0 + (newSp ? '~' + newSp : ''), k2 = key, nn = 2;
+      var taken = {}; rows_('訂單明細').forEach(function (x) { if (String(x.訂單ID) === oid && x !== l) taken[String(x.商品ID)] = 1; });
+      while (taken[k2]) k2 = key + '~' + (nn++);
+      n.商品ID = k2; extra += ';規格:' + (oldSp || '無') + '→' + (newSp || '無');
+    }
     n.品名 = name; n.型態 = type; n.數量 = q; n.單價 = up; n.小計 = q * up;
     if (newInfo) Object.keys(newInfo).forEach(function (k) { n[k] = newInfo[k]; });
     if (arr !== String(l.到貨狀態)) { n.到貨狀態 = arr; n.可出貨 = arr === '已到貨' ? 'Y' : 'N'; if (arr === '已出貨') ordOk_(n, u.acc); if (arr === '已到貨') { arrNames = [name]; ordOk_(n, u.acc); } n.到貨操作人 = u.acc; n.到貨時間 = now_(); }

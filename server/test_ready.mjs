@@ -61,6 +61,11 @@ r = await call('adminEditLineFull', tk, O3, HAT + '~灰', { keep: true, qty: 4, 
 ok(!r.ok && /現貨不足/.test(r.error) && Number(lineOf(O3, HAT + '~灰').qty) === 3 && (await shop('貓耳毛帽')).ready === null, 'edit beyond ready stock is refused and nothing changes: ' + r.error);
 r = await call('adminEditLineFull', tk, O3, HAT + '~灰', { keep: true, qty: 1, unit: 1280 });
 ok(r.ok && JSON.stringify((await shop('貓耳毛帽')).ready) === '{"灰":2}', 'edit qty 3 → 1 returns 2');
+{ const L0 = lineOf(O3, HAT + '~灰'); const keepEta = DB['商品'].find(x => x.id === HAT).arrival;
+  r = await call('adminEditLineFull', tk, O3, HAT + '~灰', { keep: false, qty: 1, unit: 1280, name: L0.product_name, type: '預購', arr: '待到貨', spec: '黑', vendor: L0.vendor || '', cost: L0.cost == null ? '' : L0.cost, tax: L0.cost_tax_incl === 'Y', src: L0.source || '', eta: keepEta || '' });
+  const L1 = lineOf(O3, HAT + '~黑'); ok(r.ok && L1 && L1.spec === '黑' && !lineOf(O3, HAT + '~灰'), 'edit spec 灰→黑 also renames line key: ' + (r.error || (L1 && L1.product_id)));
+  r = await call('adminEditLineFull', tk, O3, HAT + '~黑', { keep: false, qty: 1, unit: 1280, name: L0.product_name, type: '預購', arr: '待到貨', spec: '灰', vendor: L0.vendor || '', cost: L0.cost == null ? '' : L0.cost, tax: L0.cost_tax_incl === 'Y', src: L0.source || '', eta: keepEta || '' });
+  ok(r.ok && lineOf(O3, HAT + '~灰'), 'edit spec back 黑→灰'); }
 // 6) 刪除已到貨的庫存進貨:現貨扣回
 const K = DB['庫存進貨'].find(k => k.product_id === BOX).order_id;
 r = await call('adminDeleteStockIn', tk, K); ok(r.ok && (await shop('擴香禮盒')).ready === null, 'delete stock-in → ready removed');
