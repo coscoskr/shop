@@ -1094,6 +1094,7 @@ function memberChangePay(tk, sid, d) {
     if (f0.indexOf(String(s.狀態)) !== 0) throw new Error('這張出貨單已經付款或開始處理(' + s.狀態 + '),不能再改付款方式,請聯繫客服');
     if (String(s.發票號碼 || '') || String(s.綠界物流ID || '')) throw new Error('這張出貨單已經在處理中,不能再改付款方式,請聯繫客服');
     var m = String(s.配送方式 || ''), c = cvsOf_(s);
+    if (pay === '賣貨便' && String(s.付款方式) !== '賣貨便' && !mhFriendOk_(ctx, d)) throw new Error(MH_FRIEND_MSG);
     if (pay === '賣貨便' && m !== '店到店') throw new Error((logiOn_(d) ? '超商取貨付款' : '賣貨便') + '只能搭配超商店到店');
     if (pay === '賣貨便' && !logiOn_(d) && c && c.cvs !== '7-11') throw new Error('賣貨便只能寄 7-11,你的取貨門市是 ' + c.cvs + ',請改選其他付款方式');
     if (pay === '付現金' && m !== '自取') throw new Error('付現金只能搭配到店自取');
@@ -2328,6 +2329,9 @@ function kindOk_(d) {
   return k;
 }
 function payLabel_(p) { return String(p) === '賣貨便' && logiOn_() ? '超商取貨付款' : String(p || ''); }
+/* 賣貨便要用 LINE 傳下單連結:只有 LINE 登入、而且是官方帳號好友的會員才能選(綠界物流上線後不限) */
+var MH_FRIEND_MSG = '賣貨便需要用 LINE 登入並加入我們的官方帳號好友(我們會用 LINE 傳賣貨便下單連結給你)。加好友後請重新整理頁面再選,或改選其他付款方式';
+function mhFriendOk_(ctx, d) { if (logiOn_(d)) return true; var m = ctx && ctx.lid ? memberRow_(ctx.lid) : null; return !!(m && m.已加好友 === 'Y'); }
 function logiOn_(d) { return prop_('ECPAY_LOGI_LIVE') === '1' || !!(d && d.paytest); }
 function cvsOf_(s) {
   var m = String(s.收件資訊 || '').match(/^【店到店】(7-11|全家)\s*(.*?)｜收件人\s*(.*)$/); if (!m) return null;
@@ -2476,6 +2480,7 @@ function memberCreateShip0_(tk, items, d) {
   var pay = d.pay, ship = t_(d.ship, 200), phone = t_(d.phone, 20), method = d.method ? String(d.method) : '';
   if (!PAY[pay]) throw new Error('請選擇付款方式');
   if (pay === '刷卡' && prop_('ECPAY_PAY_LIVE') !== '1' && !d.paytest) throw new Error('線上付款即將開放,目前請選擇匯款或賣貨便');
+  if (pay === '賣貨便' && !mhFriendOk_(ctx, d)) throw new Error(MH_FRIEND_MSG);
   if (pay === '賣貨便' && method === '自取') throw new Error('賣貨便無法自取,請選擇匯款或付現金');
   if (pay === '賣貨便' && method && method !== '店到店') throw new Error('超商取貨付款只能搭配超商店到店');
   if (pay === '賣貨便' && !method && d.cvs) method = '店到店';

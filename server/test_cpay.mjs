@@ -21,7 +21,11 @@ DB['訂單'].push({ order_id: 'O1', ordered_at: '2026-11-18 10:00:00', name: '�
 DB['出貨單'].push({ ship_id: 'S1', order_id: 'O1', status: '待匯款', name: '王', phone: '0912345678', pay_method: '匯款', receiver: '【店到店】7-11 竹中門市(店號 123456)｜收件人 王小明', ship_method: '店到店', subtotal: 1000, promo_discount: 0, credit_used: 0, shipping: 60, total: 1060, line_id: 'U1' });
 // 直接用內部 mem_ 的替身:把 token 對應寫進 KV 的手機登入
 KV.set('m_T1', '0912345678');
-let r = await call('memberChangePay', 'T1', 'S1', { pay: '賣貨便' });
+// LINE 登入、官方好友的會員(賣貨便只開給好友)
+{ const crypto = await import('node:crypto'); const TL = 'Ltestfriend';
+  DB['登入階段'].push({ hash: code.INTERNAL.sha_(TL), line_id: 'U1', expires: '2099-01-01 00:00:00' });
+  DB['會員'].push({ line_id: 'U1', nickname: '王', friend: 'Y', level: '一般會員' }); }
+let r = await call('memberChangePay', 'Ltestfriend', 'S1', { pay: '賣貨便' });
 const S = () => DB['出貨單'][0];
 ok(r.ok && S().pay_method === '賣貨便' && S().status === '待出貨' && Number(S().total) === 1038, 'to 賣貨便 fee 38 total ' + S().total + ' ' + (r.error||''));
 r = await call('memberChangePay', 'T1', 'S1', { pay: '付現金' }); ok(!r.ok, 'cash blocked: ' + r.error);
@@ -37,4 +41,9 @@ r = await call('memberChangePay', 'T1', 'S2', { pay: '匯款' }); ok(!r.ok && /�
   ok(!/門市/.test(m), '賣貨便 create without store passes store check (stops later at: ' + m + ')');
   m = ''; try { code.INTERNAL.memberCreateShip0_('T1', [], { pay: '匯款', method: '店到店', rname: '王小明', phone: '0912345678', cvs: '7-11' }); } catch (e) { m = e.message; }
   ok(/門市/.test(m), '匯款 店到店 still needs store: ' + m); }
+// 賣貨便只給 LINE 登入且是官方好友的會員(訪客 T1 不行)
+{ let m = ''; try { code.INTERNAL.memberCreateShip0_('T1', [], { pay: '賣貨便', method: '店到店', rname: '王小明', phone: '0912345678' }); } catch (e) { m = e.message; }
+  ok(/官方帳號好友/.test(m), 'guest cannot create 賣貨便: ' + m); }
+DB['出貨單'].push({ ship_id: 'S3', order_id: 'O2', status: '待匯款', name: '王', phone: '0912345678', pay_method: '匯款', receiver: '【店到店】7-11 測試門市(店號 123456)｜收件人 王小明', ship_method: '店到店', subtotal: 500, promo_discount: 0, credit_used: 0, shipping: 60, total: 560 });
+r = await call('memberChangePay', 'T1', 'S3', { pay: '賣貨便' }); ok(!r.ok && /官方帳號好友/.test(r.error), 'guest cannot switch to 賣貨便: ' + r.error);
 console.log(fails ? fails + ' FAILED' : 'ALL PASSED');

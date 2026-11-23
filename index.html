@@ -818,7 +818,7 @@ function payChangeHtml(o) {
 function cpInit(o) {
   var f = $('#cpf'); if (!f) return; var mv = f.dataset.m;
   [].forEach.call(f.querySelectorAll('input[name="pay"]'), function (r) {
-    var ok = r.value === '賣貨便' ? mv === '店到店' : r.value === '付現金' ? mv === '自取' : true, lb = r.closest('.payc');
+    var ok = r.value === '賣貨便' ? mv === '店到店' && (mhOk() || o.pay === '賣貨便') : r.value === '付現金' ? mv === '自取' : true, lb = r.closest('.payc');
     if (lb) lb.hidden = !ok; r.checked = r.value === o.pay && (r.dataset.k || '') === (o.pay === '刷卡' ? (o.kind || 'Credit') : '');
   });
 }
@@ -868,7 +868,7 @@ function shipForm() {
     picked.map(function (i) { var spc = sp(i.pid); return '<tr><td>' + esc(i.name) + (spc ? '<br><small>' + esc(spc) + '</small>' : '') + '</td><td class="n">' + i.qty + '</td><td class="n">' + i.unit + '</td><td class="n">' + i.sub + '</td></tr>'; }).join('') + '</tbody></table>' +
     '<div id="sq" class="ds" style="margin-top:8px">計算金額中…</div></div>' +
     '<form id="sf"><fieldset class="payf"><legend>配送方式' + (MD.free ? ' <small class="ds" style="font-weight:400">滿 ' + money(MD.free) + ' 免運</small>' : '') + '</legend><div class="payg">' +
-      shipCard('店到店', ICO.store, '超商店到店', '7-11/全家門市取貨 · ' + money(MD.feeCvs), true) + (logiOn() ? '' : shipCard('賣貨便', ICO.store, '賣貨便', '7-11 取貨付款(付款方式會自動選賣貨便)')) + shipCard('宅配', ICO.truck, '宅配到府', '送到指定地址 · ' + money(MD.fee)) + shipCard('自取', ICO.home, '到店自取', '台中門市自取 · 免運') + '</div></fieldset>' +
+      shipCard('店到店', ICO.store, '超商店到店', '7-11/全家門市取貨 · ' + money(MD.feeCvs), true) + (logiOn() || !mhOk() ? '' : shipCard('賣貨便', ICO.store, '賣貨便', '7-11 取貨付款(付款方式會自動選賣貨便)')) + shipCard('宅配', ICO.truck, '宅配到府', '送到指定地址 · ' + money(MD.fee)) + shipCard('自取', ICO.home, '到店自取', '台中門市自取 · 免運') + '</div></fieldset>' +
     '<label>收件人姓名(請填本名)<input name="rname" required maxlength="30" placeholder="與證件相同,例如:王小明" value="' + esc((MD.me && MD.me.pname) || o0.nm || '') + '"><small class="ds" style="color:var(--acc)">超商取貨需核對證件,請填寫本名,不可填暱稱</small></label>' +
     '<label>聯絡電話<input name="phone" required inputmode="tel" value="' + esc((MD.me && MD.me.phone) || o0.ph || '') + '"></label>' +
     (true ? '<div id="mcvs"><label>超商<select name="cvs"><option>7-11</option><option>全家</option></select></label><input type="hidden" name="store"><input type="hidden" name="cvsid"><div class="cvsp"><div id="cvsn" class="ds">尚未選擇門市</div><button type="button" class="btn l" data-a="map">選擇門市(開啟超商地圖)</button></div><small class="ds" id="mfh" hidden></small></div>'
@@ -876,7 +876,7 @@ function shipForm() {
     '<p id="mhs" class="ds" hidden style="background:var(--soft);padding:10px 12px;border-radius:10px;margin:8px 0">賣貨便不用選門市:出貨單成立後,我們會傳賣貨便下單連結給你,取貨門市在賣貨便下單時填寫即可。</p>' +
     '<div id="mhome" hidden><label>收件地址<input name="addr" maxlength="150" value="' + esc((MD.me && MD.me.addr) || '') + '"></label></div>' +
     (bal > 0 ? '<label>使用購物金(餘額 ' + money(bal) + ')<input name="credit" type="number" min="0" step="1" value="0" inputmode="numeric"></label><small class="ds" id="crh"></small>' + credNote() : '') +
-    '<fieldset class="payf"><legend>付款方式</legend><small class="ds" id="mhh" hidden style="color:var(--acc);display:block;margin-bottom:6px">配送方式選了賣貨便,付款方式固定為賣貨便(要改請先換配送方式)</small><div class="payg">' + payCards() + '</div></fieldset>' +
+    '<fieldset class="payf"><legend>付款方式</legend><small class="ds" id="mhh" hidden style="color:var(--acc);display:block;margin-bottom:6px">配送方式選了賣貨便,付款方式固定為賣貨便(要改請先換配送方式)</small><div class="payg">' + payCards() + '</div>' + mhNote() + '</fieldset>' +
     '<label>備註<textarea name="note" rows="2" maxlength="200"></textarea></label>' +
     '<p id="sfe" class="tg" role="alert"></p><button class="btn a">確認出貨</button> <button type="button" class="btn l" data-a="mb">返回</button></form>';
 }
@@ -1035,11 +1035,14 @@ function payCards() {
     c('刷卡', 'Credit', ICO.card, '信用卡一次付清', on ? '線上刷卡,付款完成自動確認' : '即將開放', false, !on) +
     c('刷卡', 'Installment', ICO.cal, '信用卡分期', ins ? '3～24 期,依發卡銀行核准' : '即將開放', false, !ins) +
     c('刷卡', 'BNPL', ICO.phone, '無卡分期', bn2 ? '免信用卡,線上申請審核' : '即將開放', false, !bn2) +
-    (logiOn() ? c('賣貨便', '', ICO.store, '超商取貨付款', '7-11/全家門市取貨時付款') : c('賣貨便', '', ICO.store, '賣貨便', '7-11 取貨付款,僅店到店')) +
+    (logiOn() ? c('賣貨便', '', ICO.store, '超商取貨付款', '7-11/全家門市取貨時付款') : mhOk() ? c('賣貨便', '', ICO.store, '賣貨便', '7-11 取貨付款,僅店到店') : c('賣貨便', '', ICO.store, '賣貨便', '需 LINE 登入並加入官方帳號好友', false, true)) +
     c('付現金', '', ICO.cash, '付現金', '到店自取時當面付款');
 }
 function instOn() { return !!(window.D && D.instLive) || testOn(); }
 function bnplOn() { return !!(window.D && D.bnplLive) || testOn(); }
+/* 賣貨便要用 LINE 傳下單連結:LINE 登入、而且是官方帳號好友才能選(綠界物流上線後不限) */
+function mhOk() { return logiOn() || !!(window.MD && MD.me && MD.me.friend); }
+function mhNote() { return mhOk() ? '' : '<p class="ds" style="margin:6px 0 0">想用賣貨便:請用 LINE 登入並加入我們的官方帳號好友(我們會用 LINE 傳賣貨便下單連結給你),加好友後重新整理頁面即可選擇。' + (window.D && D.line && D.line.friend ? ' <a href="' + esc(D.line.friend) + '" target="_blank" rel="noopener">加入官方帳號好友</a>' : '') + '</p>'; }
 function logiOn() { return !!(window.D && D.logiLive) || testOn(); }
 /* 超商地圖:先把填到一半的出貨單存起來,選完門市回來再接著填 */
 function goMap() {
