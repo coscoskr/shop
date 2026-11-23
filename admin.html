@@ -454,6 +454,9 @@ function etaW(v) { var m = /^下單後(\d+)週$/.exec(String(v || '')); return m
 function canLogi(s) { return s.method === '店到店' && !s.lgid && !s.no && (LOGI || s.pay !== '賣貨便'); }
 function PL(p) { return p === '賣貨便' && LOGI ? '超商取貨付款' : String(p || ''); }
 function selShips() { return Object.keys(SSEL).filter(function (k) { return SSEL[k]; }); }
+/* 出貨單表單目前填的內容(用來判斷有沒有改了還沒儲存) */
+function shfSer(f) { return [].map.call(f.querySelectorAll('input[name],select[name],textarea[name]'), function (x) { return x.name + '=' + (x.type === 'checkbox' || x.type === 'radio' ? x.checked : x.value); }).join('\n'); }
+function shfDirty(id) { var f = $('#shf'); return !!(f && $('#dlg').open && f.dataset.id === id && f.dataset.snap !== undefined && shfSer(f) !== f.dataset.snap); }
 function openShip(sid) {
   var x = shipList().filter(function (y) { return y.s.id === sid; })[0]; if (!x) return;
   var s = x.s, d = $('#dlg');
@@ -467,7 +470,7 @@ function openShip(sid) {
     '<p class="m">狀態依付款方式走流程;改成「已出貨…」會記錄出貨時間;出貨單全部走到最後一個狀態時,訂單自動變「已完成」。</p><p class="er" id="se" role="alert"></p>' +
     '<button class="btn a">儲存</button> <button type="button" class="btn l" data-a="x">關閉</button> <button type="button" class="btn l" data-a="dship" data-id="' + esc(s.id) + '">刪除出貨單</button>' + (s.method === '店到店' && (FL[s.pay] || []).indexOf(s.st) >= ({ '刷卡': 2, '匯款': 3, '賣貨便': 1, '付現金': 1 }[s.pay] || 9) ? ' <button type="button" class="btn l" data-a="shre" data-id="' + esc(s.id) + '">重新推播出貨通知</button>' : '') + (s.pay === '匯款' && (s.st === '待匯款' || s.st === '已匯款待查帳') ? ' <button type="button" class="btn l" data-a="rmiss" data-id="' + esc(s.id) + '" style="border-color:#d64545;color:#d64545">沒收到匯款</button>' : '') + '</form>' +
     '<h4>狀態紀錄</h4><div id="shh" data-id="' + esc(s.id) + '" class="m">載入中…</div>';
-  if (!d.open) d.showModal(); recvToggle();
+  if (!d.open) d.showModal(); recvToggle(); var sf0 = $('#shf'); if (sf0) sf0.dataset.snap = shfSer(sf0);
   call('adminShipHistory', T, s.id).then(function (r) {
     var el = $('#shh'); if (!el || el.dataset.id !== s.id) return;
     el.className = '';
@@ -1159,6 +1162,7 @@ document.addEventListener('click', function (e) {
     }); return;
   }
   if (a === 'lgc') {
+    if (shfDirty(id)) { tell('你剛剛改的資料(例如收件資訊、門市店號)還沒儲存。\n請先按下方「儲存」,再產生綠界物流單,不然會用舊的資料。'); return; }
     ask('確定替出貨單 ' + id + ' 產生綠界物流單號?\n產生後即為正式寄件單,同一張出貨單只能產生一次。', function () {
       call('adminLogiCreate', T, id).then(function (d) { setO(d); if (tab === 's') shipRows(); if ($('#dlg').open && $('#shf') && $('#shf').dataset.id === id) openShip(id); tell(d.msg); }).catch(function (er) { tell(er.message); });
     }); return;
