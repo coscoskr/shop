@@ -881,6 +881,9 @@ function hbCheck(inp) {
   if (!v) { if (st) { st.textContent = ''; st.style.color = ''; } return; }
   inp.style.border = '2px solid ' + (ok ? '#2e9e5b' : '#d64545');
   if (st) { st.textContent = ok ? '✓ 完全符合的 LINE 會員' : '✗ 沒有符合的會員(請選清單裡的暱稱,或清空這格)'; st.style.color = ok ? '#2e9e5b' : '#d64545'; }
+  // 會員有填本名、但和舊檔案的購買人不同 → 黃色提醒(例如購買人「李佳俞」卻選到本名「林育安」的 YuNa)
+  var mm = ok && HB._mem && HB._mem[HB._nick[v]], row = inp.closest('tr'), buyer = row ? row.cells[0].textContent.trim() : '';
+  if (mm && mm.real && buyer && mm.real !== buyer && buyer.indexOf(mm.real) < 0 && mm.real.indexOf(buyer) < 0) { inp.style.border = '2px solid #d99a00'; if (st) { st.textContent = '⚠ 這位會員的本名是「' + mm.real + '」,和購買人「' + buyer + '」不同,請確認沒有選錯人'; st.style.color = '#b07d00'; } }
 }
 document.addEventListener('input', function (e) { if (e.target.dataset && e.target.dataset.hn !== undefined) hbCheck(e.target); });
 document.addEventListener('change', function (e) { if (e.target.dataset && e.target.dataset.hn !== undefined) hbCheck(e.target); });
@@ -898,7 +901,10 @@ document.addEventListener('change', function (e) {
 function histBindDraw(r) {
   var b = $('#hbind'); if (!b) return; HB = r;
   var nick = {}, dup = {}; r.members.forEach(function (m) { var k = m.nick.trim().toLowerCase(); dup[k] = (dup[k] || 0) + 1; });
-  var lab = function (m) { return m.nick.trim() + (dup[m.nick.trim().toLowerCase()] > 1 ? ' ·' + m.id.slice(-4) : ''); };
+  // 暱稱相同(不分大小寫,例如 YuNa / Yuna)時,加上本名與加入日期,避免綁錯人;都一樣才補 LINE ID 末4碼
+  var lab = function (m) { var k = m.nick.trim().toLowerCase(); if (dup[k] <= 1) return m.nick.trim();
+    var j = m.joined ? m.joined.slice(5).replace('-', '/') + '加入' : ''; return m.nick.trim() + (m.real ? '(' + m.real + ')' : '') + (j ? ' · ' + j : '') + ' ·' + m.id.slice(-4); };
+  r._mem = {}; r.members.forEach(function (m) { r._mem[m.id] = m; });
   r.members.forEach(function (m) { nick[lab(m)] = m.id; }); r._nick = nick;
   var rn = '<div style="margin-top:16px;padding:10px;border:1px dashed var(--line);border-radius:10px"><b>補發綁定通知</b><span class="m"> 客人沒收到「綁定成功」訊息時,選她的 LINE 暱稱重發</span><br><input list="hdl2" id="rnn" placeholder="輸入 LINE 暱稱搜尋並選擇" style="min-width:220px;margin-top:6px"> <button type="button" class="btn a" data-a="hrn">補發</button><datalist id="hdl2">' + Object.keys(nick).map(function (k) { return '<option value="' + esc(k) + '">'; }).join('') + '</datalist></div>';
   if (!r.groups.length) { b.innerHTML = '<p class="m">' + (r.msg ? esc(r.msg) + '<br>' : '') + '目前沒有待綁定的舊訂單。</p>' + rn; return; }

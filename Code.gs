@@ -3923,7 +3923,7 @@ function adminHistBindList(tk) {
     var k = String(o.姓名); cnt[k] = cnt[k] || { name: k, orders: 0, items: 0 }; cnt[k].orders++; cnt[k].items += items[String(o.訂單ID)] || 0;
   });
   var gs = Object.keys(cnt).map(function (k) { return cnt[k]; }).sort(function (a, b) { return b.items - a.items; });
-  var ms = rows_('會員').map(function (m) { return { id: String(m['LINE ID']), nick: String(m.暱稱 || ''), real: String(m.姓名 || '') }; });
+  var ms = rows_('會員').map(function (m) { return { id: String(m['LINE ID']), nick: String(m.暱稱 || ''), real: String(m.姓名 || ''), joined: String(m.加入時間 || '').slice(0, 10) }; });
   var notes = {}; try { notes = JSON.parse(String(settings_().舊訂單備註 || '{}')) || {}; } catch (e) {}
   return { groups: gs, members: ms, notes: notes };
 }
