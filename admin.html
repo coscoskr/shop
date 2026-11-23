@@ -795,7 +795,7 @@ function openMember(lid) {
   var d = $('#dlg');
   d.innerHTML = '<h3>' + esc(m.name) + ' <span class="m">購物金餘額 ' + m.balance + ' 元 · 訂單 ' + m.orders + ' 筆 · ' + (m.friend ? '已加好友' : '尚未加好友') + '</span></h3>' +
     '<form id="lvf" data-id="' + esc(lid) + '"><div class="g"><label>會員等級<select name="lv">' + opts(MB.levels, m.level) + '</select></label><div class="f" style="grid-column:span 2">' + fld('備註', 'note', m.note) + '</div></div><p class="er" id="le2" role="alert"></p><button class="btn a">儲存等級</button></form>' +
-    '<h4>發放購物金</h4><form id="gf" data-id="' + esc(lid) + '"><div class="g">' + fld('金額', 'amt', '', 'number') + fld('有效天數', 'days', '90', 'number') + fld('備註', 'note', '') + '</div><p class="er" id="ge" role="alert"></p><button class="btn a">發放</button></form>' +
+    '<h4>發放購物金</h4><form id="gf" data-id="' + esc(lid) + '"><div class="g">' + fld('金額', 'amt', '', 'number') + fld('張數', 'cnt', '1', 'number') + fld('有效天數', 'days', '90', 'number') + fld('備註', 'note', '') + '</div><p class="er" id="ge" role="alert"></p><button class="btn a">發放</button></form>' +
     '<h4>購物金紀錄</h4><div id="gl"><p class="m">載入中…</p></div><p style="margin-top:14px"><button class="btn l" data-a="x">關閉</button></p>';
   if (!d.open) d.showModal();
   loadGrants(lid);
@@ -1258,7 +1258,15 @@ document.addEventListener('submit', function (e) {
     call('adminSetLevel', T, f.dataset.id, f.lv.value, f.note.value).then(function (r) { MB = r; memberRows(); openMember(f.dataset.id); }).catch(fail('#le2'));
   } else if (f.id === 'gf') {
     $('#ge').textContent = '';
-    call('adminGrant', T, f.dataset.id, f.amt.value, f.days.value, f.note.value).then(function (r) { MB = r; memberRows(); openMember(f.dataset.id); }).catch(fail('#ge'));
+    var gGo = function (force) {
+      call('adminGrant', T, f.dataset.id, f.amt.value, f.days.value, f.note.value, !!force, f.cnt ? f.cnt.value : 1).then(function (r) { MB = r; memberRows(); openMember(f.dataset.id); }).catch(function (er) {
+        var m = String(er && er.message || er);
+        if (m.indexOf('DUPGRANT:') === 0) { ask(m.slice(9) + '\n確定要再發一張嗎?\n(一次要發多張,可以直接填「張數」)', function () { gGo(true); }); return; }
+        $('#ge').textContent = m;
+      });
+    };
+    var gn = Math.max(1, Math.floor(+(f.cnt ? f.cnt.value : 1) || 1));
+    if (gn > 1) ask('確定發放 ' + gn + ' 張 ' + f.amt.value + ' 元購物金(共 ' + gn * (+f.amt.value || 0) + ' 元)?', function () { gGo(false); }); else gGo(false);
   } else if (f.id === 'acf') {
     $('#ace').textContent = '';
     call('adminSaveActivity', T, { id: f.dataset.id, name: f.name.value, from: f.from.value, to: f.to.value, on: f.on.value === '1', scope: f.scope.value, val: f.val.value, lv: f.lv.value, type: f.type.value, num: f.num.value, min: f.min.value, when: f.when.value, days: f.days.value })

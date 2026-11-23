@@ -3662,8 +3662,9 @@ function adminSetLevel(tk, lid, level, note) {
   });
   return adminMembers(tk);
 }
-function adminGrant(tk, lid, amt, days, note) {
-  var u = me_(tk);
+function adminGrant(tk, lid, amt, days, note, force, cnt) {
+  var u = me_(tk), n = Math.floor(Number(cnt || 1));
+  if (!(n >= 1 && n <= 20)) throw new Error('張數需為 1-20');
   lk_(function () {
     var m = memberRow_(lid); if (!m) throw new Error('找不到會員');
     var a = Math.floor(Number(amt)), dd = Math.floor(Number(days));
@@ -3674,9 +3675,9 @@ function adminGrant(tk, lid, amt, days, note) {
       if (String(g['LINE ID']) !== String(lid) || String(g.來源) !== '手動發放' || Number(g.金額) !== a || String(g.備註 || '') !== t_(note, 100) || String(g.操作人) !== u.acc) return false;
       var tm = new Date(String(g.發放時間).replace(' ', 'T') + '+08:00').getTime(); return nowMs - tm >= 0 && nowMs - tm < 10000;
     });
-    if (dupG.length) throw new Error('剛剛已經發放過一筆相同的購物金(' + dupG[0].序號 + '),已略過重複發放');
-    addGrant_(lid, a, dd, '手動發放', t_(note, 100), u.acc, '', '');
-    log_(u.acc, '發放購物金', m.暱稱, a + ' 元,' + dd + ' 天;' + t_(note, 100));
+    if (dupG.length && !force) throw new Error('DUPGRANT:剛剛(10 秒內)已經發放過一筆相同金額的購物金(' + dupG[0].序號 + ')');
+    for (var k = 0; k < n; k++) addGrant_(lid, a, dd, '手動發放', t_(note, 100), u.acc, '', '');
+    log_(u.acc, '發放購物金', m.暱稱, a + ' 元' + (n > 1 ? ' ×' + n + ' 張(共 ' + a * n + ' 元)' : '') + ',' + dd + ' 天;' + t_(note, 100) + (dupG.length ? '(確認後再發一次)' : ''));
   });
   return adminMembers(tk);
 }

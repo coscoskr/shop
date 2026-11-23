@@ -41,3 +41,12 @@ console.log(fails ? fails + ' FAILED' : 'ALL PASSED');
   ok(r9.ok && S9().status === '已自取付款' && !!S9().shipped_at, 'cash → 已自取付款 ' + (r9.error || ''));
   if (fails) process.exit(1);
 }
+{ // 手動發購物金:可一次發多張;10 秒內重複發同額要確認(force)
+  DB['會員'] = DB['會員'] || []; DB['會員'].push({ line_id: 'UG1', nickname: 'Avan', friend: 'Y', level: '一般會員' });
+  DB['購物金'] = DB['購物金'] || [];
+  const cnt = () => DB['購物金'].filter(g => g.line_id === 'UG1').length;
+  let g = await call('adminGrant', tk, 'UG1', 50, 90, '', false, 2); ok(g.ok && cnt() === 2, 'grant 2 × 50 ' + (g.error || ''));
+  g = await call('adminGrant', tk, 'UG1', 50, 90, '', false, 1); ok(!g.ok && /^DUPGRANT:/.test(g.error) && cnt() === 2, 'repeat within 10s needs confirm');
+  g = await call('adminGrant', tk, 'UG1', 50, 90, '', true, 1); ok(g.ok && cnt() === 3, 'force repeat ok');
+  if (fails) process.exit(1);
+}
