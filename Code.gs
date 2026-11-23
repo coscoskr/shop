@@ -2887,6 +2887,19 @@ function mailTo_(to, subject, body) {
 }
 /** 第一次部署後,請在編輯器執行一次 authAll,授權雲端硬碟(商品圖片)與寄信(遊客通知) */
 function authAll() { DriveApp.getRootFolder(); return 'Drive/Mail OK, 今日剩餘寄信額度 ' + MailApp.getRemainingDailyQuota(); }
+/** 補發到貨通知:對指定訂單,把「已到貨、還沒建立出貨單」的品項重新發一次到貨通知(LINE;沒 LINE 有 email 就寄信) */
+function adminResendArrival(tk, oids) {
+  var u = me_(tk), want = {}, arr = {};
+  [].concat(oids || []).slice(0, 300).forEach(function (x) { want[String(x)] = 1; });
+  rows_('訂單明細').forEach(function (l) { var oid = String(l.訂單ID); if (want[oid] && String(l.到貨狀態) === '已到貨' && !String(l.出貨單ID || '')) (arr[oid] = arr[oid] || []).push(String(l.品名)); });
+  var n = Object.keys(arr).length;
+  if (!n) throw new Error('勾選的訂單沒有「已到貨、還沒出貨」的品項,不需要補發');
+  var r = notifyArrival_(arr);
+  lk_(function () { Object.keys(arr).forEach(function (oid) { log_(u.acc, '補發到貨通知', oid, arr[oid].join('、')); }); });
+  r.orders = n; r.skipped = Object.keys(want).length - n;
+  r.msg = '已補發到貨通知:成功 ' + r.sent + ' 張' + (r.failed ? ',失敗 ' + r.failed + ' 張(LINE 額度或封鎖)' : '') + (r.noLine ? ',沒有 LINE/email ' + r.noLine + ' 張' : '') + (r.skipped ? '\n略過 ' + r.skipped + ' 張(沒有已到貨未出貨的品項)' : '');
+  return r;
+}
 function notifyArrival_(arr) {
   var tpl = String(settings_().到貨通知內容 || ''), r = { sent: 0, noLine: 0, failed: 0 };
   Object.keys(arr).forEach(function (oid) {

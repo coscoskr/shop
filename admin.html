@@ -391,7 +391,7 @@ function openOrder(id) {
         '<label>出貨單<output>' + esc(i.sid || '—') + '</output></label><div class="sv"><button class="btn a" data-a="sl" data-oid="' + esc(o.id) + '" data-pid="' + esc(i.pid) + '">儲存後關閉</button></div></div></div>';
     }).join('') + '<p class="m">每個品項右下角按「儲存後關閉」。廠商、成本、稅、貨源只記在這一筆訂單明細(到貨日期仍是商品共用)。已記錄付款的品項,廠商/成本/貨源要先到「廠商付款紀錄」刪除付款紀錄才能改。已建立出貨單的品項,數量、單價、到貨狀態不能改。</p>';
   if (o.ships.length) h += '<h4>相關出貨單</h4><table><tbody>' + o.ships.map(function (s) { return '<tr data-a="ship" data-id="' + esc(s.id) + '"><td>' + esc(s.id) + '</td><td>' + esc(shipItTxt(s)) + '</td><td>' + esc(PL(s.pay)) + ' ' + money(s.total) + '</td><td>' + stChip(s.st) + '</td></tr>'; }).join('') + '</tbody></table>';
-  h += '<p style="margin-top:18px"><button class="btn l" data-a="x">關閉</button> <button class="btn l" data-a="dord" data-id="' + esc(o.id) + '">刪除訂單</button></p>';
+  h += '<p style="margin-top:18px"><button class="btn l" data-a="x">關閉</button> <button class="btn l" data-a="dord" data-id="' + esc(o.id) + '">刪除訂單</button>' + (o.items.some(function (i) { return i.arr === '已到貨' && !i.sid; }) ? ' <button class="btn l" data-a="rearr" data-id="' + esc(o.id) + '">補發到貨通知</button>' : '') + '</p>';
   d.innerHTML = h; if (!d.open) d.showModal();
 }
 
@@ -1213,6 +1213,11 @@ document.addEventListener('click', function (e) {
     var ids3 = selShips(); if (!ids3.length) { tell('請先勾選出貨單'); return; }
     ask('確定刪除勾選的 ' + ids3.length + ' 張出貨單?\n已出貨的不能刪(會略過);購物金會退回,品項回到「訂單明細」可重新出貨。\n這是重大事件,會記錄在 Google 試算表的「重大事件」工作表(含刪除前資料)。', function () {
       call('adminBatchDeleteShips', T, ids3).then(function (d) { setO(d); SSEL = {}; shipRows(); tell(d.msg); }).catch(function (er) { tell(er.message); });
+    }); return;
+  }
+  if (a === 'rearr') {
+    ask('重新用 LINE 發一次到貨通知給這位客人?\n(只列出已到貨、還沒建立出貨單的品項)', function () {
+      call('adminResendArrival', T, [id]).then(function (r) { tell(r.msg); }).catch(function (er) { tell(er.message); });
     }); return;
   }
   if (a === 'po') { openPO([id]); return; }
