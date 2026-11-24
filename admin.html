@@ -1389,7 +1389,7 @@ function pvDraw() {
     '<label>叫貨<select data-k="ord"><option value="">全部</option><option value="no"' + (VF.ord === 'no' ? ' selected' : '') + '>未叫貨</option><option value="yes"' + (VF.ord === 'yes' ? ' selected' : '') + '>已叫貨</option></select></label>' +
     '<label>下單從<input type="date" data-k="from" value="' + esc(VF.from) + '"></label><label>到<input type="date" data-k="to" value="' + esc(VF.to) + '"></label>' +
     '<label>訂單編號<input data-k="qo" placeholder="例如:O2611" value="' + esc(VF.qo) + '" style="width:130px"></label><label>訂購人<input data-k="qb" placeholder="LINE 名稱或購買人" value="' + esc(VF.qb) + '" style="width:150px"></label><label>品名<input data-k="qn" placeholder="可用空格分隔多個字" value="' + esc(VF.qn) + '" style="width:170px"></label><label>規格<input data-k="qs" placeholder="例如:黑色" value="' + esc(VF.qs) + '" style="width:130px"></label><button class="btn l" data-pv="rs">清除篩選</button></div>' +
-    '<p style="margin:8px 0"><span class="zm" role="group" aria-label="表格縮放"><button class="btn l s" data-pv="zo" aria-label="縮小">－</button><b id="pvzv" style="min-width:48px;display:inline-block;text-align:center">' + PZ + '%</b><button class="btn l s" data-pv="zi" aria-label="放大">＋</button><button class="btn l s" data-pv="zr">還原</button><button class="btn l s" data-pv="zf">符合寬度</button></span> <button class="btn a" data-pv="bo">批次訂貨</button> <button class="btn l" data-pv="bos">全選未叫貨</button> <button class="btn l" data-pv="boc">取消叫貨</button> <button class="btn a" data-pv="info">批次修改(到貨/成本/廠商/貨源)</button> <button class="btn l" data-pv="rn">發送到貨通知</button> <button class="btn a" data-pv="pay">廠商付款紀錄</button> <button class="btn l" data-pv="bdel">批次刪除</button></p>' +
+    '<p style="margin:8px 0"><span class="zm" role="group" aria-label="表格縮放"><button class="btn l s" data-pv="zo" aria-label="縮小">－</button><b id="pvzv" style="min-width:48px;display:inline-block;text-align:center">' + PZ + '%</b><button class="btn l s" data-pv="zi" aria-label="放大">＋</button><button class="btn l s" data-pv="zr">還原</button><button class="btn l s" data-pv="zf">符合寬度</button></span> <button class="btn a" data-pv="bo">批次訂貨</button> <button class="btn l" data-pv="bos">全選未叫貨</button> <button class="btn l" data-pv="boc">取消叫貨</button> <button class="btn a" data-pv="info">批次修改(到貨/成本/廠商/貨源)</button> <button class="btn l" data-pv="bcode">批次輸入折扣碼</button> <button class="btn l" data-pv="rn">發送到貨通知</button> <button class="btn a" data-pv="pay">廠商付款紀錄</button> <button class="btn l" data-pv="bdel">批次刪除</button></p>' +
     '<div style="display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 10px"><div id="pvflt" style="flex:1;min-width:300px;border:1px solid var(--line);border-radius:6px;padding:8px 12px"></div><div id="pvsum" style="flex:1;min-width:300px;border:1px solid var(--line);border-radius:6px;padding:8px 12px;background:#fafafa"></div></div>' +
     '<div id="pvt"></div>';
   $('#v').innerHTML = h; pvRows();
@@ -1568,6 +1568,17 @@ document.addEventListener('click', function (e) {
       call('adminArrivalRenotify', T, kr).then(function (r) { var dq = $('#dq'); dq.oncancel = null; if (dq.open) dq.close(); pvSet(r, r.msg); }).catch(function (er) { var dq = $('#dq'); dq.oncancel = null; if (dq.open) dq.close(); tell(er.message); });
     });
   }
+  else if (a === 'bcode') {
+    var kc = pvSel(), co = {}; PV.lines.forEach(function (l) { if (PSEL[l.key] && !l.stock) { var x = co[l.oid] = co[l.oid] || { oid: l.oid, buyer: l.buyer, sub: 0, n: 0, code: l.code, dname: l.dname, disc: l.disc, sid: false }; x.sub += l.qty * l.unit; x.n += l.qty; if (l.sid) x.sid = true; } });
+    var cl = Object.keys(co).map(function (k) { return co[k]; });
+    if (!kc.length || !cl.length) { tell('請先勾選客人訂單的品項(同一張訂單勾一項就可以)'); return; }
+    d.innerHTML = '<h3>批次輸入折扣碼</h3><p class="m">替客人補輸入折扣碼:勾選品項所屬的 <b>' + cl.length + '</b> 張訂單,會一次套用同一個折扣碼,依各訂單的商品金額重算折抵(取代原本的優惠)。已建立出貨單或未達最低消費的訂單會略過。</p>' +
+      '<table><thead><tr><th>訂單編號</th><th>訂購人</th><th>件數</th><th>商品金額</th><th>目前優惠</th></tr></thead><tbody>' + cl.map(function (x) { return '<tr><td>' + esc(x.oid) + '</td><td>' + esc(x.buyer) + '</td><td>' + x.n + '</td><td>' + money(x.sub) + '</td><td>' + (x.sid ? '<span class="er">已建立出貨單,會略過</span>' : x.disc ? esc(x.dname || '優惠') + ' −' + money(x.disc) : '—') + '</td></tr>'; }).join('') + '</tbody></table>' +
+      '<form id="pvcode" style="margin-top:12px"><label>折扣碼<input name="code" required maxlength="30" list="pvcdl" autocomplete="off" style="max-width:240px"></label><datalist id="pvcdl">' + (typeof CD !== 'undefined' && CD ? CD.filter(function (x) { return x.state === '可用'; }).map(function (x) { return '<option value="' + esc(x.code) + '">'; }).join('') : '') + '</datalist>' +
+      '<p class="er" id="pce" role="alert"></p><button class="btn a">套用到 ' + cl.length + ' 張訂單</button> <button type="button" class="btn l" data-a="x">取消</button></form>';
+    d.showModal(); var ci = d.querySelector('#pvcode input'); if (ci) ci.focus();
+    if (!CD.length) call('adminCodes', T).then(function (r) { CD = r; var dl = $('#pvcdl'); if (dl) dl.innerHTML = CD.filter(function (x) { return x.state === '可用'; }).map(function (x) { return '<option value="' + esc(x.code) + '">'; }).join(''); }).catch(function () {});
+  }
   else if (a === 'info') {
     var ks2 = pvSel(); if (!ks2.length) { tell('請先勾選品項'); return; }
     d.innerHTML = pvBatchHtml(); pvBatchMark();
@@ -1600,6 +1611,7 @@ document.addEventListener('submit', function (e) {
   var done = function (r) { $('#dlg').close(); pvSet(r); }, bad = fail('#pve');
   if (f.id === 'pvpay') call('adminRecordPayment', T, pvSel(), { date: v('date'), amount: v('amount'), note: v('note'), imgs: PIMG }).then(done).catch(bad);
   else if (f.id === 'pvinfo') pvBatchSubmit(f);
+  else if (f.id === 'pvcode') { $('#pce').textContent = ''; wait('套用中…請稍候'); call('adminBatchOrderCode', T, pvSel(), v('code')).then(function (r) { var dq = $('#dq'); dq.oncancel = null; if (dq.open) dq.close(); $('#dlg').close(); OT = 0; O = null; pvSet(r, r.msg); }).catch(function (er) { var dq = $('#dq'); dq.oncancel = null; if (dq.open) dq.close(); $('#pce').textContent = er.message; }); }
   else if (f.id === 'pvedit') call('adminUpdatePayment', T, f.dataset.id, { date: v('date'), amount: v('amount'), note: v('note'), imgs: PIMG }).then(function (r) { $('#dlg').close(); OT = 0; PV = r; PVT = Date.now(); pvDraw(); }).catch(bad);
 });
 

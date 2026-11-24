@@ -1526,7 +1526,30 @@ function adminOrders(tk) {
 /** 後台替客人輸入/更換折扣碼,或手動調整優惠折抵金額(已建立出貨單的訂單不能改) */
 function adminOrderAdjust(tk, oid, d) {
   var u = me_(tk); d = d || {};
+  lk_(function () { ordAdj_(u, oid, d); });
+  return adminOrders(tk);
+}
+/** 後台批次補輸入折扣碼:勾選的品項所屬訂單(可多張)一次套用同一個折扣碼,依各訂單商品金額重算折抵 */
+function adminBatchOrderCode(tk, keys, code) {
+  var u = me_(tk), c = t_(code, 30), ok = [], skip = [];
+  if (!c) throw new Error('請輸入折扣碼');
+  var oids = []; (keys || []).slice(0, 500).forEach(function (k) { var o = String(k).split('|')[0]; if (o && !/^K/.test(o) && oids.indexOf(o) < 0) oids.push(o); });
+  if (!oids.length) throw new Error('勾選的品項中沒有客人訂單');
   lk_(function () {
+    oids.forEach(function (oid) {
+      try {
+        var o = ord_(oid);
+        if (String(o.折扣碼 || '').toLowerCase() === c.toLowerCase()) { skip.push(oid + '(已經是這個折扣碼)'); return; }
+        ordAdj_(u, oid, { code: c }); ok.push(oid);
+      } catch (e) { skip.push(oid + '(' + String(e && e.message || e) + ')'); }
+    });
+  });
+  var r = purchaseList_();
+  r.msg = '折扣碼 ' + c + ':已套用 ' + ok.length + ' 張訂單' + (ok.length ? '\n' + ok.join('、') : '') + (skip.length ? '\n\n略過 ' + skip.length + ' 張:\n' + skip.join('\n') : '');
+  return r;
+}
+function ordAdj_(u, oid, d) {
+  (function () {
     var o = ord_(oid);
     if (rows_('訂單明細').some(function (x) { return String(x.訂單ID) === oid && x.出貨單ID; })) throw new Error('此訂單已有品項建立出貨單,不能再調整優惠;請先刪除出貨單');
     var sub = Number(o.商品金額) || 0, n = cp_(o), oldCode = String(o.折扣碼 || ''), newCode = t_(d.code, 30), msg = '';
@@ -1551,8 +1574,7 @@ function adminOrderAdjust(tk, oid, d) {
     n.總額 = tot_(sub, n, 0);
     put_('訂單', o._r, n);
     log_(u.acc, '調整訂單優惠', oid, msg + ';合計 ' + o.總額 + '→' + n.總額);
-  });
-  return adminOrders(tk);
+  })();
 }
 function adminUpdateOrder(tk, oid, d) {
   var u = me_(tk);

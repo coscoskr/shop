@@ -75,4 +75,9 @@ r = await call('setup'); ok(!r.ok, 'setup not callable');
 r = await call('authAll'); ok(!r.ok, 'authAll not callable');
 r = await call('adminSaveCode', tk, { code: 'VIP5', type: '百分比', value: 5 }); ok(r.ok, 'discount code');
 r = await call('quote', '', [{ id: pid, qty: 1 }], false, 'vip5'); ok(r.ok && r.result.discount === 40, 'quote with code: ' + JSON.stringify(r.result).slice(0, 80));
+{ const pl = await call('adminPurchaseList', tk); const keys = pl.result.lines.filter(l => !l.stock && !l.sid).map(l => l.key); const oids = [...new Set(keys.map(k => k.split('|')[0]))];
+  r = await call('adminBatchOrderCode', tk, keys, 'vip5'); ok(r.ok && /已套用/.test(r.result.msg), 'batch order code: ' + (r.ok ? r.result.msg : r.error).slice(0, 120));
+  const os = DB['訂單'].filter(o => oids.includes(String(o.order_id))); ok(os.length > 0 && os.every(o => o.discount_code === 'VIP5' && Number(o.promo_discount) === Math.round(Number(o.subtotal) * 5 / 100)), 'orders got VIP5 discount');
+  r = await call('adminBatchOrderCode', tk, keys, 'VIP5'); ok(r.ok && /已經是這個折扣碼/.test(r.result.msg), 'batch code again skipped');
+  r = await call('adminBatchOrderCode', tk, keys, 'NOPE'); ok(r.ok && /不存在/.test(r.result.msg), 'bad code skipped with reason'); }
 console.log(fails ? fails + ' FAILED' : 'ALL PASSED', '(transactions:', txCount + ')');
