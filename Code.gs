@@ -196,8 +196,8 @@ function specParse_(p) {
   return { names: names, q: q };
 }
 function specs_(p) { return specParse_(p).names; }
-/** 規格名稱整理:最多 30 字,| ~ = 是系統分隔用的字元,換成 / - - */
-function specNorm_(s) { return t_(s, 30).split('|').join('/').split('~').join('-').split('=').join('-'); }
+/** 規格名稱整理:最多 60 字,| ~ = 是系統分隔用的字元,換成 / - - */
+function specNorm_(s) { return t_(s, 60).split('|').join('/').split('~').join('-').split('=').join('-'); }
 function specQty_(p) { return specParse_(p).q; }
 /** 這個商品(含規格)目前還能賣幾件;null=不限量 */
 function availOf_(p, sp) {
@@ -833,7 +833,7 @@ function adminSaveProduct(tk, d) {
     put_('商品', old ? old._r : 0, row);
     put_('商品_內部', oi ? oi._r : 0, inn);
     log_(u.acc, old ? '修改商品' : '新增商品', id + ' ' + name, old ? [diff_(old, row), diff_(oi, inn)].filter(function (x) { return x && x !== '新增'; }).join(';') : '新增');
-    if (d.cb && d.cb.proid) cbBindDo_(u, id, d.cb); // 同一次儲存一起綁定酷柏商品(規格不對會整筆不存,畫面會顯示原因)
+    [].concat(d.cb || []).slice(0, 20).forEach(function (x) { if (x && x.proid) cbBindDo_(u, id, x); }); // 同一次儲存一起綁定酷柏商品(可一次綁多個顏色;規格不對會整筆不存,畫面會顯示原因)
     return adminProducts_();
   } finally { L.releaseLock(); }
 }
@@ -1374,7 +1374,7 @@ function adminAddStockIn(tk, d) {
     if (!(qty >= 1 && qty <= 99999)) throw new Error('進貨數量不正確');
     var cost = (d.cost === '' || d.cost == null) ? '' : Number(d.cost);
     if (cost !== '' && !(cost >= 0)) throw new Error('成本不正確');
-    var sp = t_(d.spec, 30), sl = specs_(p);
+    var sp = t_(d.spec, 60), sl = specs_(p);
     if (sl.length && sl.indexOf(sp) < 0) throw new Error('請選擇規格');
     if (!sl.length) sp = '';
     var inn = rows_('商品_內部').filter(function (r) { return String(r.商品ID) === String(p.商品ID); })[0] || {};
@@ -3268,14 +3268,50 @@ function cbDone_(plans) {
 /* 自動對照(不用人確認):品牌、品名、規格都對得上、而且全店只有一個商品規格符合 → 直接當作對照過,入帳並記住。
    對不上或有兩個以上可能 → 才交給 AI 配對、請到貨管理員確認。 */
 function cbG_(s) { return String(s || '').replace(/【[^】]*】/g, '').replace(/[\s\-_.,，。、・·\/|｜()（）\[\]#＃+*:：'"「」]/g, '').toLowerCase(); }
+/* --- 酷柏「一個顏色一個商品」對 COS「同一頁多顏色(規格:顏色 / 尺寸)」:用貨號找商品、用顏色+尺寸找規格 --- */
+var CB_CLR_ = { CHESTNUT: '栗', CHESTUNT: '栗', SAND: '沙', APRICOT: '杏', CHOCOLATE: '巧克力', BLACK: '黑', BROWN: '棕', NAVY: '藏藍', GREY: '灰', GRAY: '灰', BEIGE: '米', TAUPE: '米', WHITE: '白', MUSTARD: '杏', TAN: '棕', CARAMEL: '焦糖', TOFFEE: '太妃', PINK: '粉', RED: '紅', BLUE: '藍', GREEN: '綠', CREAM: '奶油', IVORY: '象牙', KHAKI: '卡其', CHARCOAL: '炭灰', OLIVE: '橄欖', NATURAL: '原色', MOCHA: '摩卡', COFFEE: '咖啡', WALNUT: '胡桃', WALINUTS: '胡桃', CAMEL: '駝', SILVER: '銀', GOLD: '金', PURPLE: '紫', YELLOW: '黃', ORANGE: '橘' };
+/** 品名裡括號中的貨號(例:（OZ3010）→ OZ3010) */
+function cbSku_(s) { var m = String(s || '').match(/[（(]\s*([A-Za-z]{1,4}\d{3,5}[A-Za-z]{0,4})\s*[）)]/); return m ? m[1].toUpperCase() : ''; }
+/** 尺寸:EU36 / 36碼 → 36(交期、預售等字一律忽略) */
+function cbSize_(s) { var m = String(s || '').match(/EU\s*(\d{2})|(\d{2})\s*碼/i); return m ? (m[1] || m[2]) : ''; }
+/** 酷柏的顏色:規格寫「顏色#尺寸」就取 # 前面;否則取品名貨號括號後面的字 */
+function cbColorOf_(title, spec) {
+  var sp = String(spec || ''), i = sp.indexOf('#'); if (i > 0) return sp.slice(0, i);
+  var t = String(title || ''), m = t.match(/[（(]\s*[A-Za-z]{1,4}\d{3,5}[A-Za-z]{0,4}\s*[）)]/); return m ? t.slice(m.index + m[0].length) : '';
+}
+function cbClrEn_(s) { return (String(s || '').toUpperCase().match(/[A-Z]{3,}/g) || []).filter(function (w) { return !/^(UGG|OZLANA|AUSPECIAL|EVERAU|OZWEAR|AUSTRALIAN|SHEPHERD|NATURE|FUR|COLOR|COLOUR|EU)$/.test(w); }); }
+function cbClrZh_(s) { return (String(s || '').match(/[\u4e00-\u9fff]+/g) || []).join('').replace(/[色子]/g, ''); }
+/** 兩段顏色文字是不是同一個顏色:英文字相同、中文相同,或用中英對照表接得起來 */
+function cbSameClr_(a, b) {
+  var ea = cbClrEn_(a), eb = cbClrEn_(b), za = cbClrZh_(a), zb = cbClrZh_(b);
+  if (ea.some(function (w) { return eb.indexOf(w) >= 0; })) return true;
+  if (za && zb && (za.indexOf(zb) >= 0 || zb.indexOf(za) >= 0)) return true;
+  var ta = ea.map(function (w) { return CB_CLR_[w]; }).filter(Boolean), tb = eb.map(function (w) { return CB_CLR_[w]; }).filter(Boolean);
+  return ta.some(function (x) { return zb.indexOf(x) >= 0; }) || tb.some(function (x) { return za.indexOf(x) >= 0; });
+}
+/** 用顏色+尺寸找店內規格。酷柏規格沒有尺寸就不適用(回 null);否則回 {n: 對到幾個, spec: 唯一的那個} */
+function cbSpecBy_(it, p) {
+  var sl = specs_(p), z = cbSize_(it.spec); if (!z || !sl.length) return null;
+  var c = cbColorOf_(it.title, it.spec);
+  var h = sl.filter(function (x) {
+    var k = x.lastIndexOf(' / '), col = k >= 0 ? x.slice(0, k) : '', sz = cbSize_(k >= 0 ? x.slice(k + 3) : x);
+    if (sz !== z) return false;
+    return col ? !!c && cbSameClr_(c, col) : (!c || cbSameClr_(c, p.名稱));
+  });
+  return { n: h.length, spec: h.length === 1 ? h[0] : '' };
+}
 function cbGuess_(it, prods) {
-  var t = cbG_(it.title), ks = cbG_(it.spec), plain = !!it.single, hit = [];
+  var t = cbG_(it.title), ks = cbG_(it.spec), plain = !!it.single, hit = [], sku = cbSku_(it.title);
   if (!t) return null;
   Object.keys(prods).forEach(function (pid) {
     var p = prods[pid], nm = cbG_(p.名稱), br = cbG_(p.品牌);
-    if (!nm || nm.length < 3 || t.indexOf(nm) < 0) return;           // 店內品名要完整出現在酷柏品名裡
-    if (br && t.indexOf(br) < 0) return;                              // 有填品牌的話,品牌也要出現
+    if (!(sku && cbSku_(p.名稱) === sku)) {                            // 貨號相同就算同款(COS 品名常多寫「三色」等字)
+      if (!nm || nm.length < 3 || t.indexOf(nm) < 0) return;         // 店內品名要完整出現在酷柏品名裡
+      if (br && t.indexOf(br) < 0) return;                            // 有填品牌的話,品牌也要出現
+    }
     var sl = specs_(p);
+    var bs = cbSpecBy_(it, p);                                        // 有尺寸的(鞋子):顏色+尺寸要剛好對到一個規格
+    if (bs) { if (bs.n === 1) hit.push({ pid: pid, spec: bs.spec }); else if (bs.n > 1) hit.push(null, null); return; }
     if (!sl.length) { if (plain) hit.push({ pid: pid, spec: '' }); return; }
     var m = sl.filter(function (x) {
       var g = cbG_(x); if (!g) return false;

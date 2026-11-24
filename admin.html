@@ -668,43 +668,85 @@ function editProd(id) {
 }
 /* ---------- 酷柏商品綁定 ---------- */
 function cbNm(x) { return String(x || '').replace(/【[^】]*】/g, '').replace(/[\s\-_.,，。、・·\/|｜()（）\[\]#＃+*:：'"「」]/g, '').toLowerCase(); }
+/* 顏色+尺寸對照(與 Code.gs 的 cbSpecBy_ 同一套規則):酷柏一個顏色一個商品 → 這邊同一頁「顏色 / 尺寸」 */
+var CBCLR = { CHESTNUT: '栗', CHESTUNT: '栗', SAND: '沙', APRICOT: '杏', CHOCOLATE: '巧克力', BLACK: '黑', BROWN: '棕', NAVY: '藏藍', GREY: '灰', GRAY: '灰', BEIGE: '米', TAUPE: '米', WHITE: '白', MUSTARD: '杏', TAN: '棕', CARAMEL: '焦糖', TOFFEE: '太妃', PINK: '粉', RED: '紅', BLUE: '藍', GREEN: '綠', CREAM: '奶油', IVORY: '象牙', KHAKI: '卡其', CHARCOAL: '炭灰', OLIVE: '橄欖', NATURAL: '原色', MOCHA: '摩卡', COFFEE: '咖啡', WALNUT: '胡桃', WALINUTS: '胡桃', CAMEL: '駝', SILVER: '銀', GOLD: '金', PURPLE: '紫', YELLOW: '黃', ORANGE: '橘' };
+var CBSKU = /[（(]\s*([A-Za-z]{1,4}\d{3,5}[A-Za-z]{0,4})\s*[）)]/;
+function cbSku(s) { var m = String(s || '').match(CBSKU); return m ? m[1].toUpperCase() : ''; }
+function cbSize(s) { var m = String(s || '').match(/EU\s*(\d{2})|(\d{2})\s*碼/i); return m ? (m[1] || m[2]) : ''; }
+function cbColor(title, spec) { var sp = String(spec || ''), i = sp.indexOf('#'); if (i > 0) return sp.slice(0, i); var t = String(title || ''), m = t.match(CBSKU); return m ? t.slice(m.index + m[0].length) : ''; }
+function cbEn(s) { return (String(s || '').toUpperCase().match(/[A-Z]{3,}/g) || []).filter(function (w) { return !/^(UGG|OZLANA|AUSPECIAL|EVERAU|OZWEAR|AUSTRALIAN|SHEPHERD|NATURE|FUR|COLOR|COLOUR|EU)$/.test(w); }); }
+function cbZh(s) { return (String(s || '').match(/[一-鿿]+/g) || []).join('').replace(/[色子]/g, ''); }
+function cbSameClr(a, b) {
+  var ea = cbEn(a), eb = cbEn(b), za = cbZh(a), zb = cbZh(b);
+  if (ea.some(function (w) { return eb.indexOf(w) >= 0; })) return true;
+  if (za && zb && (za.indexOf(zb) >= 0 || zb.indexOf(za) >= 0)) return true;
+  var ta = ea.map(function (w) { return CBCLR[w]; }).filter(Boolean), tb = eb.map(function (w) { return CBCLR[w]; }).filter(Boolean);
+  return ta.some(function (x) { return zb.indexOf(x) >= 0; }) || tb.some(function (x) { return za.indexOf(x) >= 0; });
+}
+/** 回傳對到的規格(唯一才算);沒有尺寸資訊回 null,對不到或不只一個回 '' */
+function cbSpecBy(title, spec, sl, pname) {
+  var z = cbSize(spec); if (!z || !sl.length) return null;
+  var c = cbColor(title, spec);
+  var h = sl.filter(function (x) { var k = x.lastIndexOf(' / '), col = k >= 0 ? x.slice(0, k) : '', sz = cbSize(k >= 0 ? x.slice(k + 3) : x); if (sz !== z) return false; return col ? !!c && cbSameClr(c, col) : (!c || cbSameClr(c, pname)); });
+  return h.length === 1 ? h[0] : '';
+}
 function cbBind(p, id) {
-  var box = $('#cbbl'), res = $('#cbr'), f = $('#pf'), list = [], sel = -1, bound = [], auto = true, tmr = 0, lastQ = '';
+  var box = $('#cbbl'), res = $('#cbr'), f = $('#pf'), list = [], sel = {}, bound = [], auto = true, tmr = 0, lastQ = '';
   var sl = function () { return SPL.map(function (x) { return x.n; }).filter(Boolean); }; // 用畫面上目前的規格(新增商品還沒存也可以)
+  var pname = function () { return f.elements.name.value; };
   var specSel = function (cur, none) { var l = sl(); return '<select class="cbsp">' + (none ? '<option value="__none">不綁定</option>' : '') + (l.length ? l.map(function (n) { return '<option value="' + esc(n) + '"' + (n === cur ? ' selected' : '') + '>' + esc(n) + '</option>'; }).join('') : '<option value="">(這個商品沒有規格)</option>') + '</select>'; };
+  var boundIds = function () { var o = {}; bound.forEach(function (x) { o[x.proid] = 1; }); return o; };
   var drawBound = function (d) {
     bound = d.binds || [];
-    box.innerHTML = (bound.length ? bound.map(function (x) {
-      return '<div style="display:flex;gap:8px;align-items:center;margin:4px 0"><span style="flex:1">✅ 酷柏 ' + esc(x.proid) + ' ' + esc(x.title || '') + '<br><span class="m">' + (x.spec === '*' ? '整個商品' : '酷柏規格編號 ' + esc(x.spec)) + ' → ' + esc(x.cspec || '(無規格)') + '</span></span><button type="button" class="btn l s" data-cbu="' + esc(x.key) + '">解除</button></div>';
-    }).join('') : '<span class="er" style="display:inline">⚠ 還沒綁定酷柏商品:酷柏到貨時會先停在「待對應」,不會入帳。</span>') +
+    var g = {}, order = [];
+    bound.forEach(function (x) { if (!g[x.proid]) { g[x.proid] = { proid: x.proid, title: x.title, keys: [], to: [] }; order.push(x.proid); } g[x.proid].keys.push(x.key); g[x.proid].to.push(x.spec === '*' ? '整個商品 → ' + (x.cspec || '(無規格)') : (x.cspec || '不綁定')); });
+    box.innerHTML = (order.length ? '<div class="m" style="margin:4px 0">已綁定(' + order.length + ' 個酷柏商品)</div><table style="width:100%;border-collapse:collapse">' + order.map(function (k) {
+      var x = g[k], to = x.to.filter(function (t) { return t !== '不綁定'; });
+      return '<tr style="border-top:1px solid #e6dcd3"><td style="padding:6px 8px;vertical-align:top">酷柏 ' + esc(x.proid) + ' ' + esc(x.title || '') + '</td><td style="padding:6px 8px;vertical-align:top" class="m">' + esc(to.join('、') || '(都選不綁定)') + '</td><td style="padding:6px 8px;vertical-align:top;text-align:right;white-space:nowrap"><button type="button" class="btn l s" data-cbu="' + esc(x.keys.join(',')) + '">解除</button></td></tr>';
+    }).join('') + '</table>' : '<span class="er" style="display:inline">還沒綁定酷柏商品:酷柏到貨時會先停在「待對應」,不會入帳。</span>') +
       ((d.pend || []).length ? '<p class="m" style="margin:6px 0 0">目前待對應的酷柏到貨:' + d.pend.map(function (x) { return esc(x.title) + ' ×' + x.qty + '(酷柏 ' + esc(x.proid) + ')'; }).join('、') + '</p>' : '');
-    if (!bound.length) find(); // 還沒綁定:直接用品名找候選,不用自己搜尋
+    lastQ = ''; find(); // 已綁定也照樣列出同款其他顏色,可以直接再勾選加綁
   };
   box.addEventListener('click', function (e) {
     var k = e.target.dataset.cbu; if (!k) return;
-    call('adminCbUnbind', T, id, k).then(function (d) { drawBound(d); tell('已解除綁定'); }).catch(function (er) { tell(er.message); });
+    var keys = k.split(','), dd = null, i = 0;
+    var next = function () { if (i >= keys.length) { drawBound(dd); tell('已解除綁定'); return; } call('adminCbUnbind', T, id, keys[i++]).then(function (d) { dd = d; next(); }).catch(function (er) { tell(er.message); }); };
+    next();
   });
-  var mapHtml = function (x, keep) {
-    if (x.single) return '<div class="cbmap" style="margin-top:6px">整個商品對到:' + specSel(keep && keep['*'] != null ? keep['*'] : (sl().length === 1 ? sl()[0] : '')) + '</div>';
-    return '<div class="cbmap" style="margin-top:6px">每個酷柏規格對到這個商品的哪個規格:' + (x.specs || []).map(function (s) {
-      // 自動對應:名稱互相包含就算(規格常寫成「英文 | 編號 中文」,也拆開每一段比對)
-      var g = cbNm(s.title), hit = sl().filter(function (n) { return [n].concat(String(n).split(/[|｜\/]/)).some(function (part) { var h = cbNm(part); return h && g && h.length >= 2 && (h.indexOf(g) >= 0 || g.indexOf(h) >= 0); }); });
-      var cur = keep && keep[s.id] != null ? keep[s.id] : (hit.length === 1 ? hit[0] : (s.plain && sl().length <= 1 ? (sl()[0] || '') : '__none'));
-      return '<div style="display:flex;gap:8px;align-items:center;margin:3px 0" data-sid="' + esc(s.id) + '"><span style="flex:1">' + esc(s.title) + (s.bound ? ' <span class="m">(目前:' + esc(s.bound) + ')</span>' : '') + '</span>' + specSel(cur, true) + '</div>';
-    }).join('') + '</div>';
+  var autoMap = function (x, s) { // 一個酷柏規格要對到哪個店內規格:先用顏色+尺寸,再用名稱互相包含
+    var l = sl(), by = cbSpecBy(x.title, s.title, l, pname());
+    if (by !== null) return by || '__none';
+    var gg = cbNm(s.title), hit = l.filter(function (n) { return [n].concat(String(n).split(/[|｜\/]/)).some(function (part) { var h = cbNm(part); return h && gg && h.length >= 2 && (h.indexOf(gg) >= 0 || gg.indexOf(h) >= 0); }); });
+    return hit.length === 1 ? hit[0] : (s.plain && l.length <= 1 ? (l[0] || '') : '__none');
   };
-  var keepNow = function () { var k = {}; res.querySelectorAll('.cbsel [data-sid]').forEach(function (r) { k[r.dataset.sid] = r.querySelector('select').value; }); var s1 = res.querySelector('.cbsel .cbmap > select'); if (s1) k['*'] = s1.value; return k; };
+  var autoHits = function (x) { return (x.specs || []).filter(function (s) { return autoMap(x, s) !== '__none'; }).length; };
+  var mapHtml = function (x, keep) {
+    if (x.single) return '<div class="cbmap" style="margin:6px 0 0 24px">整個商品對到:' + specSel(keep && keep['*'] != null ? keep['*'] : (sl().length === 1 ? sl()[0] : '')) + '</div>';
+    return '<div class="cbmap" style="margin:6px 0 0 24px"><div class="m">每個酷柏規格對到這個商品的哪個規格(已依顏色和尺寸自動帶入,請確認):</div><table style="border-collapse:collapse">' + (x.specs || []).map(function (s) {
+      var cur = keep && keep[s.id] != null ? keep[s.id] : autoMap(x, s);
+      return '<tr data-sid="' + esc(s.id) + '"><td style="padding:3px 12px 3px 0">' + esc(s.title) + (s.bound ? '<br><span class="m">目前:' + esc(s.bound) + '</span>' : '') + '</td><td style="padding:3px 0">' + specSel(cur, true) + '</td></tr>';
+    }).join('') + '</table></div>';
+  };
+  var keepNow = function (i) { var k = {}, w = res.querySelector('[data-cbi="' + i + '"]'); if (!w) return null; w.querySelectorAll('[data-sid]').forEach(function (r) { k[r.dataset.sid] = r.querySelector('select').value; }); var s1 = w.querySelector('.cbmap > select'); if (s1) k['*'] = s1.value; return k; };
   var drawList = function (note) {
     if (!list.length) { res.innerHTML = note ? '<p class="m">' + note + '</p>' : ''; return; }
+    var keep = {}; Object.keys(sel).forEach(function (i) { keep[i] = keepNow(i); });
+    var bi = boundIds();
     res.innerHTML = (note ? '<p class="m" style="margin:6px 0 0">' + note + '</p>' : '') + list.map(function (x, i) {
-      var on = i === sel;
-      return '<div class="' + (on ? 'cbsel' : '') + '" style="border:' + (on ? '2px solid #b5653c;background:#fff8f3' : '1px solid #e6dcd3') + ';border-radius:8px;padding:8px;margin-top:6px"><label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer"><input type="radio" name="cbpick" value="' + i + '"' + (on ? ' checked' : '') + ' style="margin-top:4px"><span><b>' + esc(x.title) + '</b> <span class="m">酷柏編號 ' + esc(x.id) + '・' + (x.on ? '上架中' : '已下架') + '</span>' +
-        (x.bound ? '<br><span class="m">目前綁定:' + esc(x.bound) + '</span>' : '') + '<br><span class="m" style="font-size:12px">規格:' + esc((x.specs || []).map(function (s) { return s.title; }).join(' / ') || '(無)') + '</span></span></label>' + (on ? mapHtml(x) : '') + '</div>';
-    }).join('') + '<label style="display:flex;gap:8px;margin-top:6px;cursor:pointer"><input type="radio" name="cbpick" value="-1"' + (sel < 0 ? ' checked' : '') + '> <span class="m">都不是／先不綁定</span></label>';
+      var on = !!sel[i];
+      return '<div data-cbi="' + i + '" style="border:1px solid ' + (on ? '#8a7a6d' : '#e6dcd3') + ';border-radius:8px;padding:8px;margin-top:6px"><label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer"><input type="checkbox" name="cbpick" value="' + i + '"' + (on ? ' checked' : '') + ' style="margin-top:4px"><span>' + esc(x.title) + ' <span class="m">酷柏編號 ' + esc(x.id) + '・' + (x.on ? '上架中' : '已下架') + (bi[x.id] ? '・已綁定到這個商品(勾選會重新綁定)' : '') + '</span>' +
+        (x.bound && !bi[x.id] ? '<br><span class="m">目前綁定:' + esc(x.bound) + '</span>' : '') + '<br><span class="m" style="font-size:12px">規格:' + esc((x.specs || []).map(function (s) { return s.title; }).join(' / ') || '(無)') + '</span></span></label>' + (on ? mapHtml(x, keep[i]) : '') + '</div>';
+    }).join('') + '<p class="m" style="margin:6px 0 0">可以勾選多個顏色;都不勾就不綁定。按「儲存」時一起綁定。</p>';
   };
-  var pickBest = function (name) {
-    var n = cbNm(name), hit = []; list.forEach(function (x, i) { if (n && x.on && cbNm(x.title).indexOf(n) >= 0) hit.push(i); });
-    return hit.length === 1 ? hit[0] : -1;
+  var pickAuto = function () { // 同款(貨號相同)而且顏色、尺寸對得上的:全部自動勾選;沒有貨號才用品名找唯一的一個
+    var o = {}, bi = boundIds(), sku = cbSku(pname()), n = cbNm(pname()), one = [];
+    list.forEach(function (x, i) {
+      if (bi[x.id]) return;
+      if (sku && cbSku(x.title) === sku) { if (x.on && autoHits(x)) o[i] = 1; return; }
+      if (n && x.on && cbNm(x.title).indexOf(n) >= 0) one.push(i);
+    });
+    if (!Object.keys(o).length && one.length === 1) o[one[0]] = 1;
+    return o;
   };
   var seq = 0;
   var run = function (q, fromName) {
@@ -713,40 +755,42 @@ function cbBind(p, id) {
     res.innerHTML = '<p class="m">正在找酷柏商品…</p>';
     call('adminCbSearch', T, q).then(function (l) {
       if (my !== seq) return;
-      if (!l.length && fromName && q.length > 6) return run(q.slice(0, 6), true); // 品名太長找不到:用前面幾個字再找一次
-      l.sort(function (a, b) { return (b.on - a.on); }); list = l.slice(0, 6);
-      var nm = f.elements.name.value;
-      sel = (fromName && auto) ? pickBest(nm) : -1;
-      if (sel >= 0 && !f.elements.vendor.value) f.elements.vendor.value = '酷柏';
-      drawList(!list.length ? '酷柏找不到相近的商品,可以在上面改關鍵字搜尋。' : sel >= 0 ? '✔ 已自動選出最符合的酷柏商品,請確認;不對就改選。' : '找到 ' + list.length + ' 個相近的酷柏商品,請選一個(按「儲存」時一起綁定)。');
+      if (!l.length && fromName && q.length > 6 && !cbSku(pname())) return run(q.slice(0, 6), true); // 品名太長找不到:用前面幾個字再找一次
+      l.sort(function (a, b) { return (b.on - a.on); }); list = l.slice(0, 12);
+      sel = (fromName && auto) ? pickAuto() : {};
+      var ns = Object.keys(sel).length;
+      if (ns && !f.elements.vendor.value) f.elements.vendor.value = '酷柏';
+      drawList(!list.length ? '酷柏找不到相近的商品,可以在上面改關鍵字搜尋。' : ns ? '已自動勾選 ' + ns + ' 個對得上的酷柏商品,請確認;不對就取消勾選或改選。' : '找到 ' + list.length + ' 個相近的酷柏商品,請勾選(可以勾多個顏色,按「儲存」時一起綁定)。');
     }).catch(function (e) { if (my === seq) res.innerHTML = '<p class="er">' + esc(e.message) + '</p>'; });
   };
   var find = function () {
-    if (bound.length) return;
-    var v = f.elements.vendor.value; if (v && v !== '酷柏') { res.innerHTML = ''; list = []; sel = -1; lastQ = ''; return; } // 廠商不是酷柏就不用綁
-    var q = String(f.elements.name.value || '').replace(/[（(][^）)]*[）)]/g, ' ').replace(/#.*/, '').trim().slice(0, 30);
+    var v = f.elements.vendor.value; if (v && v !== '酷柏') { res.innerHTML = ''; list = []; sel = {}; lastQ = ''; return; } // 廠商不是酷柏就不用綁
+    var sku = cbSku(pname()); // 品名有貨號就用貨號找,同款所有顏色都會列出來
+    var q = sku || String(pname() || '').replace(/[（(][^）)]*[）)]/g, ' ').replace(/#.*/, '').trim().slice(0, 30);
     if (q.length >= 2) run(q, true);
   };
   res.addEventListener('change', function (e) {
-    if (e.target.name === 'cbpick') { sel = +e.target.value; auto = false; if (sel >= 0 && !f.elements.vendor.value) f.elements.vendor.value = '酷柏'; drawList(''); }
+    if (e.target.name === 'cbpick') { var i = +e.target.value; if (e.target.checked) sel[i] = 1; else delete sel[i]; auto = false; if (e.target.checked && !f.elements.vendor.value) f.elements.vendor.value = '酷柏'; drawList(''); }
   });
   // 背景搜尋:不跳視窗、不搶游標;注音/拼音選字中不搜尋,停止打字 1 秒後才找
   var kick = function () { clearTimeout(tmr); tmr = setTimeout(find, 1000); };
   f.elements.name.addEventListener('input', function (e) { if (e.isComposing) return; kick(); });
   f.elements.name.addEventListener('compositionend', kick);
   f.elements.vendor.addEventListener('change', function () { lastQ = ''; find(); });
-  var remap = function () { if (sel >= 0 && list[sel]) { var k = keepNow(), box2 = res.querySelector('.cbsel .cbmap'); if (box2) box2.outerHTML = mapHtml(list[sel], k); } };
+  var remap = function () { Object.keys(sel).forEach(function (i) { var k = keepNow(i), w = res.querySelector('[data-cbi="' + i + '"] .cbmap'); if (w && list[i]) w.outerHTML = mapHtml(list[i], k); }); };
   new MutationObserver(remap).observe($('#spl'), { childList: true, subtree: true }); $('#spl').addEventListener('change', remap); // 規格改了,對應選單跟著更新
   var search = function () { lastQ = ''; auto = false; run($('#cbq').value.trim(), false); };
   $('#cbqb').onclick = search;
   $('#cbq').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); search(); } });
-  // 按「儲存」時取出要一起綁定的內容(沒選就不綁)
+  // 按「儲存」時取出要一起綁定的內容(沒勾就不綁);可以一次綁多個酷柏商品
   window.cbCollect = function () {
-    if (sel < 0 || !list[sel]) return null;
-    var x = list[sel], d = { proid: x.id, title: x.title, single: !!x.single }, w = res.querySelector('.cbsel');
-    if (x.single) d.cspec = w.querySelector('.cbmap > select').value;
-    else d.rows = Array.prototype.map.call(w.querySelectorAll('[data-sid]'), function (r) { return { specid: +r.dataset.sid, cspec: r.querySelector('select').value }; });
-    return d;
+    var out = Object.keys(sel).map(Number).filter(function (i) { return list[i]; }).map(function (i) {
+      var x = list[i], d = { proid: x.id, title: x.title, single: !!x.single }, w = res.querySelector('[data-cbi="' + i + '"]');
+      if (x.single) d.cspec = w.querySelector('.cbmap > select').value;
+      else d.rows = Array.prototype.map.call(w.querySelectorAll('[data-sid]'), function (r) { return { specid: +r.dataset.sid, cspec: r.querySelector('select').value }; });
+      return d;
+    });
+    return out.length ? out : null;
   };
   if (id) call('adminCbBinds', T, id).then(drawBound).catch(function (e) { box.textContent = e.message; });
   else find();
@@ -1119,11 +1163,12 @@ document.addEventListener('submit', function (e) {
       cats: CSEL.slice(),
       vendor: g('vendor').value, source: g('source').value, cost: g('cost').value, taxIncl: g('tax').value === 'Y'};
     if (window.cbCollect) { var cbd = window.cbCollect(); if (cbd) o2.cb = cbd; }
-    if (o2.cb && o2.cb.rows && !o2.cb.rows.some(function (r) { return r.cspec && r.cspec !== '__none'; })) { $('#pe').textContent = '下方選了酷柏商品「' + o2.cb.title + '」,但它的每個規格都選「不綁定」。請在每個酷柏規格旁的選單選對應的規格;不想綁定就選「都不是／先不綁定」再儲存。'; var cbx = $('#cbr'); if (cbx) cbx.scrollIntoView({ block: 'center' }); return; }
+    var cbAll = (o2.cb || []).filter(function (c) { return c.rows && !c.rows.some(function (r) { return r.cspec && r.cspec !== '__none'; }); })[0];
+    if (cbAll) { $('#pe').textContent = '下方勾選了酷柏商品「' + cbAll.title + '」,但它的每個規格都選「不綁定」。請在每個酷柏規格旁的選單選對應的規格;不想綁定這個就取消勾選再儲存。'; var cbx = $('#cbr'); if (cbx) cbx.scrollIntoView({ block: 'center' }); return; }
     $('#pe').textContent = ''; wait('商品儲存中…請稍候');
     call('adminSaveProduct', T, o2).then(function (r) {
       P = r; if (o2.newBrand.trim()) call('adminBrands', T).then(function (b) { BR = b.sort(function(a, b) { var x = String(a.name || a).toLowerCase(), y = String(b.name || b).toLowerCase(); return x < y ? -1 : x > y ? 1 : 0; }); BL = b.map(function (x) { return x.name; }); });
-      var d = $('#dq'); d.innerHTML = '<p style="margin:6px 0;text-align:center;font-weight:700">✓ 商品已儲存' + (o2.cb ? ',已綁定酷柏商品' : '') + '</p>';
+      var d = $('#dq'); d.innerHTML = '<p style="margin:6px 0;text-align:center;font-weight:700">✓ 商品已儲存' + (o2.cb ? ',已綁定 ' + o2.cb.length + ' 個酷柏商品' : '') + '</p>';
       setTimeout(function () { d.oncancel = null; if (d.open) d.close(); if ($('#dlg').open) $('#dlg').close(); prodView(); }, 900);
     }).catch(function (e) { var d = $('#dq'); d.oncancel = null; if (d.open) d.close(); var el = $('#pe'); if (el) el.textContent = e.message; else tell(e.message); });
   } else if (f.id === 'af') {
