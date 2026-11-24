@@ -1698,6 +1698,7 @@ function adminCreateShip(tk, items, d) {
     lines.forEach(function (l) { var n = cp_(l); n.出貨單ID = sid; put_('訂單明細', l._r, n); });
     log_(u.acc, '建立出貨單', sid, lines.map(function (l) { return l.品名 + '×' + l.數量; }).join('、'));
     Object.keys(oids).forEach(function (oid) { syncOrderStatus_(oid, u.acc); });
+    shipCreatedNotice_(String(o0['LINE ID'] || ''), sid, d.pay === '賣貨便' && !logiOn_(d));
   });
   return adminOrders(tk);
 }
@@ -2534,9 +2535,16 @@ function memberCreateShip0_(tk, items, d) {
     lines.forEach(function (l) { var n = cp_(l); n.出貨單ID = sid; put_('訂單明細', l._r, n); });
     log_('客人 ' + o0.姓名, '建立出貨單', sid, pay + (method ? ',' + method : '') + (c.pick ? ',購物金 -' + c.pick : '') + ',應付 ' + c.total + ':' + lines.map(function (l) { return l.品名 + '×' + l.數量; }).join('、'));
     Object.keys(oids).forEach(function (oid) { syncOrderStatus_(oid, '客人'); });
-    if (pay === '賣貨便' && ctx.lid && !logiOn_(d)) { var mt = String(settings_().賣貨便成立通知內容 === undefined ? defSet_('賣貨便成立通知內容') : settings_().賣貨便成立通知內容 || '').trim(); if (mt) pushLine_(ctx.lid, mt.split('{出貨單號}').join(sid)); }
+    shipCreatedNotice_(ctx.lid, sid, pay === '賣貨便' && !logiOn_(d));
   });
   var r = memberOrders(tk); r.sid = sid; return r;
+}
+/** 出貨單成立後用 LINE 通知客人(設定「出貨單成立通知內容」;賣貨便另外加上賣貨便說明,合併成一則省額度) */
+function shipCreatedNotice_(lid, sid, myship) {
+  if (!lid) return;
+  var st = settings_(), tx = function (k) { return String(st[k] === undefined ? defSet_(k) : st[k] || '').trim().split('{出貨單號}').join(sid); };
+  var parts = [tx('出貨單成立通知內容')]; if (myship) parts.push(tx('賣貨便成立通知內容'));
+  var text = parts.filter(Boolean).join('\n\n'); if (text) pushLine_(lid, text);
 }
 
 /* ---------- 代客出貨(後台替客人把已到貨品項建立出貨單) ---------- */
@@ -2629,6 +2637,7 @@ var DEFAULT_SETTINGS = [
   ['到貨通知內容', '{姓名} 您好,您訂購的 {品名} 已到貨!請到會員中心勾選要出貨的商品:{連結}'],
   ['下單成功通知內容', '訂單{訂單編號}確認！\n\n商品:{品項}\n訂單金額:NT$ {金額}\n\n預購商品到貨後會再訊息通知您❤️\n到貨商品可以在會員的訂單明細勾選出貨～\n\n有任何問題隨時聯繫我們🫶'],
   ['出貨通知內容', '📢出貨通知\n\n出貨單號:{出貨單號}\n物流:{物流}\n物流單號:{物流單號}\n追蹤連結:{追蹤連結}\n出貨單如圖{附圖}\n\n有任何問題都歡迎聯繫我們唷～'],
+  ['出貨單成立通知內容', '出貨單已收到,約4-5工作日安排寄出\n出貨會再另外通知,謝謝❤️'],
   ['賣貨便成立通知內容', '出貨單已成立(出貨單號:{出貨單號})\n因為付款方式您是選賣貨便(貨到付款)\n所以我們稍後會提供賣貨便連結給您下單'],
   ['分享回饋通知內容', '謝謝您對 COS 的支持🖤\n也歡迎把這次的購物體驗分享給更多人！\n\n🎁 分享回饋・領購物金\n▪️ 分享購物心得＋照片至 COS LINE 社群\n→ 贈 $50 購物金\n▪️ 追蹤我們，並於 IG 限時動態或 Threads 發文，並標記 @coscos_select_kr\n→ 贈 $50 購物金\n🖤 以上兩項皆完成，再加碼 $50 購物金！\n✨ 最高共可獲得 $150 購物金\n\n⚠️ 購物金使用注意事項\n▪️ 下次消費滿 $500，可折 $50\n▪️ 下次消費滿 $1,000，可折 $150\n▪️ 每筆消費限使用一種折抵方式\n▪️ 精品、特價商品及指定商品不適用\n▪️ 購物金不得兌換現金或找零\n▪️ 購物金採年度計算，每年 1/1 重新計算\n▪️本活動相關規範及未盡事宜，依 COS 韓國選品店公告為準；本公司保留活動內容調整、修改及最終解釋之權利'],
   ['發票開立通知內容', '🧾電子發票已開立\n\n出貨單號:{出貨單號}\n發票號碼:{發票號碼}\n開立日期:{發票日期}\n金額:NT$ {金額}\n\n發票已存在綠界載具(您的手機號碼)\n可以到會員專區的出貨單查看❤️\n{連結}'],
@@ -3751,7 +3760,7 @@ function adminDeleteActivity(tk, id) {
   });
   return adminActivities(tk);
 }
-var SET_KEYS = ['店名', '店到店運費', '賣貨便運費', '宅配運費', '免運門檻', '匯款資訊', '公告', '購物金折抵級距', '購物金使用門檻', '購物金折抵上限', '購物金預設有效天數', '購物金注意事項', '到貨通知內容', '下單成功通知內容', '出貨通知內容', '賣貨便成立通知內容', '分享回饋通知內容', '可自取通知內容', '發票開立通知內容', '到店通知內容', '寄件人姓名', '寄件人手機', '退回通知內容', '送達通知內容', '未收到匯款通知內容', '物流追蹤連結', '加好友連結', '公司名稱', '公司地址', '統一編號', 'IG連結', 'LINE社群連結'];
+var SET_KEYS = ['店名', '店到店運費', '賣貨便運費', '宅配運費', '免運門檻', '匯款資訊', '公告', '購物金折抵級距', '購物金使用門檻', '購物金折抵上限', '購物金預設有效天數', '購物金注意事項', '到貨通知內容', '下單成功通知內容', '出貨通知內容', '出貨單成立通知內容', '賣貨便成立通知內容', '分享回饋通知內容', '可自取通知內容', '發票開立通知內容', '到店通知內容', '寄件人姓名', '寄件人手機', '退回通知內容', '送達通知內容', '未收到匯款通知內容', '物流追蹤連結', '加好友連結', '公司名稱', '公司地址', '統一編號', 'IG連結', 'LINE社群連結'];
 function defSet_(k) { var r = DEFAULT_SETTINGS.filter(function (x) { return x[0] === k; })[0]; return r ? r[1] : ''; }
 function adminSettings(tk) {
   me_(tk); var s = settings_(), o = {};
