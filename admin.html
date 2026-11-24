@@ -577,7 +577,7 @@ document.addEventListener('change', function (e) {
 document.addEventListener('click', function (e) { var b = e.target.closest && e.target.closest('[data-a=crm]'); if (b) { CSEL.splice(+b.dataset.i, 1); drawCats($('#cbig').value); } });
 var SPL = [];
 function drawSpecs() {
-  var b = $('#spl'); if (!b) return;
+  var b = $('#spl'); if (!b) return; setTimeout(drawImgs, 0);
   b.innerHTML = SPL.map(function (x, i) { return '<div style="display:flex;gap:6px;margin:4px 0;align-items:center"><input class="spi" data-i="' + i + '" value="' + esc(x.n) + '" maxlength="60" placeholder="規格:黑色 / M" style="flex:1;min-width:0"><input class="spq" data-i="' + i + '" type="number" min="0" step="1" value="' + esc(x.q) + '" placeholder="數量" style="width:84px" aria-label="此規格數量"><button type="button" class="btn l s" data-a="sprm" data-i="' + i + '">移除</button></div>'; }).join('') || '<span class="m">沒有規格</span>';
   syncStock();
 }
@@ -659,7 +659,8 @@ function editProd(id) {
       '<div style="display:flex;gap:8px;margin-top:8px"><input id="cbq" placeholder="找不到時可改搜尋:酷柏品名關鍵字、貨號或酷柏商品編號" style="flex:1"><button type="button" class="btn l s" id="cbqb">搜尋</button></div><div id="cbr"></div></fieldset>' +
     '<p class="er" id="pe" role="alert"></p><button class="btn a">儲存</button> <button type="button" class="btn l" data-a="x">取消</button>' +
     (id ? ' <button type="button" class="btn l" data-a="dp" data-id="' + esc(id) + '">刪除</button>' : '') + '</form>';
-  SPL = (p.specs || []).map(function (n) { var q = (p.specQty || {})[n]; return { n: n, q: q == null ? '' : q }; }); spgFill(); if (!p.id) brandAutoSizes(p.brand); if (innerWidth > 860) d.style.width = 'min(760px,96vw)'; d.addEventListener('close', function () { d.style.width = ''; }, { once: true }); d.showModal(); drawImgs(); drawCats();
+  SIMG = {}; Object.keys(p.specImg || {}).forEach(function (k) { SIMG[k] = p.specImg[k]; });
+  SPL = (p.specs || []).map(function (n) { var q = (p.specQty || {})[n]; return { n: n, q: q == null ? '' : q }; }); spgFill(); drawImgs(); if (!p.id) brandAutoSizes(p.brand); if (innerWidth > 860) d.style.width = 'min(760px,96vw)'; d.addEventListener('close', function () { d.style.width = ''; }, { once: true }); d.showModal(); drawImgs(); drawCats();
   var f = $('#pf');
   f.elements.unlimited.onchange = function () { f.elements.stock.disabled = this.checked; if (this.checked) f.elements.stock.value = ''; };
   drawSpecs();
@@ -1026,12 +1027,21 @@ function imgSet(l) { (document.querySelector('#pf [name=img]') || document.query
 function drawImgs() {
   var box = $('#imgs'); if (!box) return;
   box.innerHTML = imgGet().map(function (u, k) {
-    return '<span class="it" draggable="true" data-k="' + k + '" title="按住拖曳可調整順序"><img src="' + esc(u) + '" alt="" draggable="false"><br>' + (k === 0 ? '<b class="m">封面</b>' : '<button type="button" class="btn l s" data-a="imfirst" data-i="' + k + '">設為封面</button>') + ' <button type="button" class="btn l s" data-a="imrm" data-i="' + k + '">移除</button></span>';
+    var sk = simgKeys(), cur = Object.keys(SIMG).filter(function (x) { return SIMG[x] === u && sk.indexOf(x) >= 0; })[0] || '';
+    var sel = sk.length ? '<select class="simg" data-u="' + esc(u) + '" title="客人點這個顏色/規格時,大圖跳到這張" style="display:block;width:100%;max-width:120px;margin:3px auto 0;font-size:12px;padding:2px 4px"><option value="">不對應顏色</option>' + sk.map(function (x) { return '<option value="' + esc(x) + '"' + (x === cur ? ' selected' : '') + '>' + esc(x) + '</option>'; }).join('') + '</select>' : '';
+    return '<span class="it" draggable="true" data-k="' + k + '" title="按住拖曳可調整順序"><img src="' + esc(u) + '" alt="" draggable="false">' + sel + '<br>' + (k === 0 ? '<b class="m">封面</b>' : '<button type="button" class="btn l s" data-a="imfirst" data-i="' + k + '">設為封面</button>') + ' <button type="button" class="btn l s" data-a="imrm" data-i="' + k + '">移除</button></span>';
   }).join('') || '<span class="m">還沒有圖片</span>';
-  if (imgGet().length > 1) box.insertAdjacentHTML('afterbegin', '<p class="m imh" style="flex-basis:100%;margin:0 0 4px;font-size:12px">按住圖片拖曳可以調整順序,拖到第一張就是封面</p>');
+  if (imgGet().length > 1) box.insertAdjacentHTML('afterbegin', '<p class="m imh" style="flex-basis:100%;margin:0 0 4px;font-size:12px">按住圖片拖曳可以調整順序,拖到第一張就是封面' + (simgKeys().length ? ';圖片下方可選「對應顏色」,客人點那個顏色時大圖會跳到這張' : '') + '</p>');
 }
 /* 商品圖片拖曳排序(滑鼠按住拖到想要的位置放開) */
-var IMDRAG = -1;
+var IMDRAG = -1, SIMG = {};
+/* 可對應圖片的選項:規格是「顏色 / 尺寸」時用顏色,否則用整個規格名稱 */
+function simgKeys() {
+  var l = (typeof SPL !== 'undefined' ? SPL : []).map(function (x) { return String(x.n).trim(); }).filter(Boolean), two = l.length && l.every(function (n) { return n.split(' / ').length === 2; }), o = [];
+  l.forEach(function (n) { var k = two ? n.split(' / ')[0] : n; if (o.indexOf(k) < 0) o.push(k); }); return o;
+}
+document.addEventListener('change', function (e) { var c = e.target; if (c.classList && c.classList.contains('spi')) { drawImgs(); return; } if (!c.classList || !c.classList.contains('simg')) return; var u = c.dataset.u;
+  Object.keys(SIMG).forEach(function (k) { if (SIMG[k] === u) delete SIMG[k]; }); if (c.value) SIMG[c.value] = u; drawImgs(); });
 document.addEventListener('dragstart', function (e) { var it = e.target.closest && e.target.closest('#imgs .it'); if (!it) return; IMDRAG = Number(it.dataset.k); it.classList.add('imdg'); try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(IMDRAG)); } catch (x) {} });
 document.addEventListener('dragover', function (e) {
   var it = e.target.closest && e.target.closest('#imgs .it'); if (IMDRAG < 0 || !it) return; e.preventDefault();
@@ -1105,7 +1115,7 @@ document.addEventListener('submit', function (e) {
     call('adminBatch', T, ids, 'info', data).then(function (r) { batchDone(r, '批次修改'); }).catch(fail('#be'));
   } else if (f.id === 'pf') {
     var g = function (n) { return f.elements[n]; };
-    var o2 = { id: CUR, name: g('name').value, price: g('price').value, stock: g('stock').value, arrival: g('arrivalq').checked ? '排隊中' : +g('arrw').value > 0 ? '下單後' + Math.round(+g('arrw').value) + '週' : g('arrival').value, close: g('close').value, tiers: g('tiers').value, unlimited: g('unlimited').checked, brand: g('brand').value, newBrand: g('newBrand').value, specs: SPL.filter(function (x) { return String(x.n).trim(); }).map(function (x) { return { n: x.n.trim(), q: x.q }; }), img: g('img').value, desc: g('desc').value, type: g('type').value, on: g('on').checked,
+    var o2 = { id: CUR, name: g('name').value, price: g('price').value, stock: g('stock').value, arrival: g('arrivalq').checked ? '排隊中' : +g('arrw').value > 0 ? '下單後' + Math.round(+g('arrw').value) + '週' : g('arrival').value, close: g('close').value, tiers: g('tiers').value, unlimited: g('unlimited').checked, brand: g('brand').value, newBrand: g('newBrand').value, specs: SPL.filter(function (x) { return String(x.n).trim(); }).map(function (x) { return { n: x.n.trim(), q: x.q }; }), specImg: (function () { var o = {}, ks = simgKeys(), im = g('img').value.split('|'); Object.keys(SIMG).forEach(function (k) { if (ks.indexOf(k) >= 0 && im.indexOf(SIMG[k]) >= 0) o[k] = SIMG[k]; }); return o; })(), img: g('img').value, desc: g('desc').value, type: g('type').value, on: g('on').checked,
       cats: CSEL.slice(),
       vendor: g('vendor').value, source: g('source').value, cost: g('cost').value, taxIncl: g('tax').value === 'Y'};
     if (window.cbCollect) { var cbd = window.cbCollect(); if (cbd) o2.cb = cbd; }

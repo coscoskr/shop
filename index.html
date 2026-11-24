@@ -540,6 +540,14 @@ function spSet(k, v) {
   var h = $('#spsel'); if (h) { h.value = val; h.dispatchEvent(new Event('change', { bubbles: true })); }
   var w = $('#spw'); if (w) w.innerHTML = specPick(p);
   var n = $('#spn'); if (n && !val && two) n.textContent = SPC ? '請選擇尺寸' : '請選擇顏色和尺寸';
+  // 這個顏色(或規格)有指定圖片 → 大圖跳到那張
+  var key = two ? (k === 'c' ? SPC : '') : SPZ, u = key && p.specImg && p.specImg[key];
+  if (u) spImg(p, u);
+}
+function spImg(p, u) {
+  var i = (p.imgs || []).indexOf(u), big = $('#bigimg'); if (i < 0 || !big) return;
+  big.src = u; big.dataset.i = i;
+  [].slice.call(document.querySelectorAll('.th img')).forEach(function (n) { var on = Number(n.dataset.i) === i; n.classList.toggle('on', on); if (on && n.scrollIntoView) try { n.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' }); } catch (e) {} });
 }
 document.addEventListener('click', function (e) { var b = e.target.closest && e.target.closest('.sgb'); if (b && !b.disabled) spSet(b.dataset.sg, b.dataset.v); });
 function detail(p) {

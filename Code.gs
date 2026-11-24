@@ -8,7 +8,7 @@ function catHit_(pcats, vs) {
 var MH_STORE = '(門市在賣貨便下單時填寫)';
 var PAY = { '刷卡': '待刷卡', '匯款': '待匯款', '賣貨便': '待出貨', '付現金': '待自取通知' };
 var H = {
-  '商品': ['商品ID', '名稱', '類別', '銷售型態', '單價', '數量', '到貨日期', '說明', '階梯價', '圖片', '上架', '規格', '品牌', '關團日期'],
+  '商品': ['商品ID', '名稱', '類別', '銷售型態', '單價', '數量', '到貨日期', '說明', '階梯價', '圖片', '上架', '規格', '品牌', '關團日期', '規格圖片'],
   '商品_內部': ['商品ID', '廠商', '成本', '成本含稅', '貨源', '鎖定'],
   '類別': ['類別'],
   '品牌': ['品牌'],
@@ -313,7 +313,7 @@ function pub_(p) {
   return {
     id: p.商品ID, name: p.名稱, cats: cs_(p.類別), type: p.銷售型態, price: Number(p.單價),
     stock: p.數量 === '' ? null : (rd && Number(p.數量) === 0 ? Object.keys(rd).reduce(function (a, k) { return a + rd[k]; }, 0) : Number(p.數量)), arrival: p.到貨日期, desc: p.說明, // 只賣現貨(預購名額 0):剩餘數量＝現貨件數
-    tiers: tiers_(p.階梯價), img: imgs_(p.圖片)[0] || '', imgs: imgs_(p.圖片), specs: specs_(p), specQty: specQty_(p), brand: String(p.品牌 || ''), ready: rd || null, rdyOnly: !!rd && p.數量 !== '' && Number(p.數量) === 0, close: String(p.關團日期 || '')
+    tiers: tiers_(p.階梯價), img: imgs_(p.圖片)[0] || '', imgs: imgs_(p.圖片), specs: specs_(p), specQty: specQty_(p), specImg: specImg_(p), brand: String(p.品牌 || ''), ready: rd || null, rdyOnly: !!rd && p.數量 !== '' && Number(p.數量) === 0, close: String(p.關團日期 || '')
   };
 }
 function getShop() {
@@ -529,7 +529,7 @@ function adminProducts_() {
       stock: p.數量 === '' ? '' : Number(p.數量), arrival: p.到貨日期, desc: p.說明, tiers: String(p.階梯價 || ''),
       img: String(p.圖片 || ''), on: p.上架 === 'Y', close: String(p.關團日期 || ''), closed: closed_(p), brand: String(p.品牌 || ''), vendor: String(i.廠商 || ''),
       cost: (i.成本 === undefined || i.成本 === '') ? '' : Number(i.成本), taxIncl: i.成本含稅 === 'Y',
-      source: String(i.貨源 || ''), locked: i.鎖定 === 'Y', specs: specs_(p), specQty: specQty_(p)
+      source: String(i.貨源 || ''), locked: i.鎖定 === 'Y', specs: specs_(p), specQty: specQty_(p), specImg: specImg_(p)
     };
   });
 }
@@ -829,7 +829,7 @@ function adminSaveProduct(tk, d) {
     }
     var oi = rows_('商品_內部').filter(function (r) { return r.商品ID === id; })[0] || null;
     var inn = { '商品ID': id, '廠商': t_(d.vendor, 60), '成本': (d.cost === '' || d.cost == null) ? '' : Number(d.cost), '成本含稅': d.taxIncl ? 'Y' : 'N', '貨源': t_(d.source, 60), '鎖定': 'N' };
-    var row = { '商品ID': id, '名稱': name, '類別': (d.cats || []).join(','), '銷售型態': d.type, '單價': price, '數量': stock, '到貨日期': d.arrival || '', '說明': t_(d.desc, 1000), '階梯價': String(d.tiers || '').trim(), '圖片': imgList_(d.img), '上架': d.on ? 'Y' : 'N', '規格': specs.join('|'), '品牌': brandResolve_(u, d), '關團日期': cl };
+    var row = { '商品ID': id, '名稱': name, '類別': (d.cats || []).join(','), '銷售型態': d.type, '單價': price, '數量': stock, '到貨日期': d.arrival || '', '說明': t_(d.desc, 1000), '階梯價': String(d.tiers || '').trim(), '圖片': imgList_(d.img), '上架': d.on ? 'Y' : 'N', '規格': specs.join('|'), '規格圖片': specImgSave_(d.specImg, imgList_(d.img)), '品牌': brandResolve_(u, d), '關團日期': cl };
     put_('商品', old ? old._r : 0, row);
     put_('商品_內部', oi ? oi._r : 0, inn);
     log_(u.acc, old ? '修改商品' : '新增商品', id + ' ' + name, old ? [diff_(old, row), diff_(oi, inn)].filter(function (x) { return x && x !== '新增'; }).join(';') : '新增');
@@ -2341,6 +2341,13 @@ function payLabel_(p) { return String(p) === '賣貨便' && logiOn_() ? '超商�
 /* 賣貨便要用 LINE 傳下單連結:只有 LINE 登入、而且是官方帳號好友的會員才能選(綠界物流上線後不限) */
 var MH_FRIEND_MSG = '賣貨便需要用 LINE 登入並加入我們的官方帳號好友(我們會用 LINE 傳賣貨便下單連結給你)。加好友後請重新整理頁面再選,或改選其他付款方式';
 function mhFriendOk_(ctx, d) { if (logiOn_(d)) return true; var m = ctx && ctx.lid ? memberRow_(ctx.lid) : null; return !!(m && m.已加好友 === 'Y'); }
+/* 規格圖片:客人點某個顏色(或規格)時,商品大圖跳到指定的那張。存成 {"顏色或規格": "圖片網址"} */
+function specImg_(p) { try { var o = JSON.parse(String(p.規格圖片 || '') || '{}'), im = imgs_(p.圖片), r = {}; Object.keys(o).forEach(function (k) { if (im.indexOf(String(o[k])) >= 0) r[k] = String(o[k]); }); return r; } catch (e) { return {}; } }
+function specImgSave_(m, imgStr) {
+  var im = String(imgStr || '').split('|'), r = {}, n = 0;
+  if (m && typeof m === 'object') Object.keys(m).forEach(function (k) { var kk = String(k).trim().slice(0, 60), u = String(m[k] || ''); if (kk && u && im.indexOf(u) >= 0 && n < 200) { r[kk] = u; n++; } });
+  return n ? JSON.stringify(r) : '';
+}
 function logiOn_(d) { return prop_('ECPAY_LOGI_LIVE') === '1' || !!(d && d.paytest); }
 function cvsOf_(s) {
   var m = String(s.收件資訊 || '').match(/^【店到店】(7-11|全家)\s*(.*?)｜收件人\s*(.*)$/); if (!m) return null;

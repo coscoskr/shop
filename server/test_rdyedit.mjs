@@ -39,4 +39,9 @@ r = await call('placeOrder', { token: 'Lmem1', name: '王小美', phone: '12', i
 r = await call('placeOrder', { token: 'Lmem1', name: '王小美', phone: '0912345678', items: [{ id: PID, qty: 1 }] });
 const M = DB['會員'].find(m => m.line_id === 'UM1'), O = DB['訂單'].find(o => o.line_id === 'UM1');
 ok(r.ok && O && O.name === '王小美' && O.phone === '0912345678' && M.real_name === '王小美' && M.phone === '0912345678', 'LINE 會員填了就能下單,資料存進會員:' + (r.error || JSON.stringify([O && O.name, M.real_name, M.phone])));
+// 規格圖片:存起來、前台拿得到;不在圖片清單裡的網址會被丟掉
+r = await call('adminSaveProduct', tk, { name: 'UGG 拖鞋', price: 2100, stock: '', unlimited: true, type: '預購', tiers: '', cats: ['美妝'], on: true, vendor: '酷柏', cost: 1500, taxIncl: false, source: '韓國', newBrand: 'UGG',
+  img: 'https://x.com/a.png|https://x.com/b.png', specs: [{ n: '白 / US6', q: '' }, { n: '杏 / US6', q: '' }], specImg: { '杏': 'https://x.com/b.png', '白': 'https://evil.com/z.png' } });
+const sp = (await call('getShop')).result.products.find(p => p.name === 'UGG 拖鞋');
+ok(r.ok && sp && JSON.stringify(sp.specImg) === '{"杏":"https://x.com/b.png"}', '規格圖片存取:' + (r.error || JSON.stringify(sp && sp.specImg)));
 console.log(fails ? fails + ' FAILED' : 'ALL PASSED');
