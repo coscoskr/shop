@@ -1407,13 +1407,13 @@ function adminDeleteStockIn(tk, id) {
 }
 /** 訂單明細批次刪除:庫存進貨列直接刪;客訂品項會刪掉整張訂單(含該訂單其他品項) */
 function adminBatchDeleteLines(tk, keys) {
-  var u = me_(tk), done = 0, skip = [], orders = {}, stocks = {};
+  var u = me_(tk), done = 0, skip = [], orders = {}, stocks = {}; DELHELD_ = null;
   (keys || []).slice(0, 500).forEach(function (k) { var oid = String(k).split('|')[0]; if (/^K/.test(oid) && !orders[oid]) stocks[oid] = 1; else orders[oid] = 1; });
   lk_(function () {
     Object.keys(stocks).forEach(function (id) { try { deleteStockIn_(u, id); done++; } catch (e) { skip.push(e.message); } });
     Object.keys(orders).forEach(function (oid) { try { deleteOrder_(u, oid); done++; } catch (e) { skip.push(e.message); } });
   });
-  var r = purchaseList_(); r.msg = '已刪除 ' + done + ' 筆(庫存進貨或整張訂單)' + (skip.length ? ',略過 ' + skip.length + ' 筆:\n' + skip.join('\n') : '');
+  var r = purchaseList_(); r.msg = '已刪除 ' + done + ' 筆(庫存進貨或整張訂單)' + (skip.length ? ',略過 ' + skip.length + ' 筆:\n' + skip.join('\n') : '') + heldMsg_();
   return r;
 }
 
@@ -1675,10 +1675,15 @@ function deleteOrder_(u, oid) {
   if (lines.some(function (l) { return !!l.出貨單ID; })) throw new Error('訂單 ' + oid + ' 已有商品建立出貨單,請先刪除對應出貨單');
   var snap = { order: cp_(o), lines: lines.map(cp_) };
   var ps = {}; rows_('商品').forEach(function (p) { ps[String(p.商品ID)] = p; });
+  var held = [];
   lines.forEach(function (l) {
     var p = ps[bp_(l.商品ID)];
-    if (p) lineBack_(p, l, String(l.規格 || ''), Number(l.數量));
+    if (!p) return;
+    // 預購商品已經到貨(貨在手上):不加回預購名額,記成「待到貨」的庫存進貨,等老闆確認要不要上現貨
+    if (String(l.到貨狀態) === '已到貨' && rdyIs_(p) && !rdyLine_(p, l)) { held.push(holdStock_(p, l, u.acc, '刪除訂單 ' + oid + ' 多出來')); return; }
+    lineBack_(p, l, String(l.規格 || ''), Number(l.數量));
   });
+  if (held.length) (DELHELD_ = DELHELD_ || []).push.apply(DELHELD_, held);
   refund_(o.購物金明細);
   rows_('購物金').forEach(function (g) { if (String(g.訂單ID) === oid && Number(g.剩餘) > 0) { var gn = cp_(g); gn.剩餘 = 0; put_('購物金', g._r, gn); } });
   var del = { '訂單明細': lines.map(function (x) { return x._r; }), '訂單': [o._r] };
@@ -1689,13 +1694,28 @@ function deleteOrder_(u, oid) {
   log_(u.acc, '刪除訂單', oid, sm);
   major_(u.acc, '刪除訂單', oid, sm, snap);
 }
+var DELHELD_ = null; // 這次刪除訂單時,已到貨的預購品項轉成待確認的庫存進貨(回報用)
+/** 已到貨、沒有訂單要的貨:新增一筆「待到貨」的庫存進貨(不上現貨),等老闆確認後改成已到貨才上架。回傳說明文字 */
+function holdStock_(p, l, who, why) {
+  var inn = rows_('商品_內部').filter(function (r) { return String(r.商品ID) === String(p.商品ID); })[0] || {}, id = seq_('庫存進貨', 'K'), q = Number(l.數量), sp = String(l.規格 || '');
+  put_('庫存進貨', 0, { '訂單ID': id, '商品ID': String(p.商品ID), '品名': String(p.名稱), '規格': sp, '數量': q, '到貨狀態': '待到貨', '廠商': String(l.廠商 || inn.廠商 || ''),
+    '成本': l.成本 !== undefined && l.成本 !== '' ? l.成本 : (inn.成本 === undefined ? '' : inn.成本), '成本含稅': l.成本含稅 || inn.成本含稅 || 'N', '貨源': String(l.貨源 || inn.貨源 || ''),
+    '廠商付款ID': String(l.廠商付款ID || ''), '到貨操作人': '', '到貨時間': '', '日期': today_(), '建立人': who, '出貨單ID': '' });
+  log_(who, '新增庫存進貨', id + ' ' + p.名稱, q + ' 件' + (sp ? ',規格 ' + sp : '') + ',' + why + '(已到貨的貨,待確認是否上現貨)');
+  return id + ' ' + p.名稱 + (sp ? '(' + sp + ')' : '') + ' ×' + q;
+}
+function heldMsg_() {
+  var h = DELHELD_ || []; DELHELD_ = null;
+  return h.length ? '\n\n已到貨的商品先放進庫存表(待確認,還沒上現貨):\n・' + h.join('\n・') + '\n要上架請到「訂單明細」把這筆【庫存】改成「已到貨」;不要的到「庫存表」刪除。' : '';
+}
 function adminDeleteOrder(tk, oid) {
-  var u = me_(tk);
+  var u = me_(tk); DELHELD_ = null;
   lk_(function () { deleteOrder_(u, String(oid)); });
-  return adminOrders(tk);
+  var r = adminOrders(tk), hm = heldMsg_(); if (hm) r.msg = '已刪除訂單 ' + oid + hm;
+  return r;
 }
 function adminBatchDeleteOrders(tk, oids) {
-  var u = me_(tk), done = 0, skip = [];
+  var u = me_(tk), done = 0, skip = []; DELHELD_ = null;
   lk_(function () {
     var seen = {};
     (oids || []).slice(0, 200).forEach(function (x) {
@@ -1703,7 +1723,7 @@ function adminBatchDeleteOrders(tk, oids) {
       try { deleteOrder_(u, x); done++; } catch (e) { skip.push(x + ':' + e.message); }
     });
   });
-  var r = adminOrders(tk); r.msg = '已刪除 ' + done + ' 張訂單' + (skip.length ? ',略過 ' + skip.length + ' 張:\n' + skip.join('\n') : '');
+  var r = adminOrders(tk); r.msg = '已刪除 ' + done + ' 張訂單' + (skip.length ? ',略過 ' + skip.length + ' 張:\n' + skip.join('\n') : '') + heldMsg_();
   return r;
 }
 

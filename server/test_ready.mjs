@@ -87,5 +87,12 @@ Object.assign(lineOf(O5, BOX), { sale_type: '現貨', arrival_status: '已到貨
 const before5 = JSON.stringify((await shop('擴香禮盒')).ready);
 r = await call('adminDeleteOrder', tk, O5);
 ok(r.ok && JSON.stringify((await shop('擴香禮盒')).ready) === before5, 'old 現貨-type line on a pre-order product does not create ready stock on delete: ' + before5);
+{ DB['商品'].find(p => p.id === BOX).stock = 5;
+  r = await buy([{ id: BOX, qty: 2 }]); const O6 = DB['訂單'][DB['訂單'].length - 1].order_id;
+  Object.assign(lineOf(O6, BOX), { arrival_status: '已到貨' }); const st6 = Number(DB['商品'].find(p => p.id === BOX).stock), rd6 = JSON.stringify((await shop('擴香禮盒')).ready), k0 = DB['庫存進貨'].length;
+  r = await call('adminDeleteOrder', tk, O6);
+  const k6 = DB['庫存進貨'].slice(k0);
+  ok(r.ok && k6.length === 1 && Number(k6[0].qty) === 2 && k6[0].arrival_status === '待到貨' && /庫存表/.test(r.result.msg || ''), 'delete order with arrived pre-order line → 庫存進貨 待到貨 (ask before listing) ' + (r.result && r.result.msg));
+  ok(Number(DB['商品'].find(p => p.id === BOX).stock) === st6 && JSON.stringify((await shop('擴香禮盒')).ready) === rd6, 'pre-order quota and ready stock unchanged'); }
 ok(lineOf(O4, BOX).ordered_by === '預購現貨', 'lines taken from ready stock are marked 叫貨人=預購現貨');
 console.log(fails ? fails + ' FAILED' : 'ALL PASSED');

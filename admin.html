@@ -1044,9 +1044,9 @@ document.addEventListener('click', function (e) {
     call('adminEditLineFull', T, b.dataset.oid, b.dataset.pid, { name: q('.ln_n'), spec: q('.ln_p'), type: q('.ln_t'), qty: q('.lq'), unit: q('.lu'), arr: q('.ln_a'), eta: tr.querySelector('.ln_q').checked ? '排隊中' : +q('.ln_w') > 0 ? '下單後' + Math.round(+q('.ln_w')) + '週' : q('.ln_e'), vendor: q('.ln_v'), cost: q('.ln_c'), tax: q('.ln_x') === '含稅', src: q('.ln_s'), notify: !!($('#ntf') && $('#ntf').checked) }).then(function (d) { setO(d); if (tab === 'o') orderRows(); else if (tab === 's') shipRows(); $('#dlg').close(); if (!d.notify) tell('品項已儲存'); if (d.notify) tell('已用 LINE 通知:送出 ' + d.notify.sent + ' 位' + (d.notify.noLine ? ',' + d.notify.noLine + ' 筆訂單沒有 LINE 登入' : '') + (d.notify.failed ? ',' + d.notify.failed + ' 位失敗(可能還沒加好友)' : '')); }).catch(function (er) { tell(er.message); });
   } else if (a === 'dord') {
     var o = ordById(id);
-    ask('確定刪除訂單 ' + id + '(' + o.name + ',' + money(o.total) + ')?\n商品庫存會加回去,此動作無法復原。', function () {
+    ask('確定刪除訂單 ' + id + '(' + o.name + ',' + money(o.total) + ')?\n沒到貨的商品名額會加回去;已到貨的預購商品會放進庫存表(待確認,不會自動上現貨)。此動作無法復原。', function () {
       wait('刪除中…請稍候');
-      call('adminDeleteOrder', T, id).then(function (d) { setO(d); $('#dlg').close(); render(); tell('已刪除訂單 ' + id); }).catch(function (er) { tell(er.message); });
+      call('adminDeleteOrder', T, id).then(function (d) { setO(d); $('#dlg').close(); render(); tell(d.msg || ('已刪除訂單 ' + id)); }).catch(function (er) { tell(er.message); });
     });
   } else if (a === 'rmiss') {
     ask('確定通知客人「沒有確認到款項」?\n會用 LINE(或 Email)請客人跟我們聯繫,出貨單狀態不會改變。', function () {
