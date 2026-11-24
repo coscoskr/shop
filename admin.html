@@ -2056,20 +2056,69 @@ document.addEventListener('click', function (e) { var rp0 = e.target.dataset && 
 var SK = null;
 function stockPage() {
   $('#v').innerHTML = '<p class="m">載入中…</p>';
-  call('adminStockView', T).then(function (d) { SK = d; VL = d.vlist || VL; drawStock(); }).catch(function (e) { $('#v').innerHTML = '<p class="er">' + esc(e.message) + '</p>'; });
+  // 品牌要從商品清單拿;還沒載入就一起載
+  Promise.all([call('adminStockView', T), P ? Promise.resolve(null) : call('adminInit', T).catch(function () { return null; })]).then(function (r) {
+    if (r[1] && r[1].products) P = r[1].products; (P || []).forEach(function (x) { SKBR[x.id] = String(x.brand || ''); });
+    SK = r[0]; VL = r[0].vlist || VL; drawStock(); }).catch(function (e) { $('#v').innerHTML = '<p class="er">' + esc(e.message) + '</p>'; });
 }
 function drawStock() {
   var P2 = SK.products;
+  SKF = SKF || { q: '', brand: '', type: '', st: '', on: '', rq: '', rarr: '' };
+  var brands = [], bOf = skBrand; P2.forEach(function (p) { var b0 = bOf(p.id); if (b0 && brands.indexOf(b0) < 0) brands.push(b0); }); brands.sort();
+  var opt = function (v, l, cur) { return '<option value="' + esc(v) + '"' + (v === cur ? ' selected' : '') + '>' + esc(l) + '</option>'; };
   $('#v').innerHTML = '<h2 style="margin-top:0">庫存表</h2><p class="m">一批貨到了,一部分是客人訂的、一部分是要放庫存:客訂在「訂單明細」,庫存部分在這裡新增「庫存進貨」。兩種都會出現在「訂單明細」(庫存的訂購人顯示【庫存】),可以一起勾選做廠商付款。庫存進貨改成「已到貨」時才會增加商品數量;<b>預購商品</b>則變成該商品的「現貨」(前台會顯示現貨件數,客人下單時該規格的現貨夠這筆的數量就直接用現貨、可出貨,不夠就整筆照預購)。</p>' +
-    '<table><thead><tr><th>商品</th><th>型態</th><th>目前數量</th><th>待到貨(客訂)</th><th>待到貨(庫存進貨)</th><th>預設廠商</th><th>成本</th></tr></thead><tbody>' +
-    P2.map(function (p) { return '<tr><td style="white-space:normal">' + esc(p.name) + ' <span class="m">' + esc(p.id) + '</span></td><td>' + esc(p.type) + '</td><td>' + (p.stock === '' ? '無限' : nf(p.stock)) + (p.ready ? '<br><b style="color:#1b7a36">現貨 ' + Object.keys(p.ready).map(function (k) { return esc(k || '') + (k ? '×' : '') + nf(p.ready[k]); }).join('、') + '</b>' : '') + '</td><td>' + nf(p.waitOrders) + '</td><td>' + nf(p.waitStock) + '</td><td>' + esc(p.vendor) + '</td><td>' + (p.cost === '' ? '' : nf(p.cost)) + '</td></tr>'; }).join('') + '</tbody></table>' +
+    '<div class="skfb" style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin:10px 0">' +
+    '<label style="margin:0">搜尋<input id="skq" value="' + esc(SKF.q) + '" placeholder="品名、商品編號、品牌、規格(可空格分隔多個字)" style="width:280px"></label>' +
+    '<label style="margin:0">品牌<select id="skb">' + opt('', '全部', SKF.brand) + brands.map(function (x) { return opt(x, x, SKF.brand); }).join('') + '</select></label>' +
+    '<label style="margin:0">型態<select id="skt0">' + opt('', '全部', SKF.type) + opt('現貨', '現貨', SKF.type) + opt('預購', '預購', SKF.type) + '</select></label>' +
+    '<label style="margin:0">庫存<select id="skst">' + opt('', '全部', SKF.st) + opt('have', '有庫存/有現貨', SKF.st) + opt('none', '沒有庫存', SKF.st) + opt('wait', '有待到貨', SKF.st) + '</select></label>' +
+    '<label style="margin:0">上架<select id="skon">' + opt('', '全部', SKF.on) + opt('Y', '上架中', SKF.on) + opt('N', '已下架', SKF.on) + '</select></label>' +
+    '<button type="button" class="btn l s" data-sk="clr">清除篩選</button><span class="m" id="skn"></span></div>' +
+    '<div id="sktb"></div>' +
     '<h3 style="margin-top:22px">新增庫存進貨</h3><form id="skf" style="max-width:760px"><div class="g"><label>商品<select name="pid" id="skp">' + P2.map(function (p) { return '<option value="' + esc(p.id) + '">' + esc(p.name) + '</option>'; }).join('') + '</select></label>' +
     '<label>規格<select name="spec" id="sks"></select></label>' + fld('數量', 'qty', '', 'number') + '<label>廠商<select name="vendor">' + vopt('', '(用商品預設)') + '</select></label>' + fld('單件成本(空白=用商品預設)', 'cost', '', 'number') + fld('貨源(空白=用商品預設)', 'src', '') + '</div>' +
     '<label class="ck"><input type="checkbox" name="arrived"> 已到貨(直接增加商品數量)</label><p class="er" id="ske" role="alert"></p><button class="btn a">新增</button></form>' +
-    '<h3 style="margin-top:22px">庫存進貨紀錄</h3><table><thead><tr><th>編號</th><th>日期</th><th>商品</th><th>規格</th><th>數量</th><th>狀態</th><th>廠商</th><th>成本</th><th></th></tr></thead><tbody>' +
-    (SK.ins.map(function (l) { return '<tr><td>' + esc(l.id) + '</td><td>' + esc(l.at) + '</td><td style="white-space:normal">' + esc(l.name) + '</td><td>' + esc(l.spec) + '</td><td>' + nf(l.qty) + '</td><td>' + esc(l.arr) + '</td><td>' + esc(l.vendor) + '</td><td>' + nf(l.cost) + '</td><td><button class="btn l s" data-sk="del" data-id="' + esc(l.id) + '">刪除</button></td></tr>'; }).join('') || '<tr><td colspan="9" class="m">還沒有庫存進貨</td></tr>') + '</tbody></table><p class="m">到貨狀態、廠商、成本請到「訂單明細」勾選後用「批次修改」;付款也在那邊一起做。</p>';
+    '<h3 style="margin-top:22px">庫存進貨紀錄</h3>' +
+    '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin:6px 0"><label style="margin:0">搜尋<input id="skrq" value="' + esc(SKF.rq) + '" placeholder="編號、品名、規格、廠商" style="width:240px"></label>' +
+    '<label style="margin:0">狀態<select id="skra">' + opt('', '全部', SKF.rarr) + opt('待到貨', '待到貨', SKF.rarr) + opt('已到貨', '已到貨', SKF.rarr) + '</select></label><span class="m" id="skrn"></span></div>' +
+    '<div id="skrb"></div>' +
+    '<p class="m">到貨狀態、廠商、成本請到「訂單明細」勾選後用「批次修改」;付款也在那邊一起做。</p>';
+  skTables();
   skSpecs();
 }
+var SKF = null, SKBR = {};
+function skBrand(id) { return SKBR[id] || ''; }
+function skHit(txt, q) { txt = String(txt).toLowerCase(); return String(q || '').toLowerCase().split(/\s+/).filter(Boolean).every(function (w) { return txt.indexOf(w) >= 0; }); }
+/* 庫存表:依篩選條件重畫兩個表格(不重畫篩選列,打字不會跳掉) */
+function skTables() {
+  var f = SKF, all = SK.products;
+  var L = all.filter(function (p) {
+    var br = skBrand(p.id), rdyN = p.ready ? Object.keys(p.ready).reduce(function (a, k) { return a + Number(p.ready[k] || 0); }, 0) : 0;
+    if (f.q && !skHit([p.name, p.id, br, (p.specs || []).join(' ')].join(' '), f.q)) return false;
+    if (f.brand && br !== f.brand) return false;
+    if (f.type && p.type !== f.type) return false;
+    if (f.on && (p.on ? 'Y' : 'N') !== f.on) return false;
+    if (f.st === 'have' && !(p.stock === '' || Number(p.stock) > 0 || rdyN > 0)) return false;
+    if (f.st === 'none' && (p.stock === '' || Number(p.stock) > 0 || rdyN > 0)) return false;
+    if (f.st === 'wait' && !(p.waitOrders > 0 || p.waitStock > 0)) return false;
+    return true;
+  });
+  $('#skn').textContent = '共 ' + L.length + ' / ' + all.length + ' 項商品';
+  $('#sktb').innerHTML = '<table><thead><tr><th>商品</th><th>型態</th><th>目前數量</th><th>待到貨(客訂)</th><th>待到貨(庫存進貨)</th><th>預設廠商</th><th>成本</th></tr></thead><tbody>' +
+    (L.map(function (p) { var br = skBrand(p.id); return '<tr' + (p.on ? '' : ' style="opacity:.6"') + '><td style="white-space:normal">' + (br ? '<span class="m">' + esc(br) + '</span> ' : '') + esc(p.name) + ' <span class="m">' + esc(p.id) + (p.on ? '' : '・已下架') + '</span></td><td>' + esc(p.type) + '</td><td>' + (p.stock === '' ? '無限' : nf(p.stock)) + (p.ready ? '<br><b style="color:#1b7a36">現貨 ' + Object.keys(p.ready).map(function (k) { return esc(k || '') + (k ? '×' : '') + nf(p.ready[k]); }).join('、') + '</b>' : '') + '</td><td>' + nf(p.waitOrders) + '</td><td>' + nf(p.waitStock) + '</td><td>' + esc(p.vendor) + '</td><td>' + (p.cost === '' ? '' : nf(p.cost)) + '</td></tr>'; }).join('') || '<tr><td colspan="7" class="m">沒有符合條件的商品</td></tr>') + '</tbody></table>';
+  var R = SK.ins.filter(function (l) {
+    if (f.rq && !skHit([l.id, l.name, l.spec, l.vendor, l.at].join(' '), f.rq)) return false;
+    if (f.rarr && l.arr !== f.rarr) return false;
+    return true;
+  });
+  $('#skrn').textContent = '共 ' + R.length + ' / ' + SK.ins.length + ' 筆';
+  $('#skrb').innerHTML = '<table><thead><tr><th>編號</th><th>日期</th><th>商品</th><th>規格</th><th>數量</th><th>狀態</th><th>廠商</th><th>成本</th><th></th></tr></thead><tbody>' +
+    (R.map(function (l) { return '<tr><td>' + esc(l.id) + '</td><td>' + esc(l.at) + '</td><td style="white-space:normal">' + esc(l.name) + '</td><td>' + esc(l.spec) + '</td><td>' + nf(l.qty) + '</td><td>' + esc(l.arr) + '</td><td>' + esc(l.vendor) + '</td><td>' + nf(l.cost) + '</td><td><button class="btn l s" data-sk="del" data-id="' + esc(l.id) + '">刪除</button></td></tr>'; }).join('') || '<tr><td colspan="9" class="m">' + (SK.ins.length ? '沒有符合條件的紀錄' : '還沒有庫存進貨') + '</td></tr>') + '</tbody></table>';
+}
+var SKMAP = { skq: 'q', skb: 'brand', skt0: 'type', skst: 'st', skon: 'on', skrq: 'rq', skra: 'rarr' };
+document.addEventListener('input', function (e) { var k = SKMAP[e.target.id]; if (!k || !SK) return; SKF[k] = e.target.value; skTables(); });
+document.addEventListener('change', function (e) { var k = SKMAP[e.target.id]; if (!k || !SK) return; SKF[k] = e.target.value; skTables(); });
+document.addEventListener('click', function (e) { var b = e.target.closest('[data-sk="clr"]'); if (!b) return; SKF = null; drawStock(); });
 function skSpecs() {
   var p = SK.products.filter(function (x) { return x.id === $('#skp').value; })[0], el = $('#sks'); if (!el) return;
   el.innerHTML = p && p.specs.length ? p.specs.map(function (x) { return '<option>' + esc(x) + '</option>'; }).join('') : '<option value="">(無規格)</option>';
