@@ -980,8 +980,18 @@ function arrSec() {
   var a = SG.arr || {};
   return '<h3 style="margin-top:28px">到貨通知助理</h3><p class="m">把廠商的到貨通知(文字或截圖)從你的個人 LINE 轉傳到官方帳號,系統會依下單先後分配給未到貨的訂單、多的轉現貨庫存,先回預覽,你回「確認」才入帳並通知客人。只有綁定的管理員 LINE 有效。<br>目前:' + (a.bound ? '<b>已綁定管理員</b>' : '尚未綁定') + (a.ai ? '' : ';<span class="er">尚未設定 ANTHROPIC_API_KEY</span>') +
     '<br>酷柏自動到貨:' + (a.cb ? '<b>已啟用</b>(酷柏 KEY 到貨後自動入帳並通知客人;第一次出現的品項會先傳預覽到管理員 LINE。酷柏的到貨不用再轉傳,轉傳了也會自動略過)' : '尚未啟用(未設定 COOLBAU_ARR_SECRET)') + (a.cbPend ? ';<span class="er">有 ' + a.cbPend + ' 項待對應,請在官方 LINE 傳「酷柏」</span>' : '') + '</p>' +
-    '<div id="arrbox"><button type="button" class="btn a" id="arrcode">產生綁定碼</button> ' + (a.bound ? '<button type="button" class="btn l" id="arrunb">解除綁定</button>' : '') + '</div>';
+    '<div id="arrbox"><button type="button" class="btn a" id="arrcode">產生綁定碼</button> ' + (a.bound ? '<button type="button" class="btn l" id="arrunb">解除綁定</button>' : '') + '</div>' +
+    '<p class="m" style="margin-top:14px">酷柏到貨確認人員:規格對不上的品項、多出來沒有訂單在等的貨(回「上架 全部」才上架),會同時傳給到貨管理員和這些人,任一位回覆就處理。<br>目前:' +
+    ((a.cf || []).length ? (a.cf || []).map(function (c) { return esc(c.name) + '(…' + esc(c.id) + ') <button type="button" class="btn l" data-cfun="' + esc(c.id) + '">移除</button>'; }).join(' ') : '沒有') + '</p>' +
+    '<div id="cfbox"><input id="cfname" placeholder="確認人員名字" maxlength="20" style="width:140px"> <button type="button" class="btn a" id="cfcode">新增確認人員</button></div>';
 }
+document.addEventListener('click', function (e) {
+  var b = e.target.closest('#cfcode,[data-cfun]'); if (!b) return;
+  if (b.id === 'cfcode') { var nm = ($('#cfname').value || '').trim(); if (!nm) { alert('請填確認人員的名字'); return; }
+    call('adminConfirmCode', T, nm).then(function (r) { $('#cfbox').innerHTML = '<div class="warn">請用' + esc(nm) + '的 LINE,對官方帳號傳這句話(綁定碼只能用一次):\n綁定確認人員 ' + esc(r.code) + '</div>'; }).catch(function (x) { alert(x.message); }); return; }
+  if (!confirm('確定移除這位確認人員?')) return;
+  call('adminConfirmUnbind', T, b.getAttribute('data-cfun')).then(function (r) { SG.arr.cf = r.confirmers; drawSettings(); }).catch(function (x) { alert(x.message); });
+});
 document.addEventListener('click', function (e) {
   var b = e.target.closest('#arrcode,#arrunb'); if (!b) return;
   if (b.id === 'arrunb') { if (!confirm('確定解除到貨管理員綁定?')) return; call('adminArrivalUnbind', T).then(function () { SG.arr.bound = false; drawSettings(); }).catch(function (x) { alert(x.message); }); return; }
