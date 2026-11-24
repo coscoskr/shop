@@ -1112,6 +1112,7 @@ function memberChangePay(tk, sid, d) {
     var n = cp_(s), oldPay = String(s.付款方式), oldFee = Number(s.運費) || 0;
     if (oldPay === pay && String(s.付款類型 || '') === kind) { out = 'same'; return; }
     n.付款方式 = pay; n.付款類型 = kind; n.狀態 = PAY[pay]; n.收款帳號 = pay === '匯款' ? String(settings_().匯款資訊 || '') : '';
+    if (pay === '賣貨便' && !String(s.物流 || '')) n.物流 = '7-11';
     if ((oldPay === '賣貨便') !== (pay === '賣貨便')) n.運費 = feeFor_(m, pay, Number(s.商品金額) - Number(s.優惠折抵 || 0)); // 賣貨便運費和店到店不同
     n.總額 = Math.max(0, Number(s.商品金額) - Number(s.優惠折抵 || 0) - Number(s.購物金折抵 || 0)) + Number(n.運費 || 0);
     put_('出貨單', s._r, n);
@@ -1693,7 +1694,7 @@ function adminCreateShip(tk, items, d) {
     var lines = pickLines_(null, items), c = shipCalc_(lines, { pay: d.pay, method: d.method }), o0 = ord_(String(lines[0].訂單ID));
     lines.forEach(function (l) { var ox = ord_(String(l.訂單ID)); if (String(ox['LINE ID'] || '') !== String(o0['LINE ID'] || '') || nz_(ox.電話) !== nz_(o0.電話)) throw new Error('一張出貨單只能合併同一位客人的訂單'); });
     var sid = seq_('出貨單', 'S'), oids = {}; lines.forEach(function (l) { oids[String(l.訂單ID)] = 1; });
-    put_('出貨單', 0, { '出貨單ID': sid, '訂單ID': Object.keys(oids).join(','), '狀態': PAY[d.pay], '物流': t_(d.co, 30), '物流單號': t_(d.no, 40), '品項': lines.map(function (l) { return l.品名 + '×' + l.數量; }).join('、'), '建立時間': now_(), '出貨時間': '',
+    put_('出貨單', 0, { '出貨單ID': sid, '訂單ID': Object.keys(oids).join(','), '狀態': PAY[d.pay], '物流': t_(d.co, 30) || (d.pay === '賣貨便' ? '7-11' : ''), '物流單號': t_(d.no, 40), '品項': lines.map(function (l) { return l.品名 + '×' + l.數量; }).join('、'), '建立時間': now_(), '出貨時間': '',
       'LINE ID': String(o0['LINE ID'] || ''), '姓名': String(o0.姓名), '電話': String(d.phone || o0.電話), '付款方式': d.pay, '收件資訊': t_(d.ship, 200), '備註': t_(d.note, 200), '商品金額': c.sub, '優惠折抵': c.disc, '購物金折抵': c.cred, '運費': c.fee, '總額': c.total,
       '付款連結': '', '匯款後五碼': '', '會員等級': String(o0.會員等級 || ''), '折抵明細': JSON.stringify(c.alloc) });
     lines.forEach(function (l) { var n = cp_(l); n.出貨單ID = sid; put_('訂單明細', l._r, n); });
@@ -1758,7 +1759,7 @@ function adminUpdateShip(tk, sid, d) {
     }
     var link = t_(d.link, 500); if (link && !/^https:\/\//.test(link)) throw new Error('付款連結需以 https:// 開頭');
     var n = cp_(s);
-    n.付款方式 = payNew; n.狀態 = d.st; if (payChanged && payNew === '匯款') n.收款帳號 = String(settings_().匯款資訊 || ''); n.物流 = t_(d.co, 30); n.物流單號 = t_(d.no, 40); n.付款連結 = link; if (d.last5 !== undefined) n.匯款後五碼 = t_(d.last5, 5); if (d.rdate !== undefined) { var rd = String(d.rdate || ''); if (rd && !/^\d{4}-\d{2}-\d{2}$/.test(rd)) throw new Error('匯款日期格式不正確'); n.匯款日期 = rd; } n.收件資訊 = ship; n.備註 = t_(d.note, 200); n.電話 = t_(d.phone, 20) || s.電話;
+    n.付款方式 = payNew; n.狀態 = d.st; if (payChanged && payNew === '匯款') n.收款帳號 = String(settings_().匯款資訊 || ''); n.物流 = t_(d.co, 30) || (payNew === '賣貨便' ? '7-11' : ''); // 賣貨便只寄 7-11 n.物流單號 = t_(d.no, 40); n.付款連結 = link; if (d.last5 !== undefined) n.匯款後五碼 = t_(d.last5, 5); if (d.rdate !== undefined) { var rd = String(d.rdate || ''); if (rd && !/^\d{4}-\d{2}-\d{2}$/.test(rd)) throw new Error('匯款日期格式不正確'); n.匯款日期 = rd; } n.收件資訊 = ship; n.備註 = t_(d.note, 200); n.電話 = t_(d.phone, 20) || s.電話;
     n.配送方式 = mNew; n.收件資訊 = ship;
     n.運費 = fee; n.總額 = Math.max(0, Number(s.商品金額) - Number(s.優惠折抵 || 0) - Number(s.購物金折抵 || 0)) + fee;
     if (d.img !== undefined) { var im = t_(d.img, 500); if (im && !/^https:\/\//.test(im)) throw new Error('出貨單圖片網址不正確'); n.出貨單圖片 = im; }
@@ -2530,7 +2531,7 @@ function memberCreateShip0_(tk, items, d) {
     var cdetail = c.pick > 0 ? spend_(ctx.lid, c.pick) : {};
     sid = seq_('出貨單', 'S');
     var oids = {}; lines.forEach(function (l) { oids[String(l.訂單ID)] = 1; });
-    put_('出貨單', 0, { '出貨單ID': sid, '訂單ID': Object.keys(oids).join(','), '狀態': PAY[pay], '物流': '', '物流單號': '', '品項': lines.map(function (l) { return l.品名 + '×' + l.數量; }).join('、'), '建立時間': now_(), '出貨時間': '',
+    put_('出貨單', 0, { '出貨單ID': sid, '訂單ID': Object.keys(oids).join(','), '狀態': PAY[pay], '物流': pay === '賣貨便' ? '7-11' : '', '物流單號': '', '品項': lines.map(function (l) { return l.品名 + '×' + l.數量; }).join('、'), '建立時間': now_(), '出貨時間': '',
       'LINE ID': ctx.lid || '', '姓名': String(o0.姓名), '電話': phone, '付款方式': pay, '收件資訊': ship, '備註': t_(d.note, 200), '商品金額': c.sub, '優惠折抵': c.disc, '購物金折抵': c.cred + c.pick, '運費': c.fee, '總額': c.total,
       '付款連結': '', '匯款後五碼': '', '會員等級': String(o0.會員等級 || ''), '折抵明細': JSON.stringify(c.alloc), '配送方式': method, '購物金明細': JSON.stringify(cdetail), '收款帳號': pay === '匯款' ? String(settings_().匯款資訊 || '') : '', '付款類型': pay === '刷卡' ? kindOk_(d) : '' });
     lines.forEach(function (l) { var n = cp_(l); n.出貨單ID = sid; put_('訂單明細', l._r, n); });
@@ -2613,7 +2614,7 @@ function adminCreateShipFor(tk, items, d) {
     sid = seq_('出貨單', 'S');
     var oids = {}; lines.forEach(function (l) { oids[String(l.訂單ID)] = 1; });
     itemsTxt = lines.map(function (l) { return l.品名 + '×' + l.數量; }).join('、'); total = c.total; name = String(o0.姓名); lidOut = ctx.lid || ''; oidsOut = Object.keys(oids).join(',');
-    put_('出貨單', 0, { '出貨單ID': sid, '訂單ID': oidsOut, '狀態': PAY[pay], '物流': '', '物流單號': '', '品項': itemsTxt, '建立時間': now_(), '出貨時間': '',
+    put_('出貨單', 0, { '出貨單ID': sid, '訂單ID': oidsOut, '狀態': PAY[pay], '物流': pay === '賣貨便' ? '7-11' : '', '物流單號': '', '品項': itemsTxt, '建立時間': now_(), '出貨時間': '',
       'LINE ID': ctx.lid || '', '姓名': name, '電話': phone, '付款方式': pay, '收件資訊': ship, '備註': t_(d.note, 200), '商品金額': c.sub, '優惠折抵': c.disc, '購物金折抵': c.cred + c.pick, '運費': c.fee, '總額': c.total,
       '付款連結': '', '匯款後五碼': '', '會員等級': String(o0.會員等級 || ''), '折抵明細': JSON.stringify(c.alloc), '配送方式': method, '購物金明細': JSON.stringify(cdetail), '收款帳號': pay === '匯款' ? String(settings_().匯款資訊 || '') : '' });
     lines.forEach(function (l) { var n = cp_(l); n.出貨單ID = sid; put_('訂單明細', l._r, n); });
