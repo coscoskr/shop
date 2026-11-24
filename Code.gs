@@ -3057,7 +3057,7 @@ function arrPlan_(items, opt) {
     var a = agg[k], left = a.qty, got = [];
     if (a.lots && a.price !== '') plan.cost[a.pid] = a.price; // 酷柏:商品成本跟著最新進價
     var cand = lines.filter(function (l) {
-      return bp_(l.商品ID) === a.pid && String(l.規格 || '') === a.spec && ['已到貨', '已出貨'].indexOf(String(l.到貨狀態)) < 0 && !l.出貨單ID && (taken[l.訂單ID + '|' + l.商品ID] || 0) < Number(l.數量) && ords[String(l.訂單ID)];
+      return arrEq_(l, a, prods) && ['已到貨', '已出貨'].indexOf(String(l.到貨狀態)) < 0 && !l.出貨單ID && (taken[l.訂單ID + '|' + l.商品ID] || 0) < Number(l.數量) && ords[String(l.訂單ID)];
     }).sort(function (x, y) {
       var tx = String(ords[String(x.訂單ID)].下單時間 || ''), ty = String(ords[String(y.訂單ID)].下單時間 || '');
       return tx < ty ? -1 : tx > ty ? 1 : (String(x.訂單ID) < String(y.訂單ID) ? -1 : 1);
@@ -3083,6 +3083,23 @@ function arrPlan_(items, opt) {
   if (unk.length) t += '\n⚠️ 對不上商品(不處理):' + unk.join('、');
   t += cbNote;
   return t + (opt && opt.auto ? '' : '\n\n回「確認」入帳並通知客人;回「取消」放棄。');
+}
+/** 到貨品項(商品 a.pid、規格 a.spec)可以分給這列訂單品項嗎:
+   同商品同規格(寫法不同也算,例「杏仁沙色EU40」=「杏仁沙色 / EU40」);
+   或是同貨號的舊商品(以前一個顏色一個商品,例 …（OZ3035）#SAND 規格 40)而顏色、尺寸都對得上 */
+function arrSpN_(s) { return String(s || '').replace(/[\s\/／|｜]+/g, '').toLowerCase(); }
+function arrSz_(s) { var m = String(s || '').match(/(?:EU\s*)?(\d{2})(?!\d)/i); return m ? m[1] : ''; }
+function arrEq_(l, a, prods) {
+  var lp = bp_(l.商品ID), ls = String(l.規格 || ''), as = String(a.spec || '');
+  if (lp === a.pid) return ls === as || (!!as && arrSpN_(ls) === arrSpN_(as));
+  var p = prods[lp], ap = prods[a.pid]; if (!p || !ap) return false;
+  var sku = cbSku_(ap.名稱); if (!sku || cbSku_(p.名稱) !== sku) return false;
+  var ak = as.lastIndexOf(' / '), lk = ls.lastIndexOf(' / ');
+  var asz = arrSz_(ak >= 0 ? as.slice(ak + 3) : as), lsz = arrSz_(lk >= 0 ? ls.slice(lk + 3) : ls);
+  if (!asz || asz !== lsz) return false;
+  var ac = ak >= 0 ? as.slice(0, ak) : cbColorOf_(ap.名稱, ''), lc = lk >= 0 ? ls.slice(0, lk) : cbColorOf_(p.名稱, '');
+  if (!String(ac).trim() && !String(lc).trim()) return true;
+  return !!String(ac).trim() && !!String(lc).trim() && cbSameClr_(ac, lc);
 }
 /** 找到貨要入帳的那一列:原本那列還沒到就用它;已經到了(先前拆過單)就找同一張訂單、同商品同規格、還在等的那一列 */
 function arrLine_(oid, pid) {
