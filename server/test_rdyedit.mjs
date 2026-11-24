@@ -44,4 +44,13 @@ r = await call('adminSaveProduct', tk, { name: 'UGG 拖鞋', price: 2100, stock:
   img: 'https://x.com/a.png|https://x.com/b.png', specs: [{ n: '白 / US6', q: '' }, { n: '杏 / US6', q: '' }], specImg: { '杏': 'https://x.com/b.png', '白': 'https://evil.com/z.png' } });
 const sp = (await call('getShop')).result.products.find(p => p.name === 'UGG 拖鞋');
 ok(r.ok && sp && JSON.stringify(sp.specImg) === '{"杏":"https://x.com/b.png"}', '規格圖片存取:' + (r.error || JSON.stringify(sp && sp.specImg)));
+// 封鎖偵測:unfollow 記封鎖時間,follow 清掉
+{ const rt = createRuntime({ H: code.H, tableData: Object.fromEntries(Object.keys(TABLES).map(n => [n, DB[n].map(r => ({ ...r }))])), kv: KV, props: {}, fetchMap: {} }); Object.assign(globalThis, rt.globals); code.__reset();
+  code.INTERNAL.contactSeen_('UM1', '', '', false);
+  let ops = rt.collectOps(); const up = ops.find(o => o.table === 'members' && o.rec && o.rec.blocked_at);
+  ok(up && up.rec.friend === 'N', '封鎖會記封鎖時間:' + JSON.stringify(up && up.rec.blocked_at));
+  for (const o of ops) if (o.table === 'members') Object.assign(DB['會員'].find(r => r.line_id === o.pk), o.rec); }
+r = await call('adminMembers', tk); const mm = r.result.members.find(x => x.lid === 'UM1'); ok(mm && mm.blocked && !mm.friend, '後台看得到已封鎖:' + JSON.stringify(mm && mm.blocked));
+{ const rt = createRuntime({ H: code.H, tableData: Object.fromEntries(Object.keys(TABLES).map(n => [n, DB[n].map(r => ({ ...r }))])), kv: KV, props: {}, fetchMap: {} }); Object.assign(globalThis, rt.globals); code.__reset();
+  code.INTERNAL.contactSeen_('UM1', '', '', true); const up = rt.collectOps().find(o => o.table === 'members'); ok(up && up.rec.friend === 'Y' && up.rec.blocked_at === '', '解除封鎖清掉時間'); }
 console.log(fails ? fails + ' FAILED' : 'ALL PASSED');

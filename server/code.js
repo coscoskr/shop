@@ -23,7 +23,7 @@ var H = {
   '人事': ['人員ID', '姓名', '薪資', '勞保', '健保', '勞退', '其他', '備註', '啟用'],
   '廠商付款': ['付款ID', '付款日期', '廠商', '金額', '匯款備註', '品項數', '應付成本', '品項', '建立人', '建立時間', '圖片'],
   '出貨單': ['出貨單ID', '訂單ID', '狀態', '物流', '物流單號', '品項', '建立時間', '出貨時間', 'LINE ID', '姓名', '電話', '付款方式', '收件資訊', '備註', '商品金額', '優惠折抵', '購物金折抵', '運費', '總額', '付款連結', '匯款後五碼', '會員等級', '折抵明細', '配送方式', '購物金明細', '匯款日期', '收款帳號', '列印時間', '出貨單圖片', '發票號碼', '發票日期', '付款類型', '綠界物流ID'],
-  '會員': ['LINE ID', '暱稱', '頭像', '等級', '加入時間', '最近登入', '已加好友', '備註', '姓名', '電話', 'Email', '收件地址'],
+  '會員': ['LINE ID', '暱稱', '頭像', '等級', '加入時間', '最近登入', '已加好友', '備註', '姓名', '電話', 'Email', '收件地址', '封鎖時間'],
   '購物金': ['序號', 'LINE ID', '發放時間', '金額', '剩餘', '到期日', '來源', '備註', '操作人', '訂單ID', '活動ID'],
   '等級': ['等級', '折扣率', '適用類別'],
   '活動': ['活動ID', '名稱', '開始', '結束', '範圍', '範圍值', '適用等級', '類型', '數值', '最低消費', '觸發', '有效天數', '啟用'],
@@ -473,12 +473,13 @@ function contactSeen_(lid, name, pic, follow) {
     var n = cp_(m), ch = false;
     if (!String(n.暱稱) && name) { n.暱稱 = name; ch = true; }
     if (!String(n.頭像) && pic) { n.頭像 = pic; ch = true; }
-    if (follow !== false && n.已加好友 !== 'Y') { n.已加好友 = 'Y'; ch = true; }
-    if (follow === false && n.已加好友 !== 'N') { n.已加好友 = 'N'; ch = true; }
+    // LINE 的 unfollow 事件 = 客人封鎖官方帳號;記下封鎖時間,重新加好友(解除封鎖)時清掉
+    if (follow !== false && n.已加好友 !== 'Y') { n.已加好友 = 'Y'; ch = true; if (String(n.封鎖時間 || '')) { n.封鎖時間 = ''; log_('LINE', '解除封鎖官方帳號', String(n.暱稱 || lid), ''); } }
+    if (follow === false && (n.已加好友 !== 'N' || !String(n.封鎖時間 || ''))) { n.已加好友 = 'N'; n.封鎖時間 = now_(); ch = true; log_('LINE', '封鎖官方帳號', String(n.暱稱 || lid), ''); }
     if (ch) put_('會員', m._r, n);
     return;
   }
-  put_('會員', 0, { 'LINE ID': lid, '暱稱': name || 'LINE使用者', '頭像': pic || '', '等級': '一般會員', '加入時間': now_(), '最近登入': '', '已加好友': follow === false ? 'N' : 'Y', '備註': '由 LINE 私訊自動建立' });
+  put_('會員', 0, { 'LINE ID': lid, '暱稱': name || 'LINE使用者', '頭像': pic || '', '等級': '一般會員', '加入時間': now_(), '最近登入': '', '已加好友': follow === false ? 'N' : 'Y', '備註': '由 LINE 私訊自動建立', '封鎖時間': follow === false ? now_() : '' });
 }
 
 /* ---------- 管理員帳號 ---------- */
@@ -2740,7 +2741,9 @@ function newSession_(lid) {
 }
 function upsertMember_(lid, name, pic, friend) {
   var m = rows_('會員').filter(function (r) { return String(r['LINE ID']) === lid; })[0];
-  if (m) { var n = cp_(m); n.暱稱 = name; n.頭像 = pic; n.最近登入 = now_(); n.已加好友 = friend ? 'Y' : 'N'; put_('會員', m._r, n); return n; }
+  if (m) { var n = cp_(m); n.暱稱 = name; n.頭像 = pic; n.最近登入 = now_();
+    if (friend) n.封鎖時間 = ''; else if (m.已加好友 === 'Y' && !String(m.封鎖時間 || '')) n.封鎖時間 = now_(); // 原本是好友、登入時變成不是 = 封鎖(漏收通知時補記)
+    n.已加好友 = friend ? 'Y' : 'N'; put_('會員', m._r, n); return n; }
   var o = { 'LINE ID': lid, '暱稱': name, '頭像': pic, '等級': '一般會員', '加入時間': now_(), '最近登入': now_(), '已加好友': friend ? 'Y' : 'N', '備註': '' };
   put_('會員', 0, o); return o;
 }
@@ -3737,7 +3740,7 @@ function adminMembers(tk) {
     levels: levels_().map(function (r) { return String(r.等級); }),
     members: rows_('會員').reverse().map(function (m) {
       var k = String(m['LINE ID']);
-      return { lid: k, name: String(m.暱稱), pic: String(m.頭像), level: String(m.等級), joined: String(m.加入時間), last: String(m.最近登入), friend: m.已加好友 === 'Y', note: String(m.備註 || ''), balance: balance_(k), orders: cnt[k] || 0, spent: spent[k] || 0 };
+      return { lid: k, name: String(m.暱稱), pic: String(m.頭像), level: String(m.等級), joined: String(m.加入時間), last: String(m.最近登入), friend: m.已加好友 === 'Y', blocked: m.已加好友 === 'Y' ? '' : String(m.封鎖時間 || ''), note: String(m.備註 || ''), balance: balance_(k), orders: cnt[k] || 0, spent: spent[k] || 0 };
     })
   };
 }

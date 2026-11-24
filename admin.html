@@ -201,7 +201,7 @@ $('#side').addEventListener('click', function (e) {
 
 function clearFilters() {
   OF = { from: '', to: '', q: '', st: '', pay: '' }; SF = { from: '', to: '', q: '', st: '', pay: '', method: '', pr: '', inv: '', prFrom: '', prTo: '', sort: '' }; PF = { q: '', type: '', on: '', lock: '' };
-  MF = { q: '', lv: '' }; VF = { vendor: '', pay: '', cost: '', arr: '', ord: '', qo: '', qb: '', qn: '', qs: '', from: '', to: '' };
+  MF = { q: '', lv: '', fr: '' }; VF = { vendor: '', pay: '', cost: '', arr: '', ord: '', qo: '', qb: '', qn: '', qs: '', from: '', to: '' };
   var t = ymd(new Date()); RF = { oFrom: t, oTo: t, sFrom: '', sTo: '', status: '', pay: '', q: '' };
 }
 var PREVTAB = null;
@@ -814,13 +814,13 @@ function logView() {
 
 
 /* ---------- 會員 / 活動 / 設定 ---------- */
-var MB = { members: [], levels: [] }, MF = { q: '', lv: '' }, AC = [], LV = [], SG = null;
+var MB = { members: [], levels: [] }, MF = { q: '', lv: '', fr: '' }, AC = [], LV = [], SG = null;
 function memberView() {
   $('#v').innerHTML = '<p class="m">載入中…</p>';
   call('adminMembers', T).then(function (d) { MB = d; drawMembers(); }).catch(function (e) { $('#v').innerHTML = '<p class="er">' + esc(e.message) + '</p>'; });
 }
 function drawMembers() {
-  $('#v').innerHTML = '<h2 style="margin-top:0">會員</h2><div class="fb" id="mfb"><label>搜尋暱稱<input data-k="q" value="' + esc(MF.q) + '"></label><label>等級<select data-k="lv">' + opts(MB.levels, MF.lv, '全部') + '</select></label><span class="sum" id="sum"></span></div><div id="tb"></div>';
+  $('#v').innerHTML = '<h2 style="margin-top:0">會員</h2><div class="fb" id="mfb"><label>搜尋暱稱<input data-k="q" value="' + esc(MF.q) + '"></label><label>等級<select data-k="lv">' + opts(MB.levels, MF.lv, '全部') + '</select></label><label>LINE 好友<select data-k="fr"><option value="">全部</option><option value="Y"' + (MF.fr === 'Y' ? ' selected' : '') + '>已加好友</option><option value="N"' + (MF.fr === 'N' ? ' selected' : '') + '>尚未加好友(含封鎖)</option><option value="B"' + (MF.fr === 'B' ? ' selected' : '') + '>已封鎖我們</option></select></label><span class="sum" id="sum"></span></div><div id="tb"></div>';
   bindFilter2('mfb', MF, memberRows); memberRows();
 }
 function bindFilter2(id, f, redraw) {
@@ -830,16 +830,16 @@ function bindFilter2(id, f, redraw) {
 }
 function memberRows() {
   var k = MF.q.toLowerCase();
-  var rows = MB.members.filter(function (m) { return (!MF.lv || m.level === MF.lv) && (!k || m.name.toLowerCase().indexOf(k) >= 0); });
+  var rows = MB.members.filter(function (m) { return (!MF.lv || m.level === MF.lv) && (!k || m.name.toLowerCase().indexOf(k) >= 0) && (!MF.fr || (MF.fr === 'Y' ? m.friend : MF.fr === 'N' ? !m.friend : !m.friend && !!m.blocked)); });
   $('#sum').textContent = '共 ' + rows.length + ' 位會員';
   $('#tb').innerHTML = '<table><thead><tr><th>暱稱</th><th>等級</th><th>購物金</th><th>訂單數</th><th>累計消費</th><th>加好友</th><th>最近登入</th></tr></thead><tbody>' +
-    rows.map(function (m) { return '<tr data-a="mb" data-id="' + esc(m.lid) + '"><td>' + esc(m.name) + '</td><td><span class="chip">' + esc(m.level) + '</span></td><td>' + nf(m.balance) + '</td><td>' + nf(m.orders) + '</td><td>' + nf(m.spent) + '</td><td>' + (m.friend ? '是' : '<span class="er">否</span>') + '</td><td>' + esc(m.last.slice(0, 16)) + '</td></tr>'; }).join('') + '</tbody></table>' +
+    rows.map(function (m) { return '<tr data-a="mb" data-id="' + esc(m.lid) + '"><td>' + esc(m.name) + '</td><td><span class="chip">' + esc(m.level) + '</span></td><td>' + nf(m.balance) + '</td><td>' + nf(m.orders) + '</td><td>' + nf(m.spent) + '</td><td>' + (m.friend ? '是' : m.blocked ? '<span class="er">已封鎖</span><br><span class="m" style="font-size:12px">' + esc(m.blocked.slice(0, 10)) + '</span>' : '<span class="er">否</span>') + '</td><td>' + esc(m.last.slice(0, 16)) + '</td></tr>'; }).join('') + '</tbody></table>' +
     (rows.length ? '' : '<p class="m">還沒有會員。客人用 LINE 登入後就會出現在這裡。</p>');
 }
 function openMember(lid) {
   var m = MB.members.filter(function (x) { return x.lid === lid; })[0]; if (!m) return;
   var d = $('#dlg');
-  d.innerHTML = '<h3>' + esc(m.name) + ' <span class="m">購物金餘額 ' + m.balance + ' 元 · 訂單 ' + m.orders + ' 筆 · ' + (m.friend ? '已加好友' : '尚未加好友') + '</span></h3>' +
+  d.innerHTML = '<h3>' + esc(m.name) + ' <span class="m">購物金餘額 ' + m.balance + ' 元 · 訂單 ' + m.orders + ' 筆 · ' + (m.friend ? '已加好友' : m.blocked ? '已封鎖官方帳號(' + esc(m.blocked.slice(0, 16)) + ')' : '尚未加好友') + '</span></h3>' +
     '<form id="lvf" data-id="' + esc(lid) + '"><div class="g"><label>會員等級<select name="lv">' + opts(MB.levels, m.level) + '</select></label><div class="f" style="grid-column:span 2">' + fld('備註', 'note', m.note) + '</div></div><p class="er" id="le2" role="alert"></p><button class="btn a">儲存等級</button></form>' +
     '<h4>發放購物金</h4><form id="gf" data-id="' + esc(lid) + '"><div class="g">' + fld('金額', 'amt', '', 'number') + fld('張數', 'cnt', '1', 'number') + fld('有效天數', 'days', '90', 'number') + fld('備註', 'note', '') + '</div><p class="er" id="ge" role="alert"></p><button class="btn a">發放</button></form>' +
     '<h4>購物金紀錄</h4><div id="gl"><p class="m">載入中…</p></div><p style="margin-top:14px"><button class="btn l" data-a="x">關閉</button></p>';
