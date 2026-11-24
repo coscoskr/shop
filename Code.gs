@@ -3070,7 +3070,7 @@ function arrPlan_(items, opt) {
       plan.assign.push({ oid: String(l.訂單ID), pid: String(l.商品ID), name: a.name, spec: a.spec, qty: take, who: who, cost: tk ? tk.cost : '', cw: tk ? tk.parts : [] });
       got.push('  ✔ ' + l.訂單ID + ' ' + who + ' ×' + take + (take < q ? '(訂 ' + q + ' 件,先到 ' + take + ' 件,剩 ' + (q - take) + ' 件繼續等)' : ''));
     });
-    if (left > 0) { var ts = a.lots && a.lots.length ? cbTake_(a.lots, left) : null; plan.surplus.push({ pid: a.pid, spec: a.spec, qty: left, price: ts && ts.cost !== '' ? ts.cost : a.price, cw: ts ? ts.parts : [], name: a.name }); got.push('  ➕ 現貨庫存 ×' + left); }
+    if (left > 0) { var ts = a.lots && a.lots.length ? cbTake_(a.lots, left) : null; plan.surplus.push({ pid: a.pid, spec: a.spec, qty: left, price: ts && ts.cost !== '' ? ts.cost : a.price, cw: ts ? ts.parts : [], name: a.name }); got.push(opt && opt.auto ? '  ❓ 沒有訂單在等 ×' + left + '(先不上現貨,待確認)' : '  ➕ 現貨庫存 ×' + left); }
     msg.push('・' + a.name + (a.spec ? '(' + a.spec + ')' : '') + ' 到 ' + a.qty + ' 件' + (a.price !== '' ? ',進價 ' + a.price : '') + '\n' + (got.join('\n') || '  (沒有待到貨的訂單)'));
   });
   var head = (opt && opt.head) || '📦 到貨預覽';
@@ -3112,7 +3112,7 @@ function arrLine_(oid, pid) {
 /** 套用所有待確認的到貨計畫(plans 有給時只套用指定的計畫,不動待確認清單) */
 function arrApply_(plans, why) {
   var pend = plans || arrPend_(); if (!pend.length) return '目前沒有待確認的到貨(可能已超過 6 小時失效),請重新轉傳。';
-  var arrived = {}, nAs = 0, nSur = 0, miss = [], WHO = why ? '酷柏到貨' : '到貨助理', WHY = why || 'LINE 轉傳到貨通知';
+  var arrived = {}, nAs = 0, nSur = 0, nHold = 0, holdTx = [], miss = [], WHO = why ? '酷柏到貨' : '到貨助理', WHY = why || 'LINE 轉傳到貨通知';
   var meta = null;
   pend.forEach(function (pl) {
     pl.assign.forEach(function (a) {
@@ -3134,19 +3134,22 @@ function arrApply_(plans, why) {
       if (!p) { miss.push(s.name + ' 現貨'); return; }
       var inn = rows_('商品_內部').filter(function (r) { return String(r.商品ID) === s.pid; })[0] || {};
       var id = seq_('庫存進貨', 'K');
-      var row = { '訂單ID': id, '商品ID': s.pid, '品名': String(p.名稱), '規格': s.spec, '數量': s.qty, '到貨狀態': '已到貨', '廠商': String(inn.廠商 || ''),
+      // 酷柏自動入帳多出來(沒有訂單在等)的貨:不自動上現貨,先記成「待到貨」的庫存進貨,等老闆確認後在後台改成已到貨才上架
+      var hold = !!why;
+      var row = { '訂單ID': id, '商品ID': s.pid, '品名': String(p.名稱), '規格': s.spec, '數量': s.qty, '到貨狀態': hold ? '待到貨' : '已到貨', '廠商': String(inn.廠商 || ''),
         '成本': s.price !== '' ? s.price : (inn.成本 === undefined ? '' : inn.成本), '成本含稅': inn.成本含稅 || 'N', '貨源': String(inn.貨源 || ''),
-        '廠商付款ID': '', '到貨操作人': WHO, '到貨時間': now_(), '日期': today_(), '建立人': WHO, '出貨單ID': '' };
-      put_('庫存進貨', 0, row); stockMove_(row, s.qty); cbLink_('K|' + id, s.cw);
-      log_(WHO, '新增庫存進貨', id + ' ' + p.名稱, s.qty + ' 件' + (s.spec ? ',規格 ' + s.spec : '') + ',已到貨(' + WHY + ',庫存 +' + s.qty + ')');
-      nSur += s.qty;
+        '廠商付款ID': '', '到貨操作人': hold ? '' : WHO, '到貨時間': hold ? '' : now_(), '日期': today_(), '建立人': WHO, '出貨單ID': '' };
+      put_('庫存進貨', 0, row); if (!hold) stockMove_(row, s.qty); cbLink_('K|' + id, s.cw);
+      log_(WHO, '新增庫存進貨', id + ' ' + p.名稱, s.qty + ' 件' + (s.spec ? ',規格 ' + s.spec : '') + (hold ? ',沒有訂單在等,待確認是否上架(' + WHY + ',未加入現貨)' : ',已到貨(' + WHY + ',庫存 +' + s.qty + ')'));
+      if (hold) { nHold += s.qty; holdTx.push(id + ' ' + p.名稱 + (s.spec ? '(' + s.spec + ')' : '') + ' ×' + s.qty); } else nSur += s.qty;
     });
   });
   pend.forEach(function (pl) { cbInnCost_(pl.cost); });
   cbDone_(pend);
   if (!plans) arrSave_([]);
   var nt = Object.keys(arrived).length ? notifyArrival_(arrived) : { sent: 0, noLine: 0, failed: 0 };
-  var t = '✅ 已入帳:客訂到貨 ' + nAs + ' 筆、轉入現貨庫存 ' + nSur + ' 件。';
+  var t = '✅ 已入帳:客訂到貨 ' + nAs + ' 筆' + (nSur ? '、轉入現貨庫存 ' + nSur + ' 件' : '') + '。';
+  if (nHold) t += '\n❓ 多出 ' + nHold + ' 件沒有訂單在等,沒有自動上現貨:\n・' + holdTx.join('\n・') + '\n要上架請到後台「訂單明細」把這筆【庫存】改成「已到貨」;不要的請到「庫存表」刪除。';
   if (Object.keys(arrived).length) t += '\n已通知客人 ' + nt.sent + ' 位' + (nt.noLine ? ',' + nt.noLine + ' 位沒有 LINE/Email 請自行聯絡' : '') + '。';
   if (miss.length) t += '\n⚠️ 這些已被別人處理或找不到,略過:' + miss.join('、');
   return t;
@@ -3190,7 +3193,7 @@ function cbLink_(lk, parts) {
 function cbWidDone_(w) {
   var ks; try { ks = JSON.parse(CacheService.getScriptCache().get('cbw_' + w) || '[]'); } catch (e) { ks = []; }
   return ks.some(function (lk) {
-    if (lk.indexOf('K|') === 0) return rows_('庫存進貨').some(function (k) { return String(k.訂單ID) === lk.slice(2) && String(k.到貨狀態) === '已到貨'; });
+    if (lk.indexOf('K|') === 0) return rows_('庫存進貨').some(function (k) { return String(k.訂單ID) === lk.slice(2); }); // 待確認上架(待到貨)的也算已收過,不重複新增
     var i = lk.indexOf('|'), oid = lk.slice(0, i), pid = lk.slice(i + 1);
     return rows_('訂單明細').some(function (l) { return String(l.訂單ID) === oid && String(l.商品ID) === pid && ['已到貨', '已出貨'].indexOf(String(l.到貨狀態)) >= 0; });
   });
@@ -3427,7 +3430,7 @@ function cbArrIn_(d) {
   cbRdyTell_(res);
   if (res.pending) res.pendItems = cbPend_().map(function (x) { return x.title + (x.spec ? '(' + x.spec + ')' : '') + ' ×' + x.qty; }).slice(0, 20);
   if (d.batch) c.put(bk, JSON.stringify(res), 2592000);
-  log_('酷柏到貨', '收到到貨', t_(d.batch, 80), '自動入帳 ' + res.auto + ' 筆、轉現貨 ' + res.stock + ' 件、略過 ' + res.skip + '、待對應 ' + res.pending + ' 項');
+  log_('酷柏到貨', '收到到貨', t_(d.batch, 80), '自動入帳 ' + res.auto + ' 筆、多出待確認上架 ' + res.stock + ' 件、略過 ' + res.skip + '、待對應 ' + res.pending + ' 項');
   return res;
 }
 /** 給配對用:待對應的酷柏品項(每列:#編號|品名|規格|件數) */

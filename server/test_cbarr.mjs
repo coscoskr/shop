@@ -201,13 +201,15 @@ order('O11', '2026-11-10 10:00:00', 'U11'); line('O11', 'P296', 'Kuromi聯名擴
 sent.length = 0;
 r = await post({ type: 'arrival', batch: 'b12', items: [{ proid: 7105, specid: 23002, title: '【韓國】Hetras x Kuromi聯名擴香3入禮盒組', spec: '標準', qty: 3, price: 850, lots: [[3, 785, 'w173053']], single: 1 }] });
 const P296 = DB['商品'].find(p => p.id === 'P296');
-ok(r.body.auto === 1 && r.body.autoQty === 1 && r.body.stock === 2 && (r.body.relist || []).length === 1, 'first-time item: 1 to the order, 2 surplus, product relisted ' + JSON.stringify(r.body));
+ok(r.body.auto === 1 && r.body.autoQty === 1 && r.body.stock === 2 && !(r.body.relist || []).length, 'first-time item: 1 to the order, 2 surplus held (not relisted) ' + JSON.stringify(r.body));
 ok(L('O11', 'P296').arrival_status === '已到貨' && sent.some(x => x.to === 'U11'), 'customer notified');
-ok(P296.on_sale === 'Y' && !P296.close_date && Number(P296.stock) === 0, 'off/closed product relisted with pre-order quota 0 (only ready stock)');
-ok(sent.some(x => x.to === 'UYIXUAN0001' && /有現貨可以販售/.test(x.text) && /現貨 2 件/.test(x.text)) && sent.some(x => x.to === 'UADMIN' && /有現貨可以販售/.test(x.text)), '乙瑄 and admin told: 有現貨可以販售');
+const K296 = DB['庫存進貨'].filter(k => k.product_id === 'P296');
+ok(K296.length === 1 && Number(K296[0].qty) === 2 && K296[0].arrival_status === '待到貨', 'surplus kept as 庫存進貨 待到貨 (waiting for boss) ' + JSON.stringify(K296.map(k => k.arrival_status)));
+ok(P296.on_sale === 'N' && P296.close_date === '2026-11-01', 'off/closed product NOT auto relisted');
+ok(sent.some(x => x.to === 'UYIXUAN0001' && /沒有訂單在等/.test(x.text) && /沒有自動上現貨/.test(x.text)) && !sent.some(x => /有現貨可以販售/.test(x.text)), '乙瑄 and admin asked whether to list the surplus');
 const shop = (await (async () => { const rt = createRuntime({ H: code.H, tableData: load(), kv: KV, props: PROPS, fetchMap: {} }); Object.assign(globalThis, rt.globals); code.__reset(); return code.INTERNAL.shopData_(); })());
 const sp = shop.products.find(p => p.id === 'P296');
-ok(sp && JSON.stringify(sp.ready) === '{"":2}' && sp.stock === 2, 'storefront shows it with 2 ready (stock 2, not sold out) ' + JSON.stringify(sp && { ready: sp.ready, stock: sp.stock }));
+ok(!sp || !sp.ready, 'storefront shows no ready stock for the held surplus ' + JSON.stringify(sp && { ready: sp.ready, stock: sp.stock }));
 // 對不上的例外:乙瑄也會收到
 aiReply = { items: [{ ref: 1, pid: null, spec: '' }] }; sent.length = 0;
 r = await post({ type: 'arrival', batch: 'b13', items: [{ proid: 9998, specid: 1, title: '【韓國】還沒建立的商品', spec: '標準', qty: 1, price: 10, single: 1 }] });
