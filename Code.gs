@@ -1396,6 +1396,7 @@ function deleteStockIn_(u, id) {
   if (l.到貨狀態 === '已到貨') stockMove_(l, -Number(l.數量));
   var snap = cp_(l);
   sh_('庫存進貨').deleteRow(l._r);
+  cbUnlinkK_(String(id));
   var sm = l.品名 + ' ' + l.數量 + ' 件' + (l.到貨狀態 === '已到貨' ? '(已從庫存扣回)' : '');
   log_(u.acc, '刪除庫存進貨', id, sm);
   major_(u.acc, '刪除庫存進貨', id, sm, snap);
@@ -3216,10 +3217,21 @@ function cbLink_(lk, parts) {
 function cbWidDone_(w) {
   var ks; try { ks = JSON.parse(CacheService.getScriptCache().get('cbw_' + w) || '[]'); } catch (e) { ks = []; }
   return ks.some(function (lk) {
+    if (lk.indexOf('X|') === 0) return true; // 入帳後老闆刪掉的庫存進貨:當作已處理過
     if (lk.indexOf('K|') === 0) return rows_('庫存進貨').some(function (k) { return String(k.訂單ID) === lk.slice(2); }); // 待確認上架(待到貨)的也算已收過,不重複新增
     var i = lk.indexOf('|'), oid = lk.slice(0, i), pid = lk.slice(i + 1);
     return rows_('訂單明細').some(function (l) { return String(l.訂單ID) === oid && String(l.商品ID) === pid && ['已到貨', '已出貨'].indexOf(String(l.到貨狀態)) >= 0; });
   });
+}
+/** 庫存進貨刪除後:酷柏批發單的記號改成「已刪除」(X|編號)。之後同編號重新使用時,酷柏改成本不會改到別的貨;同一張批發單重送也不會再入帳 */
+function cbUnlinkK_(id) {
+  var c = CacheService.getScriptCache(), k = 'cbl_K|' + id, parts; try { parts = JSON.parse(c.get(k) || '[]'); } catch (e) { parts = []; }
+  if (!parts.length) return;
+  parts.forEach(function (p) {
+    var wk = 'cbw_' + p[0], a; try { a = JSON.parse(c.get(wk) || '[]'); } catch (e) { a = []; }
+    c.put(wk, JSON.stringify(a.map(function (x) { return x === 'K|' + id ? 'X|' + id : x; })), CB_TTL_);
+  });
+  c.remove(k);
 }
 function cbAvg_(parts) { var q = 0, sum = 0; (parts || []).forEach(function (p) { q += Number(p[1]); sum += Number(p[1]) * Number(p[2]); }); return q ? Math.round(sum / q * 100) / 100 : ''; }
 /** 酷柏更正成本(到貨後才算出實際成本):更新已入帳的訂單品項、庫存進貨與商品成本;還沒入帳(待對應/待確認)的也一起改。已記錄廠商付款的不動 */
