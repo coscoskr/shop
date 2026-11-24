@@ -3088,7 +3088,7 @@ function arrPlan_(items, opt) {
 /** 到貨品項(商品 a.pid、規格 a.spec)可以分給這列訂單品項嗎:
    同商品同規格(寫法不同也算,例「杏仁沙色EU40」=「杏仁沙色 / EU40」);
    或是同貨號的舊商品(以前一個顏色一個商品,例 …（OZ3035）#SAND 規格 40)而顏色、尺寸都對得上 */
-function arrSpN_(s) { return String(s || '').replace(/[\s\/／|｜]+/g, '').toLowerCase(); }
+function arrSpN_(s) { return String(s || '').replace(/[\s\/／|｜#＃]+/g, '').toLowerCase(); }
 function arrSz_(s) { var m = String(s || '').match(/(?:EU\s*)?(\d{2})(?!\d)/i); return m ? m[1] : ''; }
 function arrEq_(l, a, prods) {
   var lp = bp_(l.商品ID), ls = String(l.規格 || ''), as = String(a.spec || '');
