@@ -303,9 +303,12 @@ function imgs_(v) { return String(v || '').split('|').map(img_).filter(Boolean);
 function etaOk_(v) { v = String(v || ''); return v === '排隊中' || /^\d{4}-\d{2}-\d{2}$/.test(v) || (/^下單後([1-9]\d?)週$/.test(v) && +/\d+/.exec(v)[0] <= 52); }
 /** 關團:關團日期當天台灣時間下午 14:00 起視同下架(資料庫每分鐘也會自動把上架改成 N) */
 function closeAt_(v) {
-  var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(v || '').trim()); if (!m) return 0;
-  return Date.UTC(+m[1], +m[2] - 1, +m[3], 6, 0, 0); // 14:00 台灣(UTC+8)= 06:00 UTC
+  var m = /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{1,2}):(\d{2}))?$/.exec(String(v || '').trim()); if (!m) return 0;
+  var h = m[4] === undefined ? 14 : +m[4], mi = m[5] === undefined ? 0 : +m[5]; if (h > 23 || mi > 59) return 0;
+  return Date.UTC(+m[1], +m[2] - 1, +m[3], h - 8, mi, 0); // 沒寫時間 = 台灣下午 14:00;可寫「yyyy-MM-dd HH:mm」指定時間
 }
+/** 關團時間的文字:「11/30 14:00」 */
+function closeTx_(v) { var m = /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{1,2}):(\d{2}))?$/.exec(String(v || '').trim()); return m ? (+m[2]) + '/' + (+m[3]) + ' ' + (m[4] === undefined ? '14:00' : ('0' + m[4]).slice(-2) + ':' + m[5]) : String(v || ''); }
 function closed_(p) { var t = closeAt_(p && p.關團日期); return !!t && Date.now() >= t; }
 function onSale_(p) { return !!p && p.上架 === 'Y' && !closed_(p); }
 function pub_(p) {
@@ -820,7 +823,7 @@ function adminSaveProduct(tk, d) {
     tiers_(d.tiers, true);
     var cl = String(d.close || '').trim();
     if (cl && !closeAt_(cl)) throw new Error('關團日期格式不正確');
-    if (d.on && closed_({ 關團日期: cl })) throw new Error('關團日期 ' + cl + ' 下午 14:00 已經過了,要上架請先改關團日期或清空');
+    if (d.on && closed_({ 關團日期: cl })) throw new Error('關團時間 ' + closeTx_(cl) + ' 已經過了,要上架請先改關團日期或清空');
     var ps = rows_('商品'), id = d.id;
     var old = id ? ps.filter(function (p) { return p.商品ID === id; })[0] : null;
     if (!old) {
@@ -890,7 +893,7 @@ function adminBatchProductDates(tk, ids, d) {
   if (!doC && !doA) throw new Error('請選擇要修改關團日期或到貨日期');
   var cl = doC ? String(d.close || '').trim() : '', ar = doA ? String(d.arrival || '').trim() : '';
   if (cl && !closeAt_(cl)) throw new Error('關團日期格式不正確');
-  if (cl && closed_({ 關團日期: cl })) throw new Error('關團日期 ' + cl + ' 下午 14:00 已經過了,請選之後的日期');
+  if (cl && closed_({ 關團日期: cl })) throw new Error('關團時間 ' + closeTx_(cl) + ' 已經過了,請選之後的時間');
   if (ar && !etaOk_(ar)) throw new Error('到貨日期格式不正確(日期、排隊中,或下單後 1~52 週)');
   ids = (ids || []).slice(0, 500).map(String);
   if (!ids.length) throw new Error('請先勾選商品');
@@ -907,7 +910,7 @@ function adminBatchProductDates(tk, ids, d) {
       done++;
     });
   });
-  return { products: adminProducts_(), msg: '已修改 ' + done + ' 項商品' + (doC ? '\n關團日期:' + (cl ? cl + ' 下午 14:00 自動下架' : '清除(不關團)') : '') + (doA ? '\n到貨日期:' + (ar || '清除') : '') + (skip.length ? '\n\n略過 ' + skip.length + ' 項:\n' + skip.join('\n') : '') };
+  return { products: adminProducts_(), msg: '已修改 ' + done + ' 項商品' + (doC ? '\n關團日期:' + (cl ? closeTx_(cl) + ' 自動下架' : '清除(不關團)') : '') + (doA ? '\n到貨日期:' + (ar || '清除') : '') + (skip.length ? '\n\n略過 ' + skip.length + ' 項:\n' + skip.join('\n') : '') };
 }
 /* ---------- 折扣碼(後台獨立功能:名稱 + 百分比或金額擇一) ---------- */
 function codeSheet_() {

@@ -647,7 +647,7 @@ function editProd(id) {
     '<div><label>預計到貨日(預購商品前台顯示「預計xx/xx左右」)<input name="arrival" type="date" value="' + esc(etaD(p.arrival)) + '"' + (p.arrival && !etaD(p.arrival) ? ' disabled' : '') + '></label>' +
       '<label class="ck" style="margin-top:4px">或 下單後 <input name="arrw" type="number" min="1" max="52" step="1" style="width:64px" value="' + etaW(p.arrival) + '"' + (p.arrival === '排隊中' ? ' disabled' : '') + '> 週到貨</label>' +
       '<label class="ck" style="margin-top:4px"><input type="checkbox" name="arrivalq"' + (p.arrival === '排隊中' ? ' checked' : '') + '> 暫不確定,排隊中</label></div>' +
-    '<div><label>關團日期(當天下午 14:00 自動下架)<input name="close" type="date" value="' + esc(p.close || '') + '"></label><span class="m" style="font-size:12px">不關團就留空。前台會顯示「x/x 14:00 關團」</span></div>' +
+    '<div><label>關團日期與時間(時間到自動下架)<span style="display:flex;gap:6px"><input name="close" type="date" value="' + esc(String(p.close || '').slice(0, 10)) + '" style="flex:2"><input name="closet" type="time" value="' + esc((String(p.close || '').match(/\d{1,2}:\d{2}$/) || ['14:00'])[0]) + '" style="flex:1"></span></label><span class="m" style="font-size:12px">不關團就把日期留空;時間沒改就是下午 14:00。前台會顯示「x/x 時間 關團」</span></div>' +
     '<div class="f"><span class="m">商品圖片(第一張是封面,張數不限)</span><div id="imgs" class="ig"></div><input type="file" id="imf" multiple accept="image/jpeg,image/png,image/webp"> <span id="ims" class="m"></span>' + fld('或貼上圖片網址(按 Enter 加入)', 'imgurl', '') + '<input type="hidden" name="img" value="' + esc(p.img) + '"></div>' +
     '<label class="f">說明<textarea name="desc" rows="3">' + esc(p.desc) + '</textarea></label>' +
     '<div class="f"><span class="m">類別(可複選)</span>' + catGroups(p.cats) + '</div>' +
@@ -1159,7 +1159,7 @@ document.addEventListener('submit', function (e) {
     call('adminBatch', T, ids, 'info', data).then(function (r) { batchDone(r, '批次修改'); }).catch(fail('#be'));
   } else if (f.id === 'pf') {
     var g = function (n) { return f.elements[n]; };
-    var o2 = { id: CUR, name: g('name').value, price: g('price').value, stock: g('stock').value, arrival: g('arrivalq').checked ? '排隊中' : +g('arrw').value > 0 ? '下單後' + Math.round(+g('arrw').value) + '週' : g('arrival').value, close: g('close').value, tiers: g('tiers').value, unlimited: g('unlimited').checked, brand: g('brand').value, newBrand: g('newBrand').value, specs: SPL.filter(function (x) { return String(x.n).trim(); }).map(function (x) { return { n: x.n.trim(), q: x.q }; }), specImg: (function () { var o = {}, ks = simgKeys(), im = g('img').value.split('|'); Object.keys(SIMG).forEach(function (k) { if (ks.indexOf(k) >= 0 && im.indexOf(SIMG[k]) >= 0) o[k] = SIMG[k]; }); return o; })(), img: g('img').value, desc: g('desc').value, type: g('type').value, on: g('on').checked,
+    var o2 = { id: CUR, name: g('name').value, price: g('price').value, stock: g('stock').value, arrival: g('arrivalq').checked ? '排隊中' : +g('arrw').value > 0 ? '下單後' + Math.round(+g('arrw').value) + '週' : g('arrival').value, close: g('close').value ? g('close').value + (g('closet') && g('closet').value && g('closet').value !== '14:00' ? ' ' + g('closet').value : '') : '', tiers: g('tiers').value, unlimited: g('unlimited').checked, brand: g('brand').value, newBrand: g('newBrand').value, specs: SPL.filter(function (x) { return String(x.n).trim(); }).map(function (x) { return { n: x.n.trim(), q: x.q }; }), specImg: (function () { var o = {}, ks = simgKeys(), im = g('img').value.split('|'); Object.keys(SIMG).forEach(function (k) { if (ks.indexOf(k) >= 0 && im.indexOf(SIMG[k]) >= 0) o[k] = SIMG[k]; }); return o; })(), img: g('img').value, desc: g('desc').value, type: g('type').value, on: g('on').checked,
       cats: CSEL.slice(),
       vendor: g('vendor').value, source: g('source').value, cost: g('cost').value, taxIncl: g('tax').value === 'Y'};
     if (window.cbCollect) { var cbd = window.cbCollect(); if (cbd) o2.cb = cbd; }
@@ -1208,7 +1208,7 @@ document.addEventListener('click', function (e) {
     dq.innerHTML = '<form id="pdf" style="min-width:300px"><h3 style="margin-top:0">批次改日期(' + pdi.length + ' 項商品)</h3>' +
       '<p class="m" style="margin-top:0">只會修改有勾「修改」的欄位,沒勾的維持原本設定。</p>' +
       '<fieldset style="border:1px solid var(--line);border-radius:8px;margin:0 0 10px"><legend><label class="ck"><input type="checkbox" name="dc"> 修改關團日期</label></legend>' +
-      '<label>關團日期(當天下午 14:00 自動下架)<input type="date" name="close" disabled></label><span class="m" style="font-size:12px">留空 = 清除關團日期(不關團)</span></fieldset>' +
+      '<label>關團日期與時間(時間到自動下架)<span style="display:flex;gap:6px"><input type="date" name="close" disabled style="flex:2"><input type="time" name="closet" value="14:00" disabled style="flex:1"></span></label><span class="m" style="font-size:12px">日期留空 = 清除關團日期(不關團)</span></fieldset>' +
       '<fieldset style="border:1px solid var(--line);border-radius:8px;margin:0 0 10px"><legend><label class="ck"><input type="checkbox" name="da"> 修改到貨日期</label></legend>' +
       '<label>預計到貨日<input type="date" name="arrival" disabled></label>' +
       '<label class="ck" style="margin-top:4px">或 下單後 <input name="arrw" type="number" min="1" max="52" step="1" style="width:64px" disabled> 週到貨</label>' +
@@ -1216,13 +1216,13 @@ document.addEventListener('click', function (e) {
       '<p id="pde" class="err" style="color:#d64545"></p><p style="margin-bottom:0"><button class="btn a" type="submit">套用</button> <button class="btn l" type="button" id="dqn">取消</button></p></form>';
     dq.showModal(); $('#dqn').onclick = function () { dq.close(); };
     var pf = $('#pdf');
-    pf.dc.onchange = function () { pf.close.disabled = !pf.dc.checked; };
+    pf.dc.onchange = function () { pf.close.disabled = !pf.dc.checked; pf.closet.disabled = !pf.dc.checked; };
     pf.da.onchange = function () { var on = pf.da.checked; pf.arrivalq.disabled = !on; pf.arrw.disabled = !on || pf.arrivalq.checked; pf.arrival.disabled = !on || pf.arrivalq.checked || +pf.arrw.value > 0; };
     pf.onsubmit = function (ev) {
       ev.preventDefault();
       if (!pf.dc.checked && !pf.da.checked) { $('#pde').textContent = '請至少勾一個要修改的欄位'; return; }
       var dd = {}, sum = [];
-      if (pf.dc.checked) { dd.close = pf.close.value; sum.push('關團日期 → ' + (dd.close ? dd.close + ' 14:00' : '清除')); }
+      if (pf.dc.checked) { var ct = pf.closet.value || '14:00'; dd.close = pf.close.value ? pf.close.value + (ct !== '14:00' ? ' ' + ct : '') : ''; sum.push('關團日期 → ' + (pf.close.value ? pf.close.value + ' ' + ct : '清除')); }
       if (pf.da.checked) { dd.arrival = pf.arrivalq.checked ? '排隊中' : +pf.arrw.value > 0 ? '下單後' + Math.round(+pf.arrw.value) + '週' : pf.arrival.value; sum.push('到貨日期 → ' + (dd.arrival || '清除')); }
       dq.close();
       ask('確定修改勾選的 ' + pdi.length + ' 項商品?\n' + sum.join('\n'), function () {
