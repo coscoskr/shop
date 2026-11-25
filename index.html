@@ -520,6 +520,10 @@ function loginHtml(why, guestBtn) {
 
 /* 規格按鈕:名稱是「顏色 / 尺寸」的商品,先選顏色再選尺寸;其他商品一排規格按鈕 */
 var SPSEP = ' / ', SPC = '', SPZ = '';
+// 尺寸按鈕照由小到大排(S、M、L、XL…;EU36、37…),認不出的尺寸就維持原本順序
+var SZ_ORD = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '2XL', '3XL', 'XXXL', '4XL'];
+function szRank(z) { var t = String(z).trim().toUpperCase().replace(/號|碼/g, ''), i = SZ_ORD.indexOf(t); if (i >= 0) return i; var m = t.match(/^(?:EU|US|UK|JP)?\s*(\d+(?:\.\d+)?)\s*(?:CM)?$/); return m ? 100 + Number(m[1]) : -1; }
+function szSort(zs) { return zs.every(function (z) { return szRank(z) >= 0; }) ? zs.slice().sort(function (a, b) { return szRank(a) - szRank(b); }) : zs; }
 function spTwo(p) { return p.specs.length > 0 && p.specs.every(function (x) { return String(x).split(SPSEP).length === 2; }); }
 function spOut(p, x) { var q = (p.specQty || {})[x]; return q === 0 || specRoom(p, x) <= 0; }
 function spBtn(v, on, off, k) { return '<button type="button" class="sgb' + (on ? ' on' : '') + '" data-sg="' + k + '" data-v="' + esc(v) + '"' + (off ? ' disabled' : '') + '>' + esc(v) + '</button>'; }
@@ -527,6 +531,7 @@ function specPick(p) {
   if (!spTwo(p)) return '<div class="sgl">規格:' + esc(SPZ || '請選擇') + '</div><div class="sg">' + p.specs.map(function (x) { return spBtn(x, SPZ === x, spOut(p, x), 'z'); }).join('') + '</div>';
   var cs = [], zs = [];
   p.specs.forEach(function (x) { var a = x.split(SPSEP); if (cs.indexOf(a[0]) < 0) cs.push(a[0]); if (zs.indexOf(a[1]) < 0) zs.push(a[1]); });
+  zs = szSort(zs);
   function has(c, z) { var k = c + SPSEP + z; return p.specs.indexOf(k) >= 0 && !spOut(p, k); }
   return '<div class="sgl">顏色:' + esc(SPC || '請選擇') + '</div><div class="sg">' + cs.map(function (c) { return spBtn(c, SPC === c, !zs.some(function (z) { return has(c, z); }), 'c'); }).join('') + '</div>' +
     '<div class="sgl">尺寸:' + esc(SPZ || '請選擇') + '</div><div class="sg">' + zs.map(function (z) { return spBtn(z, SPZ === z, SPC ? !has(SPC, z) : !cs.some(function (c) { return has(c, z); }), 'z'); }).join('') + '</div>';
