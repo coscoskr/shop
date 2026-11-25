@@ -114,4 +114,12 @@ ok(lineOf(O4, BOX).ordered_by === '預購現貨', 'lines taken from ready stock 
   ok(r.ok && !DB['訂單明細'].filter(l => l.order_id === OC).some(l => l.arrival_status === '已到貨') && /有訂單在等/.test(r.result.msg) && !DB['庫存進貨'].some(k => k.order_id === KX), 'marking 庫存 已到貨 in 訂單明細 goes to the earliest waiting order (not the newest) ' + (r.error || r.result.msg).slice(0, 120));
   ok(DB['訂單明細'].filter(l => l.order_id === OB).every(l => l.arrival_status === '已到貨') && ((await shop('貓耳毛帽')).ready || {})['黑'] === 2, 'next stock-in ×3 → 1 to second order, 2 become ready ' + JSON.stringify((await shop('貓耳毛帽')).ready));
 }
+{ // 寫法不同(不確定是不是同一個)→ 不自動分、不上現貨,維持待到貨並列出可能在等的訂單
+  DB['商品'].find(p => p.id === HAT).stock = 10;
+  r = await buy([{ id: HAT + '~黑', qty: 1 }]); const OU = DB['訂單'][DB['訂單'].length - 1].order_id;
+  const lu = DB['訂單明細'].find(l => l.order_id === OU); lu.product_id = HAT + '~#黑'; lu.spec = '#黑'; lu.arrival_status = '待到貨'; lu.shippable = 'N';
+  const rd1 = JSON.stringify(((await shop('貓耳毛帽')).ready || {})['黑']);
+  r = await call('adminAddStockIn', tk, { pid: HAT, qty: 1, cost: 700, spec: '黑', arrived: true });
+  const ku = DB['庫存進貨'].find(k => Number(k.cost) === 700);
+  ok(r.ok && lu.arrival_status === '待到貨' && ku && ku.arrival_status === '待到貨' && /不確定/.test(r.result.msg || '') && JSON.stringify(((await shop('貓耳毛帽')).ready || {})['黑']) === rd1, 'uncertain match → not assigned, not listed, stays 待到貨 ' + (r.error || r.result.msg || '').slice(0, 160)); }
 console.log(fails ? fails + ' FAILED' : 'ALL PASSED');

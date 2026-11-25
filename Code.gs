@@ -1399,6 +1399,12 @@ function kFifo_(kid, who) {
   var q = Number(k.數量), o = { auto: true, head: '庫存轉給在等的訂單' };
   arrPlan_([{ pid: String(k.商品ID), spec: String(k.規格 || ''), qty: q, price: k.成本 }], o);
   var pl = o.plan, used = 0;
+  var us = pl && pl.surplus.filter(function (x) { return x.unsure; })[0];
+  if (us) { // 可能有人在等但寫法不同、不確定:先不分也不上現貨,維持待到貨,請老闆確認
+    var nk = cp_(k); nk.到貨狀態 = '待到貨'; nk.可出貨 = 'N'; nk.到貨操作人 = ''; nk.到貨時間 = ''; put_('庫存進貨', k._r, nk);
+    log_(who, '庫存待確認', kid + ' ' + k.品名, '可能有訂單在等(寫法不同,不確定),維持待到貨:' + us.unsure.join('、'));
+    return '❓ ' + k.品名 + (k.規格 ? '(' + k.規格 + ')' : '') + ' 可能有訂單在等,但商品或規格寫法不同、不確定是不是同一個,所以先維持「待到貨」,沒有分給訂單也沒有上現貨:\n・' + us.unsure.join('\n・') + '\n請確認後再處理(要分給哪張訂單或確定上現貨,可以跟我說)。';
+  }
   if (pl && pl.assign.length) pl.assign.forEach(function (a) { used += Number(a.qty); });
   if (!used) { stockMove_(k, q); return ''; }
   var t = arrApply_([{ assign: pl.assign, surplus: [], skip: [], unk: [], cb: [], cost: {} }], '庫存進貨 ' + kid + ' 照下單順序分給在等的訂單', who);
@@ -3111,13 +3117,22 @@ function arrPlan_(items, opt) {
       var tx = String(ords[String(x.訂單ID)].下單時間 || ''), ty = String(ords[String(y.訂單ID)].下單時間 || '');
       return tx < ty ? -1 : tx > ty ? 1 : (String(x.訂單ID) < String(y.訂單ID) ? -1 : 1);
     });
+    // 不確定的(規格寫法不同、舊商品頁)排在裡面:自動入帳時整項先不分,列出可能在等的訂單請老闆確認,避免跳過先下單的客人
+    var unsure = cand.filter(function (l) { return arrEq_(l, a, prods) !== 'exact'; });
+    if (unsure.length && opt && opt.auto) {
+      var ul = cand.slice(0, 8).map(function (l) { var o = ords[String(l.訂單ID)]; return l.訂單ID + ' ' + buyerName_(o, mem) + '(' + String(o.下單時間 || '').slice(5, 10) + (arrEq_(l, a, prods) !== 'exact' ? ',' + (l.品名 || '') + (l.規格 ? ' ' + l.規格 : '') : '') + ')×' + (Number(l.數量) - (taken[l.訂單ID + '|' + l.商品ID] || 0)); });
+      var tsu = a.lots && a.lots.length ? cbTake_(a.lots, left) : null;
+      plan.surplus.push({ pid: a.pid, spec: a.spec, qty: left, price: tsu && tsu.cost !== '' ? tsu.cost : a.price, cw: tsu ? tsu.parts : [], name: a.name, unsure: ul });
+      msg.push('・' + a.name + (a.spec ? '(' + a.spec + ')' : '') + ' 到 ' + a.qty + ' 件\n  ❓ 可能有人在等(寫法不同,不確定),先不分:' + ul.join('、'));
+      return;
+    }
     // 照下單先後分:先下單的先拿;到貨數不夠這位客人的數量就拆單(先到幾件算幾件,剩下的留在原本的順位繼續等),不會跳給後面的客人
     cand.forEach(function (l) {
       if (left <= 0) return;
       var k = l.訂單ID + '|' + l.商品ID, q = Number(l.數量) - (taken[k] || 0), o = ords[String(l.訂單ID)], who = buyerName_(o, mem), take = Math.min(q, left);
       var tk = a.lots ? cbTake_(a.lots, take) : null; left -= take; taken[k] = (taken[k] || 0) + take;
       plan.assign.push({ oid: String(l.訂單ID), pid: String(l.商品ID), name: a.name, spec: a.spec, qty: take, who: who, cost: tk ? tk.cost : '', cw: tk ? tk.parts : [] });
-      got.push('  ✔ ' + l.訂單ID + ' ' + who + ' ×' + take + (take < q ? '(訂 ' + q + ' 件,先到 ' + take + ' 件,剩 ' + (q - take) + ' 件繼續等)' : ''));
+      got.push('  ✔ ' + l.訂單ID + ' ' + who + ' ×' + take + (take < q ? '(訂 ' + q + ' 件,先到 ' + take + ' 件,剩 ' + (q - take) + ' 件繼續等)' : '') + (arrEq_(l, a, prods) !== 'exact' ? ' ⚠️寫法不同(' + (l.品名 || '') + (l.規格 ? ' ' + l.規格 : '') + '),請確認是同一個' : ''));
     });
     if (left > 0) { var ts = a.lots && a.lots.length ? cbTake_(a.lots, left) : null; plan.surplus.push({ pid: a.pid, spec: a.spec, qty: left, price: ts && ts.cost !== '' ? ts.cost : a.price, cw: ts ? ts.parts : [], name: a.name }); got.push(opt && opt.auto ? '  ❓ 沒有訂單在等 ×' + left + '(先不上現貨,待確認)' : '  ➕ 現貨庫存 ×' + left); }
     msg.push('・' + a.name + (a.spec ? '(' + a.spec + ')' : '') + ' 到 ' + a.qty + ' 件' + (a.price !== '' ? ',進價 ' + a.price : '') + '\n' + (got.join('\n') || '  (沒有待到貨的訂單)'));
@@ -3140,15 +3155,15 @@ function arrSpN_(s) { return String(s || '').replace(/[\s\/／|｜#＃]+/g, '').
 function arrSz_(s) { var m = String(s || '').match(/(?:EU\s*)?(\d{2})(?!\d)/i); return m ? m[1] : ''; }
 function arrEq_(l, a, prods) {
   var lp = bp_(l.商品ID), ls = String(l.規格 || ''), as = String(a.spec || '');
-  if (lp === a.pid) return ls === as || (!!as && arrSpN_(ls) === arrSpN_(as)) || (!as && !!prods[lp] && !specs_(prods[lp]).length); // 商品現在沒有規格:舊訂單殘留的規格(例 PD3)也算同一個
+  if (lp === a.pid) return ls === as ? 'exact' : ((!!as && arrSpN_(ls) === arrSpN_(as)) || (!as && !!prods[lp] && !specs_(prods[lp]).length)) ? 'fuzzy' : false; // 規格寫法不同/舊訂單殘留規格(例 PD3):可能是同一個,但不確定
   var p = prods[lp], ap = prods[a.pid]; if (!p || !ap) return false;
   var sku = cbSku_(ap.名稱); if (!sku || cbSku_(p.名稱) !== sku) return false;
   var ak = as.lastIndexOf(' / '), lk = ls.lastIndexOf(' / ');
   var asz = arrSz_(ak >= 0 ? as.slice(ak + 3) : as), lsz = arrSz_(lk >= 0 ? ls.slice(lk + 3) : ls);
   if (!asz || asz !== lsz) return false;
   var ac = ak >= 0 ? as.slice(0, ak) : cbColorOf_(ap.名稱, ''), lc = lk >= 0 ? ls.slice(0, lk) : cbColorOf_(p.名稱, '');
-  if (!String(ac).trim() && !String(lc).trim()) return true;
-  return !!String(ac).trim() && !!String(lc).trim() && cbSameClr_(ac, lc);
+  if (!String(ac).trim() && !String(lc).trim()) return 'fuzzy';
+  return (!!String(ac).trim() && !!String(lc).trim() && cbSameClr_(ac, lc)) ? 'fuzzy' : false; // 同貨號的舊商品:可能是同一個,但不確定
 }
 /** 找到貨要入帳的那一列:原本那列還沒到就用它;已經到了(先前拆過單)就找同一張訂單、同商品同規格、還在等的那一列 */
 function arrLine_(oid, pid) {
@@ -3190,7 +3205,7 @@ function arrApply_(plans, why, who) {
         '廠商付款ID': '', '到貨操作人': hold ? '' : WHO, '到貨時間': hold ? '' : now_(), '日期': today_(), '建立人': WHO, '出貨單ID': '' };
       put_('庫存進貨', 0, row); if (!hold) stockMove_(row, s.qty); cbLink_('K|' + id, s.cw);
       log_(WHO, '新增庫存進貨', id + ' ' + p.名稱, s.qty + ' 件' + (s.spec ? ',規格 ' + s.spec : '') + (hold ? ',沒有訂單在等,待確認是否上架(' + WHY + ',未加入現貨)' : ',已到貨(' + WHY + ',庫存 +' + s.qty + ')'));
-      if (hold) { nHold += s.qty; holdTx.push(id + ' ' + p.名稱 + (s.spec ? '(' + s.spec + ')' : '') + ' ×' + s.qty); } else nSur += s.qty;
+      if (hold) { nHold += s.qty; holdTx.push(id + ' ' + p.名稱 + (s.spec ? '(' + s.spec + ')' : '') + ' ×' + s.qty + (s.unsure ? '\n   可能在等的訂單(寫法不同,請確認):' + s.unsure.join('、') : '')); } else nSur += s.qty;
     });
   });
   pend.forEach(function (pl) { cbInnCost_(pl.cost); });
@@ -3198,7 +3213,7 @@ function arrApply_(plans, why, who) {
   if (!plans) arrSave_([]);
   var nt = Object.keys(arrived).length ? notifyArrival_(arrived) : { sent: 0, noLine: 0, failed: 0 };
   var t = '✅ 已入帳:客訂到貨 ' + nAs + ' 筆' + (nSur ? '、轉入現貨庫存 ' + nSur + ' 件' : '') + '。';
-  if (nHold) t += '\n❓ 多出 ' + nHold + ' 件沒有訂單在等,沒有自動上現貨:\n・' + holdTx.join('\n・') + '\n要上架請到後台「訂單明細」把這筆【庫存】改成「已到貨」;不要的請到「庫存表」刪除。';
+  if (nHold) t += '\n❓ 這 ' + nHold + ' 件沒有自動分給訂單、也沒有上現貨(沒有訂單在等,或在等的訂單寫法不同不確定):\n・' + holdTx.join('\n・') + '\n要上架請到後台「訂單明細」把這筆【庫存】改成「已到貨」;不要的請到「庫存表」刪除。';
   if (Object.keys(arrived).length) t += '\n已通知客人 ' + nt.sent + ' 位' + (nt.noLine ? ',' + nt.noLine + ' 位沒有 LINE/Email 請自行聯絡' : '') + '。';
   if (miss.length) t += '\n⚠️ 這些已被別人處理或找不到,略過:' + miss.join('、');
   return t;

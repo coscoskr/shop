@@ -206,7 +206,7 @@ ok(L('O11', 'P296').arrival_status === '已到貨' && sent.some(x => x.to === 'U
 const K296 = DB['庫存進貨'].filter(k => k.product_id === 'P296');
 ok(K296.length === 1 && Number(K296[0].qty) === 2 && K296[0].arrival_status === '待到貨', 'surplus kept as 庫存進貨 待到貨 (waiting for boss) ' + JSON.stringify(K296.map(k => k.arrival_status)));
 ok(P296.on_sale === 'N' && P296.close_date === '2026-11-01', 'off/closed product NOT auto relisted');
-ok(sent.some(x => x.to === 'UYIXUAN0001' && /沒有訂單在等/.test(x.text) && /沒有自動上現貨/.test(x.text)) && !sent.some(x => /有現貨可以販售/.test(x.text)), '乙瑄 and admin asked whether to list the surplus');
+ok(sent.some(x => x.to === 'UYIXUAN0001' && /沒有訂單在等/.test(x.text) && /也沒有上現貨/.test(x.text)) && !sent.some(x => /有現貨可以販售/.test(x.text)), '乙瑄 and admin asked whether to list the surplus');
 const shop = (await (async () => { const rt = createRuntime({ H: code.H, tableData: load(), kv: KV, props: PROPS, fetchMap: {} }); Object.assign(globalThis, rt.globals); code.__reset(); return code.INTERNAL.shopData_(); })());
 const sp = shop.products.find(p => p.id === 'P296');
 ok(!sp || !sp.ready, 'storefront shows no ready stock for the held surplus ' + JSON.stringify(sp && { ready: sp.ready, stock: sp.stock }));
