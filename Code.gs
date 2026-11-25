@@ -3120,7 +3120,7 @@ function arrSpN_(s) { return String(s || '').replace(/[\s\/／|｜#＃]+/g, '').
 function arrSz_(s) { var m = String(s || '').match(/(?:EU\s*)?(\d{2})(?!\d)/i); return m ? m[1] : ''; }
 function arrEq_(l, a, prods) {
   var lp = bp_(l.商品ID), ls = String(l.規格 || ''), as = String(a.spec || '');
-  if (lp === a.pid) return ls === as || (!!as && arrSpN_(ls) === arrSpN_(as));
+  if (lp === a.pid) return ls === as || (!!as && arrSpN_(ls) === arrSpN_(as)) || (!as && !!prods[lp] && !specs_(prods[lp]).length); // 商品現在沒有規格:舊訂單殘留的規格(例 PD3)也算同一個
   var p = prods[lp], ap = prods[a.pid]; if (!p || !ap) return false;
   var sku = cbSku_(ap.名稱); if (!sku || cbSku_(p.名稱) !== sku) return false;
   var ak = as.lastIndexOf(' / '), lk = ls.lastIndexOf(' / ');
