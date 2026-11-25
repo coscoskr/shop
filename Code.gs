@@ -1233,7 +1233,7 @@ function pickPurchase_(keys) {
 }
 /** 批次修改勾選品項:到貨狀態(可 LINE/Email 通知)與廠商、成本、含稅、貨源(只改有填的欄位;已記錄付款的品項不能改廠商/成本/貨源) */
 function adminLineInfo(tk, keys, d) {
-  var u = me_(tk), done = 0, infoDone = 0, skip = [], arrived = {};
+  var u = me_(tk), done = 0, infoDone = 0, skip = [], arrived = {}, kArr = [], kMsg = [];
   d = d || {};
   if (d.arr && ['待到貨', '已到貨', '已出貨'].indexOf(d.arr) < 0) throw new Error('到貨狀態不正確');
   lk_(function () {
@@ -1251,7 +1251,7 @@ function adminLineInfo(tk, keys, d) {
         else {
           n.到貨狀態 = d.arr; n.可出貨 = d.arr === '已到貨' ? 'Y' : 'N'; n.到貨操作人 = u.acc; n.到貨時間 = now_(); if (d.arr !== '待到貨' && sh !== '庫存進貨') ordOk_(n, u.acc); touched = true;
           log_(u.acc, '到貨', tag, '到貨:' + l.到貨狀態 + '→' + d.arr + '(批次)');
-          if (sh === '庫存進貨') stockMove_(l, d.arr === '已到貨' ? Number(l.數量) : -Number(l.數量));
+          if (sh === '庫存進貨') { if (d.arr === '已到貨') kArr.push(String(l.訂單ID)); else stockMove_(l, -Number(l.數量)); }
           if (sh !== '庫存進貨' && (d.arr === '已出貨' || String(l.到貨狀態) === '已出貨')) (synced = synced || {})[String(l.訂單ID)] = 1;
           else if (d.arr === '已到貨') { (arrived[String(l.訂單ID)] = arrived[String(l.訂單ID)] || []).push(l.品名); cbPendSettle_([{ pid: l.商品ID, spec: l.規格, qty: l.數量 }], u.acc); }
         }
@@ -1267,6 +1267,7 @@ function adminLineInfo(tk, keys, d) {
       if (touched) { put_(sh, l._r, n); done++; }
     });
     if (synced) Object.keys(synced).forEach(function (oid) { syncOrderStatus_(oid, u.acc); });
+    kArr.forEach(function (kid) { var t = kFifo_(kid, u.acc); if (t) kMsg.push(t); }); // 庫存改成已到貨:先照下單順序分給在等的訂單,剩下的才是現貨
     // 改名後同步出貨單的「品項」文字
     if (Object.keys(ren).length) rows_('出貨單').forEach(function (s) {
       var rr = ren[String(s.出貨單ID)]; if (!rr) return;
@@ -1276,7 +1277,7 @@ function adminLineInfo(tk, keys, d) {
     });
     log_(u.acc, '批次修改', '', '共 ' + done + ' 筆' + (skip.length ? ';略過:' + skip.join('、') : '') + ';內容:' + ['到貨=' + (d.arr || ''), '廠商=' + vendor, '貨源=' + src, '成本=' + (cost === null ? '' : cost), '含稅=' + (d.tax || '')].join(','));
   });
-  var r = purchaseList_(); r.msg = '已修改 ' + done + ' 筆' + (skip.length ? ',略過 ' + skip.length + ' 筆:\n' + skip.join('\n') : '');
+  var r = purchaseList_(); r.msg = '已修改 ' + done + ' 筆' + (skip.length ? ',略過 ' + skip.length + ' 筆:\n' + skip.join('\n') : '') + (kMsg.length ? '\n\n' + kMsg.join('\n\n') : '');
   if (d.notify && Object.keys(arrived).length) { var nt = notifyArrival_(arrived); r.msg += '\n通知:成功 ' + nt.sent + '、無 LINE/Email ' + nt.noLine + '、失敗 ' + nt.failed; }
   return r;
 }
@@ -1367,7 +1368,7 @@ function stockView_() {
 function adminStockView(tk) { me_(tk); return stockView_(); }
 /** 新增一筆「庫存進貨」:跟客訂分開記錄,可和訂單明細一起勾選做廠商付款;改成已到貨時才會加進商品庫存 */
 function adminAddStockIn(tk, d) {
-  var u = me_(tk); d = d || {};
+  var u = me_(tk), km = ''; d = d || {};
   lk_(function () {
     var p = rows_('商品').filter(function (x) { return String(x.商品ID) === String(d.pid); })[0];
     if (!p) throw new Error('請選擇商品');
@@ -1384,10 +1385,29 @@ function adminAddStockIn(tk, d) {
       '廠商': t_(d.vendor, 60) || String(inn.廠商 || ''), '成本': cost === '' ? (inn.成本 === undefined ? '' : inn.成本) : cost, '成本含稅': d.tax === 'Y' ? 'Y' : (d.tax === 'N' ? 'N' : (inn.成本含稅 || 'N')), '貨源': t_(d.src, 60) || String(inn.貨源 || ''),
       '廠商付款ID': '', '到貨操作人': arrived ? u.acc : '', '到貨時間': arrived ? now_() : '', '日期': today_(), '建立人': u.acc, '出貨單ID': '' };
     put_('庫存進貨', 0, row);
-    if (arrived) stockMove_(row, qty);
-    log_(u.acc, '新增庫存進貨', id + ' ' + p.名稱, qty + ' 件' + (sp ? ',規格 ' + sp : '') + (arrived ? ',已到貨(庫存 +' + qty + ')' : ''));
+    log_(u.acc, '新增庫存進貨', id + ' ' + p.名稱, qty + ' 件' + (sp ? ',規格 ' + sp : '') + (arrived ? ',已到貨' : ''));
+    if (arrived) km = kFifo_(id, u.acc);
   });
-  return stockView_();
+  var r = stockView_(); if (km) r.msg = km;
+  return r;
+}
+/** 庫存進貨 kid 剛變成「已到貨」:先照下單先後分給在等這個商品(同規格)的訂單並通知客人,剩下的才加進現貨。
+   全部分完就刪掉這筆庫存進貨;分掉一部分就把數量改成剩下的。回傳說明文字(沒有人在等回 '') */
+function kFifo_(kid, who) {
+  var k = rows_('庫存進貨').filter(function (x) { return String(x.訂單ID) === String(kid); })[0];
+  if (!k) return '';
+  var q = Number(k.數量), o = { auto: true, head: '庫存轉給在等的訂單' };
+  arrPlan_([{ pid: String(k.商品ID), spec: String(k.規格 || ''), qty: q, price: k.成本 }], o);
+  var pl = o.plan, used = 0;
+  if (pl && pl.assign.length) pl.assign.forEach(function (a) { used += Number(a.qty); });
+  if (!used) { stockMove_(k, q); return ''; }
+  var t = arrApply_([{ assign: pl.assign, surplus: [], skip: [], unk: [], cb: [], cost: {} }], '庫存進貨 ' + kid + ' 照下單順序分給在等的訂單', who);
+  var left = q - used;
+  k = rows_('庫存進貨').filter(function (x) { return String(x.訂單ID) === String(kid); })[0];
+  if (left > 0) { var n = cp_(k); n.數量 = left; put_('庫存進貨', k._r, n); stockMove_(n, left); }
+  else { sh_('庫存進貨').deleteRow(k._r); cbUnlinkK_(String(kid)); }
+  log_(who, '庫存分給訂單', kid + ' ' + k.品名, '照下單順序分給在等的訂單 ' + used + ' 件' + (left > 0 ? ',剩 ' + left + ' 件加進現貨' : ',全部分完(這筆庫存進貨已移除)'));
+  return '📦 ' + k.品名 + (k.規格 ? '(' + k.規格 + ')' : '') + ' 有訂單在等,已照下單順序先分給訂單 ' + used + ' 件' + (left > 0 ? ',剩 ' + left + ' 件加進現貨' : '') + '\n' + pl.assign.map(function (a) { return '・' + a.oid + ' ' + a.who + ' ×' + a.qty; }).join('\n') + '\n' + t;
 }
 function deleteStockIn_(u, id) {
   var l = rows_('庫存進貨').filter(function (x) { return String(x.訂單ID) === String(id); })[0];
@@ -3139,9 +3159,9 @@ function arrLine_(oid, pid) {
   return ls.filter(function (x) { return bp_(x.商品ID) === bp_(pid) && String(x.規格 || '') === String(l.規格 || '') && wait(x); })[0] || null;
 }
 /** 套用所有待確認的到貨計畫(plans 有給時只套用指定的計畫,不動待確認清單) */
-function arrApply_(plans, why) {
+function arrApply_(plans, why, who) {
   var pend = plans || arrPend_(); if (!pend.length) return '目前沒有待確認的到貨(可能已超過 6 小時失效),請重新轉傳。';
-  var arrived = {}, nAs = 0, nSur = 0, nHold = 0, holdTx = [], miss = [], WHO = why ? '酷柏到貨' : '到貨助理', WHY = why || 'LINE 轉傳到貨通知';
+  var arrived = {}, nAs = 0, nSur = 0, nHold = 0, holdTx = [], miss = [], WHO = who || (why ? '酷柏到貨' : '到貨助理'), WHY = why || 'LINE 轉傳到貨通知';
   var meta = null;
   pend.forEach(function (pl) {
     pl.assign.forEach(function (a) {

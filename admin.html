@@ -2126,7 +2126,7 @@ function skSpecs() {
 document.addEventListener('change', function (e) { if (e.target.id === 'skp') skSpecs(); });
 document.addEventListener('submit', function (e) {
   var f = e.target; if (f.id !== 'skf') return; e.preventDefault();
-  call('adminAddStockIn', T, { pid: f.pid.value, spec: f.spec.value, qty: f.qty.value, vendor: f.vendor.value, cost: f.cost.value, src: f.src.value, arrived: f.arrived.checked }).then(function (d) { SK = d; PVDIRTY = true; P = null; drawStock(); refreshProducts(); }).catch(fail('#ske'));
+  call('adminAddStockIn', T, { pid: f.pid.value, spec: f.spec.value, qty: f.qty.value, vendor: f.vendor.value, cost: f.cost.value, src: f.src.value, arrived: f.arrived.checked }).then(function (d) { SK = d; PVDIRTY = true; P = null; drawStock(); refreshProducts(); if (d && d.msg) tell(d.msg); }).catch(fail('#ske'));
 });
 function refreshProducts() { call('adminInit', T).then(function (d) { P = d.products; }).catch(function () {}); }
 document.addEventListener('click', function (e) {
