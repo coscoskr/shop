@@ -100,4 +100,21 @@ ok(L('O4', 'P097~39').arrival_status === '已到貨' && setv('酷柏對照 6291|
 ok(L('O5', 'P232~39').arrival_status === '已到貨' && setv('酷柏對照 5946|20763') === 'P232|39', 'old listing 復古四季德訓鞋#Sand matched, not Chestnut / 黑色現貨 P308');
 r = await post({ type: 'arrival', batch: 'c4', items: [ it(6290, 21600, 'UGG OZLANA毛絨厚底兩穿鞋（OZ3009）#BLACK', 'EU39', 1) ] });
 ok(r.body.pending >= 1 && !setv('酷柏對照 6290|21600'), 'a color the shop never listed (BLACK) stays pending');
+
+// 6) 店面在後台手動到貨 → 待對應裡同一件扣掉(不會再入帳);LINE「X刪」只移除那一項
+const setPend = (a) => { const r = DB['設定'].find(x => x.key === '酷柏待對應'); if (r) r.value = JSON.stringify(a); else DB['設定'].push({ key: '酷柏待對應', value: JSON.stringify(a) }); };
+const pend = () => JSON.parse(setv('酷柏待對應') || '[]');
+setPend([
+  { proid: '6299', specid: '1', title: 'UGG OZLANA毛絨厚底兩穿鞋（OZ3009）#TAN', spec: 'EU40', single: 0, qty: 1, price: 1300, code: 'Q', lots: [[1, 1300, 'w1']] },
+  { proid: '7461', specid: '2', title: '【澳洲】ALO Aspire Tank (W2675RG)', spec: 'Black/White／XS', single: 0, qty: 1, price: 1661, code: 'J', cand: [], lots: [[1, 1661, 'w2']] },
+  { proid: '7468', specid: '3', title: '【澳洲】ALO Sock (A0480U)', spec: 'White/Black／S', single: 0, qty: 1, price: 893, code: 'K', cand: [], lots: [[1, 893, 'w3']] },
+]);
+run((I) => I.cbPendSettle_([{ pid: 'P097~40', spec: '40', qty: 1 }], 'cow'));
+ok(pend().length === 2 && !pend().some(x => x.code === 'Q'), 'manual arrival in admin of P097 40 removes the matching 酷柏 pending item');
+run((I) => I.cbPendSettle_([{ pid: 'P095~40', spec: '40', qty: 1 }], 'cow'));
+ok(pend().length === 2, 'manual arrival of a different product/color leaves pending alone');
+let a = run((I) => I.arrText_('UADMIN', 'J刪 K 刪除'));
+ok(a.r && /已從待對應移除/.test(a.r.reply) && pend().length === 0, 'LINE "J刪 K 刪除" removes only those items: ' + (a.r && a.r.reply));
+a = run((I) => I.arrText_('UOTHER', 'J刪'));
+ok(a.r === null, 'non-admin cannot remove pending items');
 console.log(fails ? fails + ' FAILED' : 'ALL PASS'); process.exit(fails ? 1 : 0);
