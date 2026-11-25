@@ -1908,7 +1908,8 @@ function deleteShip_(u, sid) {
   var s = rows_('出貨單').filter(function (x) { return String(x.出貨單ID) === sid; })[0];
   if (!s) throw new Error('找不到出貨單 ' + sid);
   var f = FLOW[s.付款方式] || [];
-  if (f.indexOf(s.狀態) >= si_(s.付款方式)) throw new Error('出貨單 ' + sid + ' 已出貨,無法刪除,請先把狀態改回出貨前');
+  // 賣貨便「已退回」(客人未取貨、貨已退回,沒有收到款)可以直接刪除,品項回到未出貨讓客人重新申請出貨
+  if (!(String(s.狀態) === '已退回' && s.付款方式 === '賣貨便') && f.indexOf(s.狀態) >= si_(s.付款方式)) throw new Error('出貨單 ' + sid + ' 已出貨,無法刪除;如果是客人未取貨退回,請先把狀態改成「已退回」再刪除');
   if (String(s.發票號碼 || '')) throw new Error('出貨單 ' + sid + ' 已開立發票(' + s.發票號碼 + '),不能刪除');
   var snap = { ship: cp_(s), lines: rows_('訂單明細').filter(function (l) { return String(l.出貨單ID) === sid; }).map(cp_) };
   rows_('訂單明細').forEach(function (l) {
