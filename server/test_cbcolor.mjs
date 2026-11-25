@@ -80,4 +80,24 @@ run((I) => { I.cbBindDo_({ acc: 't' }, 'P335', { proid: 7006, title: 'UGG OZLANA
   I.cbBindDo_({ acc: 't' }, 'P335', { proid: 7004, title: 'UGG OZLANA雙帶羊毛拖鞋（OZ3010）#GREY', single: false, rows: [{ specid: 9201, cspec: '#GREY 灰 / EU40' }] }); });
 const binds = run((I) => I.cbBinds_('P335')).r;
 ok(binds.filter(b => b.proid === '7006' || b.proid === '7004' || b.proid === '7008' || b.proid === '7007').length === 4, 'one COS product lists bindings from 4 酷柏 colors: ' + binds.map(b => b.proid).join(','));
+
+// 5) 舊商品:品名「品名#顏色」、規格只寫尺寸數字(39)、品名沒有貨號 → 也要用品名+顏色+尺寸對到(OZ3009 #TAN、OZ1023 Sand 實際案例)
+DB['商品'].push({ id: 'P095', name: '毛絨厚底兩穿鞋#CHOCOLATE', categories: '', sale_type: '預購', price: 2100, stock: null, specs: '39|36|38|40', on_sale: 'N', brand: 'UGG' });
+DB['商品'].push({ id: 'P097', name: '毛絨厚底兩穿鞋#TAN', categories: '', sale_type: '預購', price: 2100, stock: null, specs: '39|38|40|36|37', on_sale: 'N', brand: 'UGG' });
+DB['商品'].push({ id: 'P238', name: '毛絨兩穿平底鞋#TAN', categories: '', sale_type: '預購', price: 2100, stock: null, specs: '40|38|39', on_sale: 'N', brand: 'UGG' });
+DB['商品'].push({ id: 'P232', name: '復古四季德訓鞋#Sand', categories: '', sale_type: '預購', price: 2600, stock: null, specs: '40|39', on_sale: 'N', brand: 'UGG' });
+DB['商品'].push({ id: 'P229', name: '復古四季德訓鞋#Chestnut', categories: '', sale_type: '預購', price: 2600, stock: null, specs: '37|38|39', on_sale: 'N', brand: 'UGG' });
+DB['商品'].push({ id: 'P308', name: '復古四季德訓鞋（OZ1023）黑色 EU40', categories: '', sale_type: '現貨', price: 2600, stock: 1, specs: '', on_sale: 'Y', brand: 'UGG' });
+['P095','P097','P238','P232','P229','P308'].forEach(p => DB['商品_內部'].push({ product_id: p, vendor: '酷柏', cost: 1300, cost_tax_incl: 'N', source: '澳洲', locked: 'N' }));
+order('O4', '2026-10-21 10:00:00', 'U4'); order('O5', '2026-10-08 10:00:00', 'U5');
+line('O4', 'P097~39', '毛絨厚底兩穿鞋#TAN', '39', 1);
+line('O5', 'P232~39', '復古四季德訓鞋#Sand', '39', 1);
+r = await post({ type: 'arrival', batch: 'c3', items: [
+  it(6291, 21645, 'UGG OZLANA毛絨厚底兩穿鞋（OZ3009）#TAN', 'EU39（預售）', 1),
+  it(5946, 20763, 'UGG OZLANA復古四季德訓鞋（OZ1023）Sand', '11/20左右／EU39', 1),
+] });
+ok(L('O4', 'P097~39').arrival_status === '已到貨' && setv('酷柏對照 6291|21645') === 'P097|39', 'old listing 毛絨厚底兩穿鞋#TAN (spec 39) matched by name+color+size, not P095 CHOCOLATE / P238 平底');
+ok(L('O5', 'P232~39').arrival_status === '已到貨' && setv('酷柏對照 5946|20763') === 'P232|39', 'old listing 復古四季德訓鞋#Sand matched, not Chestnut / 黑色現貨 P308');
+r = await post({ type: 'arrival', batch: 'c4', items: [ it(6290, 21600, 'UGG OZLANA毛絨厚底兩穿鞋（OZ3009）#BLACK', 'EU39', 1) ] });
+ok(r.body.pending >= 1 && !setv('酷柏對照 6290|21600'), 'a color the shop never listed (BLACK) stays pending');
 console.log(fails ? fails + ' FAILED' : 'ALL PASS'); process.exit(fails ? 1 : 0);

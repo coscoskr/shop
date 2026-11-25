@@ -3374,7 +3374,8 @@ function cbSpecBy_(it, p) {
   var sl = specs_(p), z = cbSize_(it.spec); if (!z || !sl.length) return null;
   var c = cbColorOf_(it.title, it.spec);
   var h = sl.filter(function (x) {
-    var k = x.lastIndexOf(' / '), col = k >= 0 ? x.slice(0, k) : '', sz = cbSize_(k >= 0 ? x.slice(k + 3) : x);
+    var k = x.lastIndexOf(' / '), col = k >= 0 ? x.slice(0, k) : '', rest = k >= 0 ? x.slice(k + 3) : x;
+    var sz = cbSize_(rest) || ((String(rest).match(/^\s*(\d{2})\s*$/) || [])[1] || ''); // 舊商品規格常只寫「39」
     if (sz !== z) return false;
     return col ? !!c && cbSameClr_(c, col) : (!c || cbSameClr_(c, p.名稱));
   });
@@ -3384,9 +3385,9 @@ function cbGuess_(it, prods) {
   var t = cbG_(it.title), ks = cbG_(it.spec), plain = !!it.single, hit = [], sku = cbSku_(it.title);
   if (!t) return null;
   Object.keys(prods).forEach(function (pid) {
-    var p = prods[pid], nm = cbG_(p.名稱), br = cbG_(p.品牌);
+    var p = prods[pid], nm = cbG_(p.名稱), br = cbG_(p.品牌), nm0 = cbG_(String(p.名稱).replace(/\s*#.*$/, '')); // nm0:舊商品「品名#顏色」去掉顏色
     if (!(sku && cbSku_(p.名稱) === sku)) {                            // 貨號相同就算同款(COS 品名常多寫「三色」等字)
-      if (!nm || nm.length < 3 || t.indexOf(nm) < 0) return;         // 店內品名要完整出現在酷柏品名裡
+      if (!((nm && nm.length >= 3 && t.indexOf(nm) >= 0) || (nm0 && nm0.length >= 3 && t.indexOf(nm0) >= 0))) return; // 店內品名要完整出現在酷柏品名裡
       if (br && t.indexOf(br) < 0) return;                            // 有填品牌的話,品牌也要出現
     }
     var sl = specs_(p);
