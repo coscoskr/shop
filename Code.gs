@@ -3109,6 +3109,7 @@ function arrText_(uid, text) {
   }
   var who = arrWho_(uid), fw = function (pr) { cbTargets_().forEach(function (u) { if (u !== String(uid)) pushLine_(u, ('已由' + who + '回覆「' + text + '」處理:\n' + pr).slice(0, 4900)); }); return { reply: pr }; }; // 另一位不用重複處理
   if (/^([A-Za-z]\s*(刪除|删除|刪|删)[\s,，、]*)+$/.test(text) && cbPend_().length) return fw(cbPendDrop_(text, who));
+  if (/^[A-Za-z]$/.test(text) && cbPend_().length) return { reply: cbPendOne_(text.toUpperCase()) }; // 只回代號(例「A」):告訴她這項可以回什麼,不要丟給 AI 解析
   if ((/^([A-Za-z]\s*\d{1,2}[\s,，、]*)+$/.test(text) || /^[A-Za-z]\s*[+＋]/.test(text)) && cbPend_().length) return fw(cbPick_(text, who));
   // 2026-11-26 Jack:酷柏到貨多出來的貨(待到貨的庫存進貨)要管理員確認後才自動上架:回「上架 全部」或「上架 K0012 K0015」
   var mU = text.replace(/\s+/g, ' ').match(/^(?:全部上架|上架\s*全部|上架((?:[\s,，、]*K\d+)+))$/i);
@@ -3118,6 +3119,17 @@ function arrText_(uid, text) {
   if (cbOn_() && /酷柏|coolbau/i.test(text) && /到貨|到货|入庫|已到/.test(text)) return { reply: '🔄 這看起來是酷柏的到貨通知。酷柏到貨現在會自動同步入帳並通知客人,不需要再轉傳,這次沒有做任何變更。\n(其他廠商的到貨通知照常轉傳即可)' };
   if (/^取消$/.test(text)) { var n = arrPend_().length; arrSave_([]); return { reply: n ? '已取消,沒有任何變更。' : '目前沒有待確認的到貨。' }; }
   return { ai: true };
+}
+/** 只回一個代號(例「A」)時:列出這一項的選項 */
+function cbPendOne_(L) {
+  var x = cbPend_().filter(function (y) { return y.code === L; })[0];
+  if (!x) return '目前待對應裡沒有「' + L + '」。回「酷柏」可以看全部待對應的品項。';
+  var prods = {}; rows_('商品').forEach(function (p) { prods[String(p.商品ID)] = p; });
+  var c = (x.cand || []).filter(function (c) { return prods[c[0]]; });
+  return L + '｜' + x.title + (x.spec && !x.single ? '(' + x.spec + ')' : '') + ' ×' + x.qty + '\n請在代號後面加數字回覆:\n' +
+    c.map(function (c, k) { return '・' + L + (k + 1) + ' → 入帳到 ' + c[0] + ' ' + String(prods[c[0]].名稱) + (c[1] ? '(' + c[1] + ')' : ''); }).join('\n') + (c.length ? '\n' : '') +
+    (x.np && prods[x.np.pid] ? '・' + L + '+ → 在 ' + x.np.pid + ' 新增規格「' + x.np.name + '」並入帳\n' : '') +
+    '・' + L + '0 → 都不是(先不入帳)\n・' + L + '刪 → 已在後台手動處理/不用入帳,從待對應移除';
 }
 /** 酷柏到貨多出來、等確認上架的庫存進貨(待到貨,建立人 酷柏到貨) */
 function cbHeld_() { return rows_('庫存進貨').filter(function (k) { return String(k.到貨狀態) === '待到貨' && String(k.建立人) === '酷柏到貨'; }); }
