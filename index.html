@@ -275,7 +275,9 @@ google.script.run.withSuccessHandler(function (d) {
   try { var q1 = new URLSearchParams(location.search), c1 = q1.get('c'), b1 = q1.get('b');
     if (c1 && (D.cats.some(function (x) { return x === c1 || x.indexOf(c1 + '/') === 0; }) || (c1.charAt(0) === '@' && D.products.some(function (p) { return catHit(p.cats, c1, p); })))) cat = c1;
     if (b1) b1.split(',').forEach(function (b) { if (b && D.products.some(function (p) { return p.brand === b; })) FIL.brands[b] = true; }); } catch (e1) {}
+  var RV = loadView();
   nav(); grid();
+  if (RV) afterView(RV);
   if (BOOT.token) memLoad(function () { show(memList()); hlOrder(); });
   else if (PEND_S || HL_O || /[?&]m=1/.test(location.search)) { if (LT) { mt = LT; memLoad(function () { show(memList()); hlOrder(); }); } else show(memLogin()); }
   try { var pid0 = new URLSearchParams(location.search).get('p'); if (pid0 && !BOOT.token) { var pp0 = byId(pid0); if (pp0) { cur = pp0; dq = 1; show(detail(cur)); } } } catch (e0) {}
@@ -331,6 +333,34 @@ function goLogin() {
   if (D && D.line && D.line.liff) { location.href = 'https://liff.line.me/' + D.line.liff; return; }
   google.script.run.withSuccessHandler(function (u) { location.href = u; }).withFailureHandler(function () { show(loginHtml()); }).lineStart();
 }
+/* 重新整理後停在原來的地方:搜尋字、排序、每頁數量、頁數、篩選、捲動位置、打開中的商品都記在這個分頁(sessionStorage),
+   重新整理時還原;分類與品牌本來就記在網址(?c= ?b=)。新開分頁或從別的連結進來就不會帶舊狀態 */
+var VIEWP = '', VIEWT = 0, VIEWH = false;
+try { if ('scrollRestoration' in history) history.scrollRestoration = 'manual'; } catch (e) {}
+function saveView() {
+  if (!window.D || !D.products) return;
+  var dl = document.getElementById('dlg'), p = dl && dl.open ? VIEWP : '';
+  try { sessionStorage.setItem('view', JSON.stringify({ q: q, SORT: SORT, PER: PER, PAGE: PAGE, FIL: { type: FIL.type, min: FIL.min, max: FIL.max, avail: FIL.avail }, y: window.scrollY || 0, p: p, path: location.pathname + location.search })); } catch (e) {}
+}
+function loadView() {
+  try {
+    var v = JSON.parse(sessionStorage.getItem('view') || 'null'); if (!v || typeof v !== 'object') return null;
+    if (v.path !== location.pathname + location.search) return null; // 網址不一樣(例如點了別的分享連結)就不還原
+    q = String(v.q || ''); var qi = $('#q'); if (qi) qi.value = q;
+    if (['', 'pa', 'pd', 'nm'].indexOf(v.SORT) >= 0) SORT = v.SORT;
+    if ([12, 24, 48, 96].indexOf(+v.PER) >= 0) PER = +v.PER;
+    PAGE = Math.max(1, +v.PAGE || 1);
+    if (v.FIL) { FIL.type = v.FIL.type || ''; FIL.min = v.FIL.min == null ? '' : v.FIL.min; FIL.max = v.FIL.max == null ? '' : v.FIL.max; FIL.avail = !!v.FIL.avail; }
+    return v;
+  } catch (e) { return null; }
+}
+function afterView(v) {
+  var y = +v.y || 0; if (y) { var go = function () { window.scrollTo(0, y); }; go(); setTimeout(go, 150); setTimeout(go, 600); }
+  if (v.p && !/[?&](p|m|o|s|code)=/.test(location.search)) { var pp = byId(v.p); if (pp) { cur = pp; dq = 1; show(detail(cur)); } }
+}
+window.addEventListener('scroll', function () { clearTimeout(VIEWT); VIEWT = setTimeout(saveView, 200); }, { passive: true });
+window.addEventListener('pagehide', saveView);
+document.addEventListener('close', function (e) { if (e.target && e.target.id === 'dlg') { VIEWP = ''; saveView(); } }, true);
 function urlCat() { try { var u = new URL(location.href), bs = Object.keys(FIL.brands).filter(function (k) { return FIL.brands[k]; }); if (cat) u.searchParams.set('c', cat); else u.searchParams.delete('c'); if (bs.length) u.searchParams.set('b', bs.join(',')); else u.searchParams.delete('b'); if (u.href !== location.href) history.replaceState(null, '', u.pathname + u.search + u.hash); } catch (e) { } }
 function nav() {
   setLg(); urlCat();
@@ -386,7 +416,7 @@ function grid() {
       '<div class="nm">' + bn(p) + '</div><div><span class="pr">' + money(p.price) + '</span></div><div class="tg">' + (so ? '已售完' : tag(p)) + '</div>' + (clTxt(p) && !so ? '<div class="tg" style="color:#d64545">' + clTxt(p) + '</div>' : '') +
       (p.tiers.length ? '<div class="tg">' + p.tiers[0].min + ' 件起 ' + money(p.tiers[0].price) + '/件</div>' : '') + '</div>';
   }).join('') : '<p>找不到符合的商品,換個關鍵字或篩選條件試試。</p>';
-  drawTl(all.length); drawPg(pages);
+  drawTl(all.length); drawPg(pages); saveView();
 }
 function drawTl(n) {
   var t = $('#tl'), fn = filN(), so = [['', '商品排序'], ['pa', '價格:低到高'], ['pd', '價格:高到低'], ['nm', '名稱排序']], pp = [12, 24, 48, 96];
@@ -505,7 +535,7 @@ function fireworks(t) {
     t.animate([{ boxShadow: '0 0 0 0 rgba(255,210,31,.9), 0 6px 24px rgba(255,168,0,.5)' }, { boxShadow: '0 0 0 22px rgba(255,210,31,0), 0 6px 30px rgba(255,168,0,.8)' }], { duration: 900, iterations: 2 });
   } catch (x) {}
 }
-function show(h) { setLg(); var d = $('#dlg'); d.innerHTML = h; if (!d.open) d.showModal(); d.setAttribute('tabindex', '-1'); try { d.focus({ preventScroll: true }); } catch (x) {} d.style.pointerEvents = 'none'; setTimeout(function () { d.style.pointerEvents = ''; }, 350); if (d.querySelector('#lga')) prepLogin(); }
+function show(h) { if (!VIEWH) VIEWP = ''; VIEWH = false; setLg(); var d = $('#dlg'); d.innerHTML = h; if (!d.open) d.showModal(); d.setAttribute('tabindex', '-1'); try { d.focus({ preventScroll: true }); } catch (x) {} d.style.pointerEvents = 'none'; setTimeout(function () { d.style.pointerEvents = ''; }, 350); if (d.querySelector('#lga')) prepLogin(); }
 function prepLogin() {
   if (D && D.line && D.line.liff) { var a0 = $('#lga'); if (a0) { a0.href = 'https://liff.line.me/' + D.line.liff; a0.removeAttribute('aria-disabled'); a0.textContent = '使用 LINE 登入'; } return; }
   google.script.run.withSuccessHandler(function (u) { var a = $('#lga'); if (a) { a.href = u; a.removeAttribute('aria-disabled'); a.textContent = '使用 LINE 登入'; } })
@@ -556,7 +586,7 @@ function spImg(p, u) {
 }
 document.addEventListener('click', function (e) { var b = e.target.closest && e.target.closest('.sgb'); if (b && !b.disabled) spSet(b.dataset.sg, b.dataset.v); });
 function detail(p) {
-  SPC = ''; SPZ = '';
+  SPC = ''; SPZ = ''; VIEWP = p.id; VIEWH = true; setTimeout(saveView, 0);
   var t = p.tiers.map(function (x) { return '買 ' + x.min + ' 件以上,每件 ' + money(x.price); }).join('<br>');
   return '<div class="tb">' + (!LT && D.line && D.line.on ? '<button type="button" class="lgb" data-a="lgd">LINE 登入</button>' : '') + '<button type="button" class="xb" data-a="x" aria-label="關閉">✕</button></div><h2>' + bn(p) + '</h2>' + (p.imgs && p.imgs.length ? '<img class="big" id="bigimg" src="' + esc(p.imgs[0]) + '" alt="點圖片可放大" data-a="zoom" data-i="0" referrerpolicy="no-referrer"><div class="zh">點圖片可放大</div>' + (p.imgs.length > 1 ? '<div class="th">' + p.imgs.map(function (u, k) { return '<img src="' + esc(u) + '" referrerpolicy="no-referrer" alt="商品圖片 ' + (k + 1) + '" data-a="bigimg" data-i="' + k + '" data-u="' + esc(u) + '" class=""' + (k ? '' : 'on') + '">'; }).join('') + '</div>' : '') : '') +
     '<p><span class="pr">' + money(p.price) + '</span> <span class="tg">' + tag(p) + '</span></p>' + (clTxt(p) ? '<p class="tg" style="color:#d64545;font-weight:700">' + clTxt(p) + ',關團後就不能下單了</p>' : '') + (t ? '<p class="tg">' + t + '</p>' : '') +
