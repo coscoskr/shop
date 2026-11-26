@@ -48,7 +48,7 @@ begin
 
   if n_items = 0 then return 'nothing'; end if;
   msg := '⏰ 酷柏到貨還有沒處理完的(每天 10:00、17:00 提醒,處理完就不會再提醒)' || E'\n\n' || array_to_string(lines, E'\n');
-  msg := replace(msg, '__held', E'\n📦 多出來、沒有客人在等的貨(還沒上架):確認要上架回「上架 全部」,只上架其中幾筆回「上架 K0012 K0015」(用上面的編號);不要的到「庫存表」刪除');
+  msg := replace(msg, '__held', E'\n📦 多出來、沒有客人在等的貨(還沒上架):確認要上架回「上架 全部」,只上架其中幾筆回「上架 K0012 K0015」(用上面的編號);已經人工處理好的回「已處理 全部」或「已處理 K0012」結案(不上架、不再提醒)');
   msg := left(msg, 4900);
 
   select array_agg(distinct t) into targets from (
