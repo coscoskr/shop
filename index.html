@@ -274,7 +274,13 @@ google.script.run.withSuccessHandler(function (d) {
   // 分享的網址:?c=分類(含 @品牌/xxx、@現貨、@預購 這類自動分類)、?b=篩選的品牌(逗號分隔)
   try { var q1 = new URLSearchParams(location.search), c1 = q1.get('c'), b1 = q1.get('b');
     if (c1 && (D.cats.some(function (x) { return x === c1 || x.indexOf(c1 + '/') === 0; }) || (c1.charAt(0) === '@' && D.products.some(function (p) { return catHit(p.cats, c1, p); })))) cat = c1;
-    if (b1) b1.split(',').forEach(function (b) { if (b && D.products.some(function (p) { return p.brand === b; })) FIL.brands[b] = true; }); } catch (e1) {}
+    if (b1) b1.split(',').forEach(function (b) { if (b && D.products.some(function (p) { return p.brand === b; })) FIL.brands[b] = true; });
+    var g1 = function (k) { return q1.get(k) || ''; };
+    if (g1('q')) { q = g1('q').slice(0, 60); var qi0 = $('#q'); if (qi0) qi0.value = q; }
+    if (g1('t') === '現貨' || g1('t') === '預購') FIL.type = g1('t');
+    if (/^\d+$/.test(g1('min'))) FIL.min = g1('min'); if (/^\d+$/.test(g1('max'))) FIL.max = g1('max');
+    if (g1('av') === '1') FIL.avail = true;
+    if (['pa', 'pd', 'nm'].indexOf(g1('sort')) >= 0) SORT = g1('sort'); } catch (e1) {}
   var RV = loadView();
   nav(); grid();
   if (RV) afterView(RV);
@@ -361,7 +367,11 @@ function afterView(v) {
 window.addEventListener('scroll', function () { clearTimeout(VIEWT); VIEWT = setTimeout(saveView, 200); }, { passive: true });
 window.addEventListener('pagehide', saveView);
 document.addEventListener('close', function (e) { if (e.target && e.target.id === 'dlg') { VIEWP = ''; saveView(); } }, true);
-function urlCat() { try { var u = new URL(location.href), bs = Object.keys(FIL.brands).filter(function (k) { return FIL.brands[k]; }); if (cat) u.searchParams.set('c', cat); else u.searchParams.delete('c'); if (bs.length) u.searchParams.set('b', bs.join(',')); else u.searchParams.delete('b'); if (u.href !== location.href) history.replaceState(null, '', u.pathname + u.search + u.hash); } catch (e) { } }
+function urlCat() { try { var u = new URL(location.href), bs = Object.keys(FIL.brands).filter(function (k) { return FIL.brands[k]; }); if (cat) u.searchParams.set('c', cat); else u.searchParams.delete('c'); if (bs.length) u.searchParams.set('b', bs.join(',')); else u.searchParams.delete('b');
+  // 搜尋字、現貨/預購、價格範圍、只看有貨、排序也放進網址,複製網址給別人點開就是同一個畫面
+  var sp = function (k, v) { if (v !== '' && v != null && v !== false) u.searchParams.set(k, String(v)); else u.searchParams.delete(k); };
+  sp('q', q); sp('t', FIL.type); sp('min', FIL.min); sp('max', FIL.max); sp('av', FIL.avail ? '1' : ''); sp('sort', SORT);
+  if (u.href !== location.href) history.replaceState(null, '', u.pathname + u.search + u.hash); } catch (e) { } }
 function nav() {
   setLg(); urlCat();
   var big = [], subs = {};
@@ -416,7 +426,7 @@ function grid() {
       '<div class="nm">' + bn(p) + '</div><div><span class="pr">' + money(p.price) + '</span></div><div class="tg">' + (so ? '已售完' : tag(p)) + '</div>' + (clTxt(p) && !so ? '<div class="tg" style="color:#d64545">' + clTxt(p) + '</div>' : '') +
       (p.tiers.length ? '<div class="tg">' + p.tiers[0].min + ' 件起 ' + money(p.tiers[0].price) + '/件</div>' : '') + '</div>';
   }).join('') : '<p>找不到符合的商品,換個關鍵字或篩選條件試試。</p>';
-  drawTl(all.length); drawPg(pages); saveView();
+  drawTl(all.length); drawPg(pages); urlCat(); saveView();
 }
 function drawTl(n) {
   var t = $('#tl'), fn = filN(), so = [['', '商品排序'], ['pa', '價格:低到高'], ['pd', '價格:高到低'], ['nm', '名稱排序']], pp = [12, 24, 48, 96];
