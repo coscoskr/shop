@@ -95,6 +95,10 @@ r = await post({ type: 'arrival', batch: 'g4', items: [it(6300, 9300, 'UGG OZLAN
 ok(r.body.pending === 1 && !K('P048').length, 'size-only (no color) → waits for confirmation');
 const ask3 = sent.filter(x => /店面到貨上架確認/.test(x.text)).map(x => x.text)[0] || '';
 ok(!/\+ → 在 P048/.test(ask3), 'no new-spec suggestion without a color');
+const code3 = (ask3.match(/([A-Z])｜UGG OZLANA哈林頓/) || [])[1];
+a = run((I) => I.arrText_('UNEW0000001', code3));
+ok(a.r && a.r.reply && new RegExp(code3 + '刪 → ').test(a.r.reply) && new RegExp(code3 + '0 → ').test(a.r.reply) && !a.r.ai, 'bare code (例「A」) → replies with that item\'s options, not AI: ' + (a.r && a.r.reply));
+ok(!run((I) => I.arrText_('UOTHER00001', code3)).r, 'bare code from non-admin ignored');
 
 // 6) 已綁定的下次直接入帳(不用再確認)
 r = await post({ type: 'arrival', batch: 'g5', items: [Object.assign(it(7010, 9006, 'UGG OZLANA雙帶羊毛拖鞋（OZ3010）#BLACK', 'EU37', 3), { lots: [[3, 600, 'w-g5']] })] });

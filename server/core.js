@@ -220,9 +220,11 @@ export async function runAfter(after, env) {
 export async function handleWebhook({ rawBody, signature, db, env }) {
   let events = [];
   const jobs = [], after = [];
+  let envP = env; // LINE_MSG_TOKEN 存在資料表 props,不在 Edge Function Secrets:回覆管理員時要用合併後的設定,否則會「lineReply: no token」沒有回覆
   const ok = await db.withTx(async (tx) => {
     const { tableData, kv, props: dbProps } = await tx.loadAll();
     const props = Object.assign({}, env.props || {}, dbProps);
+    envP = Object.assign({}, env, { props });
     const secret = props.LINE_MSG_SECRET || '';
     if (!secret || !signature) return false;
     const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
@@ -272,7 +274,7 @@ export async function handleWebhook({ rawBody, signature, db, env }) {
     await runAfter(after, env);
     console.log('webhook jobs', JSON.stringify(jobs.map((j) => j.kind + ':' + (j.imageId ? 'img' : 'txt'))));
     for (const job of jobs) {
-      try { if (job.kind === 'reply') await lineReply(job, job.text, env); else if (job.kind === 'cb') await runCoolbauJob({ db, env, job }); else await runArrivalJob(job, { db, env }); } catch (e) { console.error('arrival job error', e); await lineReply(job, '處理失敗,請稍後再試或到後台手動處理。', env).catch(() => {}); }
+      try { if (job.kind === 'reply') await lineReply(job, job.text, envP); else if (job.kind === 'cb') await runCoolbauJob({ db, env: envP, job }); else await runArrivalJob(job, { db, env: envP }); } catch (e) { console.error('arrival job error', e); await lineReply(job, '處理失敗,請稍後再試或到後台手動處理。', envP).catch(() => {}); }
     }
   })();
   return { ok: true, later };
