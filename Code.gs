@@ -2227,6 +2227,12 @@ function adminShipHistory(tk, sid) {
     var at = String(r.時間).slice(0, 16), who = String(r.帳號), act = String(r.動作), note = String(r.內容);
     if (act === '建立出貨單') { ev.push({ at: at, who: who, st: PAY[s.付款方式] || '', text: '', kind: 'st' }); }
     else if (act === '回報匯款') { var m0 = note.match(/後五碼\s*(\S+?),/); ev.push({ at: at, who: who, st: '已匯款待查帳', text: '客人回報匯款' + (m0 ? ',後五碼 ' + m0[1] : ''), kind: 'up' }); }
+    else if (act === '刷卡成功' || act === '無卡分期付款成功') {
+      // 綠界付款通知:顯示綠界訂單編號、授權碼、付款時間
+      var tn = note.match(/綠界(?:訂單編號|交易)\s*(\d+)/), ac = note.match(/授權碼\s*(\S+)/), pd = note.match(/付款時間\s*(\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2})/);
+      ev.push({ at: at, who: who, st: '已刷卡待出貨', text: (act === '無卡分期付款成功' ? '無卡分期付款成功' : '刷卡成功') + (tn ? ',綠界訂單編號 ' + tn[1] : '') + (ac ? ',授權碼 ' + ac[1] : '') + ',付款時間 ' + (pd ? pd[1] : String(r.時間).slice(0, 19)), kind: 'up' });
+    }
+    else if (act === '刷卡失敗') ev.push({ at: at, who: who, st: '', text: '刷卡失敗:' + note, kind: 'note' });
     else if (act === '修改出貨單') {
       var m = note.match(/狀態:([^→;]*)→([^;(]*)/), rest = note.replace(/狀態:[^;]*;?/, '').replace(/\(批次\)/, '').replace(/^;|;$/g, '').trim();
       if (m) ev.push({ at: at, who: who, st: m[2].trim(), text: '', kind: 'up' });
@@ -2400,7 +2406,7 @@ function payDone_(p, test) {
     if (Number(p.TradeAmt) !== Math.round(Number(s.總額))) { log_('綠界', '刷卡金額不符', sid, '應付 ' + s.總額 + ',實收 ' + p.TradeAmt + ' 交易 ' + p.TradeNo); major_('綠界', '刷卡金額不符', sid, '應付 ' + s.總額 + ' 實收 ' + p.TradeAmt, p); out = 'amount'; return; }
     if (String(s.狀態) !== '待刷卡') { out = 'dup'; return; }
     var n = cp_(s); n.狀態 = '已刷卡待出貨'; n.匯款日期 = String(p.PaymentDate || '').slice(0, 10).replace(/\//g, '-'); put_('出貨單', s._r, n);
-    log_('綠界', /BNPL/i.test(String(p.PaymentType || '')) ? '無卡分期付款成功' : '刷卡成功', sid, (test ? '(測試環境)' : '') + String(p.PaymentType || '') + ' 金額 ' + p.TradeAmt + ' 綠界交易 ' + p.TradeNo + ' 卡號末四碼 ' + (p.card4no || ''));
+    log_('綠界', /BNPL/i.test(String(p.PaymentType || '')) ? '無卡分期付款成功' : '刷卡成功', sid, (test ? '(測試環境)' : '') + String(p.PaymentType || '') + ' 金額 ' + p.TradeAmt + ' 綠界訂單編號 ' + p.TradeNo + (p.auth_code ? ' 授權碼 ' + p.auth_code : '') + ' 付款時間 ' + String(p.process_date || p.PaymentDate || '') + (p.card4no ? ' 卡號末四碼 ' + p.card4no : '') + ' 特店交易編號 ' + String(p.MerchantTradeNo || ''));
     String(s.訂單ID).split(',').forEach(function (oid) { syncOrderStatus_(oid, '綠界'); });
     awardCredits_(sid, '綠界');
     out = 'ok';
