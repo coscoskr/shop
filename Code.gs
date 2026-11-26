@@ -321,17 +321,27 @@ function pub_(p) {
 }
 function getShop() {
   var c = CacheService.getScriptCache();
-  try { var hit = c.get('shop1'); if (hit) { var h = JSON.parse(hit); h.products = (h.products || []).filter(function (p) { return !closed_({ 關團日期: p.close }); }); return h; } } catch (e) {}
+  try { var hit = c.get('shop1'); if (hit) { var h = JSON.parse(hit); h.products = (h.products || []).filter(function (p) { return !closed_({ 關團日期: p.close }); }); xmasOn_(h.xmas); return h; } } catch (e) {}
   var r = shopData_();
   try { var js = JSON.stringify(r); if (js.length < 90000) c.put('shop1', js, 120); } catch (e) {}
+  xmasOn_(r.xmas);
   return r;
 }
+/** 聖誕版官網:設定頁的開始/結束時間(台灣時間)內自動切換成聖誕版,時間到自動換回一般版 */
+function xmasCfg_(st) {
+  var g = function (k) { return st[k] === undefined ? String(defSet_(k)) : String(st[k] || ''); };
+  return { s: closeAt_(g('聖誕活動開始').trim()), e: closeAt_(g('聖誕活動結束').trim()),
+    marq: g('聖誕跑馬燈').split('\n').map(function (x) { return x.trim(); }).filter(Boolean).slice(0, 8),
+    cats: g('聖誕專區分類').split(/[,，、]/).map(function (x) { return x.trim(); }).filter(Boolean) };
+}
+function xmasOn_(x) { if (!x) return; var n = Date.now(); x.on = !!x.s && !!x.e && n >= x.s && n < x.e; }
 function shopData_() {
   var st = settings_(); RDYC_ = null;
   return { payLive: prop_('ECPAY_PAY_LIVE') === '1', logiLive: prop_('ECPAY_LOGI_LIVE') === '1', instLive: prop_('ECPAY_INST_LIVE') === '1', bnplLive: prop_('ECPAY_BNPL_LIVE') === '1',
     store: st.店名 || '', notice: st.公告 || '', creditNote: st.購物金注意事項 === undefined ? defSet_('購物金注意事項') : String(st.購物金注意事項 || ''), free: Number(st.免運門檻) || 0, fee: Number(st.宅配運費) || 0, feeCvs: Number(st.店到店運費) || 0,
     line: { on: lineOn_(), liff: prop_('LIFF_ID'), friend: String(st.加好友連結 || ''), community: String(st.LINE社群連結 || '') },
     biz: { name: String(st.公司名稱 || ''), addr: String(st.公司地址 || ''), tax: /^\d+$/.test(String(st.統一編號 || '')) ? ('00000000' + st.統一編號).slice(-8) : String(st.統一編號 || ''), ig: String(st.IG連結 || '') },
+    xmas: xmasCfg_(st),
     cats: cats_(), products: rows_('商品').filter(onSale_).map(pub_)
   };
 }
@@ -2741,6 +2751,8 @@ var DEFAULT_SETTINGS = [
   ['發票開立通知內容', '🧾電子發票已開立\n\n出貨單號:{出貨單號}\n發票號碼:{發票號碼}\n開立日期:{發票日期}\n金額:NT$ {金額}\n\n發票已存在綠界載具(您的手機號碼)\n可以到會員專區的出貨單查看❤️\n{連結}'],
   ['到店通知內容', '📦 您的包裹已送達 {門市} 囉!\n出貨單號:{出貨單號}\n{付款提醒}請於 7 天內攜帶證件到門市取件,逾期會退回唷～'],
   ['寄件人姓名', ''], ['寄件人手機', ''],
+  ['聖誕活動開始', '2026-12-04 00:00'], ['聖誕活動結束', '2026-12-26 00:00'], ['聖誕專區分類', '交換禮物,聖誕限定'],
+  ['聖誕跑馬燈', '交換禮物專區上線:500/1000/2000 元三個價位任你挑\n12/20 前下單,聖誕節前送到(現貨或確定到貨的商品)\n點這裡逛聖誕專區'],
   ['可自取通知內容', '📢您的商品已經可以來自取囉!\n\n出貨單號:{出貨單號}\n\n請於營業時間前來取貨,有任何問題都歡迎聯繫我們唷～'],
   ['退回通知內容', '📢出貨單 {出貨單號} 因為太久沒有取貨,已被退回囉。\n\n請問您還需要這筆商品嗎?需要的話請直接回覆我們,我們再幫您重新安排出貨❤️\n(若不需要也請告訴我們一聲,謝謝您～)'],
   ['送達通知內容', '出貨單號 {出貨單號} 商品已送達,感謝您的購買!\n有任何問題隨時聯繫我們'],
@@ -4117,7 +4129,7 @@ function adminDeleteActivity(tk, id) {
   });
   return adminActivities(tk);
 }
-var SET_KEYS = ['店名', '店到店運費', '賣貨便運費', '宅配運費', '免運門檻', '匯款資訊', '公告', '購物金折抵級距', '購物金使用門檻', '購物金折抵上限', '購物金預設有效天數', '購物金注意事項', '到貨通知內容', '下單成功通知內容', '出貨通知內容', '出貨單成立通知內容', '賣貨便成立通知內容', '分享回饋通知內容', '可自取通知內容', '發票開立通知內容', '到店通知內容', '寄件人姓名', '寄件人手機', '退回通知內容', '送達通知內容', '未收到匯款通知內容', '物流追蹤連結', '加好友連結', '公司名稱', '公司地址', '統一編號', 'IG連結', 'LINE社群連結'];
+var SET_KEYS = ['店名', '店到店運費', '賣貨便運費', '宅配運費', '免運門檻', '匯款資訊', '公告', '購物金折抵級距', '購物金使用門檻', '購物金折抵上限', '購物金預設有效天數', '購物金注意事項', '到貨通知內容', '下單成功通知內容', '出貨通知內容', '出貨單成立通知內容', '賣貨便成立通知內容', '分享回饋通知內容', '可自取通知內容', '發票開立通知內容', '到店通知內容', '寄件人姓名', '寄件人手機', '退回通知內容', '送達通知內容', '未收到匯款通知內容', '物流追蹤連結', '加好友連結', '公司名稱', '公司地址', '統一編號', 'IG連結', 'LINE社群連結', '聖誕活動開始', '聖誕活動結束', '聖誕跑馬燈', '聖誕專區分類'];
 function defSet_(k) { var r = DEFAULT_SETTINGS.filter(function (x) { return x[0] === k; })[0]; return r ? r[1] : ''; }
 function adminSettings(tk) {
   me_(tk); var s = settings_(), o = {};
@@ -4131,6 +4143,8 @@ function adminSaveSettings(tk, v) {
     if (String(v.購物金折抵上限).trim() !== '' && !(Number(v.購物金折抵上限) >= 0)) throw new Error('購物金折抵上限請填數字,或留空代表不限制');
     if (String(v.購物金折抵級距 || '').trim() && !String(v.購物金折抵級距).trim().split(/[,，\s]+/).every(function (x) { return /^\d+=\d+$/.test(x); })) throw new Error('購物金折抵級距格式:滿多少=折多少,用逗號分隔,例如 500=50,1000=150;留空代表改用門檻+上限');
     ['加好友連結', 'IG連結', 'LINE社群連結'].forEach(function (k) { if (String(v[k] || '').trim() && !/^https:\/\//.test(String(v[k]).trim())) throw new Error(k + '需以 https:// 開頭'); });
+    ['聖誕活動開始', '聖誕活動結束'].forEach(function (k) { if (v[k] !== undefined && String(v[k]).trim() && !closeAt_(String(v[k]).trim())) throw new Error(k + '格式:yyyy-MM-dd HH:mm,例如 2026-12-04 00:00'); });
+    if (v.聖誕活動開始 !== undefined && String(v.聖誕活動開始).trim() && String(v.聖誕活動結束 || '').trim() && closeAt_(String(v.聖誕活動結束).trim()) <= closeAt_(String(v.聖誕活動開始).trim())) throw new Error('聖誕活動結束時間要晚於開始時間');
     var cur = rows_('設定'), ch = [];
     SET_KEYS.forEach(function (k) {
       if (v[k] === undefined) return;
