@@ -21,7 +21,7 @@ var H = {
   '固定支出': ['固定ID', '名稱', '金額', '備註', '啟用'],
   '人事': ['人員ID', '姓名', '薪資', '勞保', '健保', '勞退', '其他', '備註', '啟用'],
   '廠商付款': ['付款ID', '付款日期', '廠商', '金額', '匯款備註', '品項數', '應付成本', '品項', '建立人', '建立時間', '圖片'],
-  '出貨單': ['出貨單ID', '訂單ID', '狀態', '物流', '物流單號', '品項', '建立時間', '出貨時間', 'LINE ID', '姓名', '電話', '付款方式', '收件資訊', '備註', '商品金額', '優惠折抵', '購物金折抵', '運費', '總額', '付款連結', '匯款後五碼', '會員等級', '折抵明細', '配送方式', '購物金明細', '匯款日期', '收款帳號', '列印時間', '出貨單圖片', '發票號碼', '發票日期', '付款類型', '綠界物流ID'],
+  '出貨單': ['出貨單ID', '訂單ID', '狀態', '物流', '物流單號', '品項', '建立時間', '出貨時間', 'LINE ID', '姓名', '電話', '付款方式', '收件資訊', '備註', '商品金額', '優惠折抵', '購物金折抵', '運費', '總額', '付款連結', '匯款後五碼', '會員等級', '折抵明細', '配送方式', '購物金明細', '匯款日期', '收款帳號', '列印時間', '出貨單圖片', '發票號碼', '發票日期', '付款類型', '綠界物流ID', '匯款明細'],
   '會員': ['LINE ID', '暱稱', '頭像', '等級', '加入時間', '最近登入', '已加好友', '備註', '姓名', '電話', 'Email', '收件地址', '封鎖時間'],
   '購物金': ['序號', 'LINE ID', '發放時間', '金額', '剩餘', '到期日', '來源', '備註', '操作人', '訂單ID', '活動ID'],
   '等級': ['等級', '折扣率', '適用類別'],
@@ -66,7 +66,7 @@ function setup() {
   txt_('訂單明細', ['訂單ID', '商品ID', '出貨單ID']);
   txt_('廠商付款', ['付款ID', '付款日期']);
   txt_('庫存進貨', ['訂單ID', '商品ID', '日期', '出貨單ID']);
-  txt_('出貨單', ['出貨單ID', '訂單ID', '物流單號', '品項', '建立時間', '出貨時間', '電話', '收件資訊', '付款連結', '匯款後五碼', '匯款日期', '收款帳號', '列印時間', '出貨單圖片']);
+  txt_('出貨單', ['出貨單ID', '訂單ID', '物流單號', '品項', '建立時間', '出貨時間', '電話', '收件資訊', '付款連結', '匯款後五碼', '匯款日期', '收款帳號', '列印時間', '出貨單圖片', '匯款明細']);
   txt_('操作紀錄', ['時間']);
   if (!rows_('類別').length) CATS_DEFAULT.forEach(function (c) { put_('類別', 0, { '類別': c }); });
   ensureSettings_();
@@ -1063,7 +1063,7 @@ function shipObj_(r) {
   return { id: String(r.出貨單ID), oids: String(r.訂單ID).split(','), st: String(r.狀態), pay: String(r.付款方式), co: String(r.物流 || ''), no: String(r.物流單號 || ''), it: String(r.品項 || ''),
     cr: String(r.建立時間 || ''), at: String(r.出貨時間 || ''), name: String(r.姓名 || ''), phone: String(r.電話 || ''), ship: String(r.收件資訊 || ''), note: String(r.備註 || ''), inv: String(r.發票號碼 || ''), invd: String(r.發票日期 || ''), kind: String(r.付款類型 || ''), lgid: String(r.綠界物流ID || ''),
     sub: Number(r.商品金額), disc: Number(r.優惠折抵), cred: Number(r.購物金折抵), fee: Number(r.運費), total: Number(r.總額),
-    link: /^https:\/\//.test(String(r.付款連結)) ? String(r.付款連結) : '', last5: String(r.匯款後五碼 || ''), rdate: String(r.匯款日期 || ''), bank: String(r.收款帳號 || ''), pr: String(r.列印時間 || ''), img: String(r.出貨單圖片 || ''), method: String(r.配送方式 || ''), trk: shortTrack_(r) };
+    link: /^https:\/\//.test(String(r.付款連結)) ? String(r.付款連結) : '', last5: String(r.匯款後五碼 || ''), rdate: String(r.匯款日期 || ''), rparts: rparts_(r.匯款明細), bank: String(r.收款帳號 || ''), pr: String(r.列印時間 || ''), img: String(r.出貨單圖片 || ''), method: String(r.配送方式 || ''), trk: shortTrack_(r) };
 }
 function memberOrders(tk) {
   var ctx = mem_(tk), lm = lineMeta_(false), items = {}, sh = {};
@@ -1510,6 +1510,8 @@ var FLOW = {
   '付現金': ['待自取通知', '可自取', '已自取付款']
 };
 /** 出貨單沒填物流時的預設:賣貨便 → 7-11;宅配 → 新竹物流 */
+/** 出貨單的分筆匯款明細(JSON [[金額,後五碼,日期],...]) */
+function rparts_(v) { try { var a = JSON.parse(String(v || '') || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
 function defCo_(pay, method) { return pay === '賣貨便' ? '7-11' : method === '宅配' ? '新竹物流' : ''; }
 function lk_(fn) { var L = LockService.getScriptLock(); L.waitLock(20000); try { return fn(); } finally { L.releaseLock(); } }
 function ri_(pay) { return (pay === '賣貨便' || pay === '付現金') ? 0 : pay === '匯款' ? 2 : 1; }   // 可出貨的狀態位置
@@ -1834,7 +1836,12 @@ function adminUpdateShip(tk, sid, d) {
     }
     var link = t_(d.link, 500); if (link && !/^https:\/\//.test(link)) throw new Error('付款連結需以 https:// 開頭');
     var n = cp_(s);
-    n.付款方式 = payNew; n.狀態 = d.st; if (payChanged && payNew === '匯款') n.收款帳號 = String(settings_().匯款資訊 || ''); n.物流 = t_(d.co, 30) || defCo_(payNew, mNew); /* 賣貨便只寄 7-11、宅配用新竹物流 */ n.物流單號 = t_(d.no, 40); n.付款連結 = link; if (d.last5 !== undefined) n.匯款後五碼 = t_(d.last5, 5); if (d.rdate !== undefined) { var rd = String(d.rdate || ''); if (rd && !/^\d{4}-\d{2}-\d{2}$/.test(rd)) throw new Error('匯款日期格式不正確'); n.匯款日期 = rd; } n.收件資訊 = ship; n.備註 = t_(d.note, 200); n.電話 = t_(d.phone, 20) || s.電話;
+    n.付款方式 = payNew; n.狀態 = d.st; if (payChanged && payNew === '匯款') n.收款帳號 = String(settings_().匯款資訊 || ''); n.物流 = t_(d.co, 30) || defCo_(payNew, mNew); /* 賣貨便只寄 7-11、宅配用新竹物流 */ n.物流單號 = t_(d.no, 40); n.付款連結 = link; if (d.last5 !== undefined) n.匯款後五碼 = t_(d.last5, 5); if (d.rdate !== undefined) { var rd = String(d.rdate || ''); if (rd && !/^\d{4}-\d{2}-\d{2}$/.test(rd)) throw new Error('匯款日期格式不正確'); n.匯款日期 = rd; }
+    if (d.rparts !== undefined) { // 分多筆匯款:每筆 [金額, 後五碼, 日期];後五碼/匯款日期欄位用最後一筆
+      var rp = (Array.isArray(d.rparts) ? d.rparts : []).slice(0, 10).map(function (x) { var a = Math.round(Number(x && x[0]) || 0), l = t_(x && x[1], 5), dt = String(x && x[2] || ''); if (dt && !/^\d{4}-\d{2}-\d{2}$/.test(dt)) throw new Error('匯款日期格式不正確'); return [a, l, dt]; }).filter(function (x) { return x[0] > 0 || x[1] || x[2]; });
+      n.匯款明細 = rp.length ? JSON.stringify(rp) : '';
+      if (rp.length) { var lp = rp.slice().sort(function (a, b) { return a[2] < b[2] ? -1 : a[2] > b[2] ? 1 : 0; }).pop(); n.匯款後五碼 = lp[1] || n.匯款後五碼; n.匯款日期 = lp[2] || n.匯款日期; }
+    } n.收件資訊 = ship; n.備註 = t_(d.note, 200); n.電話 = t_(d.phone, 20) || s.電話;
     n.配送方式 = mNew; n.收件資訊 = ship;
     n.運費 = fee; n.總額 = Math.max(0, Number(s.商品金額) - Number(s.優惠折抵 || 0) - Number(s.購物金折抵 || 0)) + fee;
     if (d.img !== undefined) { var im = t_(d.img, 500); if (im && !/^https:\/\//.test(im)) throw new Error('出貨單圖片網址不正確'); n.出貨單圖片 = im; }

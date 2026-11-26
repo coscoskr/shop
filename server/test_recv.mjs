@@ -27,6 +27,10 @@ ok(r.ok && S().ship_method === '宅配' && /【宅配】台中市/.test(S().rece
 ok(S().carrier === '新竹物流', '宅配 → 物流 auto 新竹物流: ' + S().carrier);
 r = await call('adminUpdateShip', tk, 'S1', Object.assign({}, base, { fee: String(S().shipping), method: '宅配', rname: '王小明', addr: '台中市北區忠明五街20號', co: '黑貓', no: 'TN123', note: '備註X', phone: '0911222333', last5: '12345' }));
 ok(r.ok && S().carrier === '黑貓' && S().tracking_no === 'TN123' && S().note === '備註X' && S().phone === '0911222333' && S().remit_last5 === '12345', 'edit saves 物流/單號/備註/電話/後五碼 ' + JSON.stringify({ c: S().carrier, no: S().tracking_no, note: S().note, ph: S().phone, l5: S().remit_last5 }));
+r = await call('adminUpdateShip', tk, 'S1', Object.assign({}, base, { fee: String(S().shipping), method: '宅配', rname: '王小明', addr: '台中市北區忠明五街20號', co: '黑貓', no: 'TN123', rparts: [['2250', '70599', '2026-11-07'], ['1420', '70599', '2026-11-26']] }));
+ok(r.ok && JSON.parse(S().remit_parts).length === 2 && S().remit_date === '2026-11-26' && S().remit_last5 === '70599', 'split remittance saved ' + (r.error || S().remit_parts));
+r = await call('adminUpdateShip', tk, 'S1', Object.assign({}, base, { fee: String(S().shipping), method: '宅配', rname: '王小明', addr: '台中市北區忠明五街20號', co: '黑貓', no: 'TN123', rparts: [['1', '1', '2026/1/1']] }));
+ok(!r.ok && /日期/.test(r.error), 'bad split date rejected');
 r = await call('adminUpdateShip', tk, 'S1', Object.assign({}, base, { fee: String(S().shipping), method: '自取', rname: '王小明' }));
 ok(r.ok && S().receiver === '【自取】取貨人 王小明' && Number(S().shipping) === 0, 'to 自取 fee ' + S().shipping);
 r = await call('adminUpdateShip', tk, 'S1', Object.assign({}, base, { fee: '0', pay: '賣貨便', method: '店到店', cvs: '全家', store: '某店', rname: '王小明' }));
