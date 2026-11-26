@@ -3799,6 +3799,66 @@ function cbArrIn_(d) {
   log_('酷柏到貨', '收到到貨', t_(d.batch, 80), '自動入帳 ' + res.auto + ' 筆、多出待確認上架 ' + res.stock + ' 件、略過 ' + res.skip + '、待對應 ' + res.pending + ' 項');
   return res;
 }
+/* --- 酷柏到貨撤回 ---
+   酷柏送過到貨後,那邊又把批發單改回未到貨、取消、刪除或數量減少時,會送 {type:'revert', batch, revert:[{wid, at, qty, proid, specid, title, spec, why}]}。
+   ・還在「酷柏待對應」(還沒入帳):直接從待對應拿掉
+   ・入帳成庫存進貨(還沒分給客人):直接扣回(已到貨的同時扣現貨/庫存;已記錄廠商付款、現貨已經賣掉不夠扣的不動,列給管理員)
+   ・已分給客人的訂單品項:不自動改(客人可能已收到到貨通知、已排出貨單),列給管理員處理
+   自動扣回的那筆批發單記號改成 R|,之後酷柏真的到貨再送來時會重新入帳(不會被當成「之前已入帳」)。
+   回傳 {ok, reverted: 自動扣回件數, manual: [要人工處理的說明], none: 這邊本來就沒有入帳的件數} */
+function cbRevIn_(d) {
+  d = d || {};
+  var c = CacheService.getScriptCache(), bk = 'cbrev_' + t_(d.batch, 80);
+  if (d.batch) { var prev = c.get(bk); if (prev) { var pr = JSON.parse(prev); pr.dup = true; return pr; } } // 同一批重送:不重複扣
+  var WHO = '酷柏到貨撤回', res = { ok: true, reverted: 0, manual: [], none: 0 }, done = [], pe = cbPend_(), pch = false;
+  (Array.isArray(d.revert) ? d.revert : []).slice(0, 300).forEach(function (it) {
+    var w = String((it && it.wid) || ''), left = Math.floor(Number(it && it.qty)); if (!w || !(left >= 1)) return;
+    var nm = t_(it.title, 60) + (it.spec ? '(' + t_(it.spec, 40) + ')' : '') + '(酷柏批發單 ' + w + ',' + t_(it.why || '撤回', 20) + ')';
+    // 1. 還在待對應:拿掉
+    pe.forEach(function (x) {
+      (x.lots || []).forEach(function (t) { if (left > 0 && String(t[2]) === w && Number(t[0]) > 0) { var k = Math.min(left, Number(t[0])); t[0] = Number(t[0]) - k; x.qty = Math.max(0, Number(x.qty) - k); left -= k; res.reverted += k; pch = true; done.push('・' + nm + ' ×' + k + ':還沒入帳,已從待對應拿掉'); } });
+      x.lots = (x.lots || []).filter(function (t) { return Number(t[0]) > 0; });
+    });
+    // 2. 已入帳:照這筆批發單入帳到哪裡處理
+    var ks; try { ks = JSON.parse(c.get('cbw_' + w) || '[]'); } catch (e) { ks = []; }
+    var nks = ks.slice();
+    ks.forEach(function (lk, ix) {
+      if (left <= 0 || lk.indexOf('X|') === 0 || lk.indexOf('R|') === 0) return;
+      var parts; try { parts = JSON.parse(c.get('cbl_' + lk) || '[]'); } catch (e) { parts = []; }
+      var mine = 0; parts.forEach(function (p) { if (String(p[0]) === w) mine += Number(p[1]); });
+      var take = Math.min(left, mine > 0 ? mine : left);
+      if (lk.indexOf('K|') === 0) {
+        var kid = lk.slice(2), k = rows_('庫存進貨').filter(function (x) { return String(x.訂單ID) === kid; })[0];
+        if (!k) return; // 這筆庫存進貨已經分給訂單或被刪掉:沒有東西可以扣
+        if (k.廠商付款ID) { res.manual.push(nm + ' ×' + take + ':庫存進貨 ' + kid + ' 已記錄廠商付款 ' + k.廠商付款ID + ',請人工處理'); left -= take; return; }
+        var cut = Math.min(take, Number(k.數量));
+        if (k.到貨狀態 === '已到貨') {
+          var p = rows_('商品').filter(function (x) { return String(x.商品ID) === bp_(k.商品ID); })[0];
+          if (p && rdyIs_(p) && rdyQty_(rdyGet_(String(p.商品ID)), String(k.規格 || '')) < cut) { res.manual.push(nm + ' ×' + cut + ':庫存進貨 ' + kid + ' 的現貨已經賣掉,不夠扣,請人工處理'); left -= take; return; }
+          stockMove_(k, -cut);
+        }
+        if (cut >= Number(k.數量)) { sh_('庫存進貨').deleteRow(k._r); nks[ix] = 'R|' + kid; c.remove('cbl_' + lk); }
+        else { var n = cp_(k); n.數量 = Number(k.數量) - cut; put_('庫存進貨', k._r, n); c.put('cbl_' + lk, JSON.stringify(parts.map(function (p) { return String(p[0]) === w ? [p[0], Math.max(0, Number(p[1]) - cut), p[2]] : p; }).filter(function (p) { return Number(p[1]) > 0; })), CB_TTL_); nks[ix] = 'R|' + kid; }
+        log_(WHO, '扣回庫存進貨', kid + ' ' + k.品名, cut + ' 件(' + nm + ')' + (k.到貨狀態 === '已到貨' ? ',已從現貨/庫存扣回' : ',還沒上架'));
+        res.reverted += cut; left -= cut; done.push('・' + nm + ' ×' + cut + ':庫存進貨 ' + kid + ' 已扣回');
+        return;
+      }
+      var i = lk.indexOf('|'), oid = lk.slice(0, i), pid = lk.slice(i + 1);
+      var l = rows_('訂單明細').filter(function (x) { return String(x.訂單ID) === oid && String(x.商品ID) === pid; })[0];
+      if (!l || ['已到貨', '已出貨'].indexOf(String(l.到貨狀態)) < 0) return; // 已經改回去了
+      res.manual.push(nm + ' ×' + take + ':已分給訂單 ' + oid + ' ' + t_(l.品名, 40) + '(' + String(l.到貨狀態) + (l.出貨單ID ? ',出貨單 ' + l.出貨單ID : '') + '),客人可能已收到到貨通知,請確認後到後台改回未到貨並通知客人');
+      left -= take;
+    });
+    c.put('cbw_' + w, JSON.stringify(nks), CB_TTL_);
+    if (left > 0) res.none += left;
+  });
+  if (pch) cbPendSave_(pe.filter(function (x) { return Number(x.qty) > 0; }));
+  var t = '↩️ 酷柏到貨撤回(酷柏那邊改回未到貨或取消):' + (done.length ? '\n已自動扣回:\n' + done.join('\n') : '') + (res.manual.length ? '\n⚠️ 要人工處理:\n・' + res.manual.join('\n・') : '') + (res.none ? '\n這邊本來就沒有入帳的 ' + res.none + ' 件,不用處理。' : '');
+  if (done.length || res.manual.length) cbTell_(t);
+  if (d.batch) c.put(bk, JSON.stringify(res), 2592000);
+  log_(WHO, '收到到貨撤回', t_(d.batch, 80), '自動扣回 ' + res.reverted + ' 件、要人工處理 ' + res.manual.length + ' 項、本來沒入帳 ' + res.none + ' 件');
+  return res;
+}
 /** 給配對用:待對應的酷柏品項(每列:#編號|品名|規格|件數) */
 function cbPendList_() { return cbPend_().map(function (x, i) { return '#' + (i + 1) + '|' + x.title + '|' + x.spec + '|' + x.qty; }).join('\n'); }
 /* 對不上的酷柏品項:絕不自動選一個入帳。列出候選商品(AI 建議＋品牌/品名相近的),到貨管理員回代號(例 A1)或到後台商品「酷柏商品綁定」選,
