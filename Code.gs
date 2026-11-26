@@ -3083,7 +3083,7 @@ function cbHoldText_() {
 /** 管理員確認上架:待到貨 → 已到貨,先照下單順序分給在等的訂單,剩下的加進現貨並通知「有現貨可以販售」。ids 為 null 代表全部 */
 function cbHoldUp_(ids, uid) {
   var who = '到貨助理(' + String(settings_()['確認人員 ' + uid] || (String(settings_().到貨管理員LINE || '') === String(uid) ? '到貨管理員' : uid)) + ')';
-  var out = [], miss = [];
+  var out = [], miss = [], kept = [];
   lk_(function () {
     var h = cbHeld_(), want = ids ? ids.map(String) : null;
     if (want) want.forEach(function (id) { if (!h.some(function (k) { return String(k.訂單ID) === id; })) miss.push(id); });
@@ -3093,12 +3093,14 @@ function cbHoldUp_(ids, uid) {
       var n = cp_(k); n.到貨狀態 = '已到貨'; n.到貨操作人 = who; n.到貨時間 = now_(); put_('庫存進貨', k._r, n);
       log_(who, '確認上架', k.訂單ID + ' ' + k.品名, '酷柏到貨多出來的 ' + k.數量 + ' 件,管理員在 LINE 確認上架');
       var t = kFifo_(String(k.訂單ID), who);
+      if (/^❓/.test(t)) { kept.push(t); return; } // 可能有訂單在等(寫法不同):維持待到貨,不算上架
       out.push('・' + k.訂單ID + ' ' + k.品名 + (k.規格 ? '(' + k.規格 + ')' : '') + ' ×' + k.數量 + (t ? '\n  ' + t.split('\n')[0] : ''));
     });
   });
   var tell = RDYN_.length; cbRdyTell_(null);
-  if (!out.length) return (miss.length ? '找不到這些編號(可能已處理或不是酷柏多出來的貨):' + miss.join('、') + '\n' : '') + cbHoldText_();
-  return '✅ 已確認上架 ' + out.length + ' 筆:\n' + out.join('\n') + (tell ? '\n已通知「有現貨可以販售」。' : '') + (miss.length ? '\n找不到:' + miss.join('、') : '');
+  var kt = kept.length ? '\n\n' + kept.join('\n\n') : '';
+  if (!out.length) return (miss.length ? '找不到這些編號(可能已處理或不是酷柏多出來的貨):' + miss.join('、') + '\n' : '') + (kept.length ? kt.slice(2) : cbHoldText_());
+  return '✅ 已確認上架 ' + out.length + ' 筆:\n' + out.join('\n') + (tell ? '\n已通知「有現貨可以販售」。' : '') + (miss.length ? '\n找不到:' + miss.join('、') : '') + kt;
 }
 /** 給解析用的商品清單:商品ID|名稱|規格|待到貨件數(有待到貨的排前面) */
 function arrCands_() {
@@ -3232,7 +3234,7 @@ function arrApply_(plans, why, who) {
       if (!p) { miss.push(s.name + ' 現貨'); return; }
       var inn = rows_('商品_內部').filter(function (r) { return String(r.商品ID) === s.pid; })[0] || {};
       var id = seq_('庫存進貨', 'K');
-      // 酷柏自動入帳多出來(沒有訂單在等)的貨:不自動上現貨,先記成「待到貨」的庫存進貨,等老闆確認後在後台改成已到貨才上架
+      // 酷柏自動入帳多出來(沒有訂單在等)的貨:不自動上現貨,先記成「待到貨」的庫存進貨,等管理員在 LINE 回「上架」(或後台改成已到貨)才上架
       var hold = !!why;
       var row = { '訂單ID': id, '商品ID': s.pid, '品名': String(p.名稱), '規格': s.spec, '數量': s.qty, '到貨狀態': hold ? '待到貨' : '已到貨', '廠商': String(inn.廠商 || ''),
         '成本': s.price !== '' ? s.price : (inn.成本 === undefined ? '' : inn.成本), '成本含稅': inn.成本含稅 || 'N', '貨源': String(inn.貨源 || ''),
