@@ -1049,7 +1049,7 @@ document.addEventListener('submit', function (e) {
   var f = e.target; if (f.id !== 'cpf') return; e.preventDefault();
   var r = f.querySelector('input[name="pay"]:checked'); if (!r) { warn('請選擇付款方式'); return; }
   var id = f.dataset.id;
-  google.script.run.withSuccessHandler(function (d) { MD = d; var z = (d.ships || []).filter(function (x) { return x.id === id; })[0]; if (z) show(shipDetail(z)); toast('已更改付款方式'); })
+  google.script.run.withSuccessHandler(function (d) { MD = d; var z = (d.ships || []).filter(function (x) { return x.id === id; })[0]; if (z) show(shipDetail(z)); toast('已更改付款方式'); if (z && z.pay === '刷卡' && z.st === '待刷卡' && Number(z.total) > 0) goPay(z.id, PAYK[z.kind] ? z.kind : 'Credit'); })
     .withFailureHandler(function (er) { warn(er.message); }).memberChangePay(mt, id, { pay: r.value, kind: r.dataset.k || '', paytest: testOn() });
 });
 document.addEventListener('submit', function (e) {
@@ -1060,7 +1060,9 @@ document.addEventListener('submit', function (e) {
   var items = Object.keys(MSEL).map(function (k) { return { oid: k.split('|')[0], pid: k.split('|')[1] }; });
   $('#sfe').textContent = '';
   if (!SNONCE) SNONCE = nonce_();
-  google.script.run.withSuccessHandler(function (d) { SNONCE = ''; MD = d; MSEL = {}; MTAB = 's'; var ns = d.ships.filter(function (z) { return z.id === d.sid; })[0]; show(shipDetail(ns)); })
+  google.script.run.withSuccessHandler(function (d) { SNONCE = ''; MD = d; MSEL = {}; MTAB = 's'; var ns = d.ships.filter(function (z) { return z.id === d.sid; })[0]; show(shipDetail(ns));
+      // 選信用卡付款:出貨單建立後直接帶去綠界付款頁(不用再找「前往付款」按鈕);沒成功的話畫面上還有按鈕可以再按
+      if (ns && ns.pay === '刷卡' && ns.st === '待刷卡' && Number(ns.total) > 0) goPay(ns.id, PAYK[ns.kind] ? ns.kind : 'Credit'); })
     .withFailureHandler(function (er) { showErr('#sfe', er.message); }).memberCreateShip(mt, items, { pay: f.pay.value, method: mv0 === '賣貨便' ? '店到店' : mv0, rname: f.rname.value, cvs: f.cvs.value, store: f.store.value, addr: f.addr.value, credit: f.credit ? Number(f.credit.value) || 0 : 0, note: f.note.value, phone: f.phone.value, paytest: testOn(), nonce: SNONCE, kind: payKind(f), cvsid: f.cvsid ? f.cvsid.value : '' });
 });
 
