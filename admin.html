@@ -507,6 +507,15 @@ function prodView() {
   fb.addEventListener('input', function (e) { var k2 = e.target.dataset.k; if (!k2 || e.target.tagName !== 'INPUT') return; PF[k2] = e.target.value; var pos = e.target.selectionStart; prodView(); var el = document.querySelector('#pfb [data-k=' + k2 + ']'); if (el) { el.focus(); try { el.setSelectionRange(pos, pos); } catch (x) {} } });
   fb.addEventListener('change', function (e) { var k2 = e.target.dataset.k; if (k2 && e.target.tagName === 'SELECT') { PF[k2] = e.target.value; prodView(); } });
 }
+/* 下拉選單選到的文字可以一鍵複製(品牌、廠商等下拉選單本身不能反白複製) */
+function cpText(t, b) {
+  var done = function () { if (b) { var o = b.textContent; b.textContent = '已複製 ✓'; setTimeout(function () { b.textContent = o; }, 1200); } };
+  if (!t) { tell('還沒有選擇,沒有可以複製的內容'); return; }
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(done, function () { cpFallback(t); done(); }); else { cpFallback(t); done(); }
+}
+function cpFallback(t) { var x = document.createElement('textarea'); x.value = t; x.style.position = 'fixed'; x.style.opacity = '0'; document.body.appendChild(x); x.select(); try { document.execCommand('copy'); } catch (e) {} x.remove(); }
+document.addEventListener('click', function (e) { var b = e.target.closest && e.target.closest('[data-cp]'); if (!b) return; var el = document.getElementById(b.dataset.cp); if (!el) return;
+  var t = el.tagName === 'SELECT' ? (el.value ? el.options[el.selectedIndex].text : '') : el.value; cpText(String(t || '').trim(), b); });
 function brOpts(cur) { return '<option value="">(不指定品牌)</option>' + BL.map(function (x) { return '<option' + (x === cur ? ' selected' : '') + '>' + esc(x) + '</option>'; }).join(''); }
 function brandAdd() {
   var inp = $('#brnew'), v = inp.value.trim(), msg = $('#brmsg'); if (!v) { msg.className = 'er'; msg.textContent = '請先輸入新品牌'; return; }
@@ -635,7 +644,7 @@ function editProd(id) {
   var p = id ? P.filter(function (x) { return x.id === id; })[0] : { name: '', cats: [], type: '現貨', price: '', stock: '', arrival: '', close: '', desc: '', tiers: '', img: '', on: true, vendor: '', cost: '', taxIncl: false, source: '', specs: [] };
   var d = $('#dlg');
   d.innerHTML = '<h3>' + (id ? '編輯 ' + esc(p.id) : '新增商品') + '</h3><form id="pf"><div class="g" style="grid-template-columns:1fr 1fr">' +
-    '<div class="f"><span class="m">品牌(從清單選;清單沒有就在右邊空白格輸入新品牌,按「新增」)</span><div style="display:flex;gap:8px;margin-top:4px"><select name="brand" id="brsel" style="flex:1">' + brOpts(p.brand) + '</select><input name="newBrand" id="brnew" placeholder="新品牌:直接輸入" maxlength="40" autocomplete="off" style="flex:1"><button type="button" class="btn a" data-a="bradd">新增</button></div><span class="m" id="brmsg">輸入的品牌若和清單裡的只差大小寫(例:lloyd / LLOYD),會自動用清單裡的寫法。</span></div>' +
+    '<div class="f"><span class="m">品牌(從清單選;清單沒有就在右邊空白格輸入新品牌,按「新增」)</span><div style="display:flex;gap:8px;margin-top:4px"><select name="brand" id="brsel" style="flex:1">' + brOpts(p.brand) + '</select><button type="button" class="btn l s" data-cp="brsel" title="複製目前選的品牌名稱">複製</button><input name="newBrand" id="brnew" placeholder="新品牌:直接輸入" maxlength="40" autocomplete="off" style="flex:1"><button type="button" class="btn a" data-a="bradd">新增</button></div><span class="m" id="brmsg">輸入的品牌若和清單裡的只差大小寫(例:lloyd / LLOYD),會自動用清單裡的寫法。</span></div>' +
         '<div>' + fld('品名', 'name', p.name) + '<div style="margin-top:10px"><span class="m">規格(可新增,沒有上限;沒有規格就留空)</span><div id="spl"></div><button type="button" class="btn l s" data-a="spadd">+ 新增規格</button>' +
           '<div style="margin-top:10px;padding:10px;border:1px dashed #d9c9bd;border-radius:8px"><b style="font-size:13px">顏色 × 尺寸 快速產生</b><span class="m" style="display:block;font-size:12px;margin:2px 0 6px">輸入一個按 Enter(或「加入」),可加很多個;再按「加入組合」就會把每個顏色×尺寸加到上面的規格清單(原本的規格會保留)。不同顏色尺寸不同時,可以分次加入。</span>' +
           '<div class="spgr"><span>顏色</span><div id="spgcl" class="spgl"></div><input id="spgc" placeholder="例如:沙色"><button type="button" class="btn l s" data-a="spgi" data-k="c">加入</button></div>' +
@@ -652,7 +661,7 @@ function editProd(id) {
     '<label class="f">說明<textarea name="desc" rows="3">' + esc(p.desc) + '</textarea></label>' +
     '<div class="f"><span class="m">類別(可複選)</span>' + catGroups(p.cats) + '</div>' +
     '<label class="f"><input type="checkbox" name="on"' + (p.on ? ' checked' : '') + '> 上架(前台可見)</label></div>' +
-    '<fieldset><legend>內部資料(前台看不到)</legend><div class="g">' + '<label>廠商<select name="vendor">' + vopt(p.vendor, '(未指定)') + '</select></label>' + fld('貨源', 'source', p.source) + fld('成本', 'cost', p.cost, 'number') +
+    '<fieldset><legend>內部資料(前台看不到)</legend><div class="g">' + '<label>廠商<span style="display:flex;gap:6px"><select name="vendor" id="pvsel" style="flex:1">' + vopt(p.vendor, '(未指定)') + '</select><button type="button" class="btn l s" data-cp="pvsel" title="複製目前選的廠商名稱">複製</button></span></label>' + fld('貨源', 'source', p.source) + fld('成本', 'cost', p.cost, 'number') +
     '<label>成本是否含稅<select name="tax"><option value="N"' + (p.taxIncl ? '' : ' selected') + '>未稅</option><option value="Y"' + (p.taxIncl ? ' selected' : '') + '>含稅</option></select></label>' +
     '</div></fieldset>' +
     '<fieldset id="cbb"><legend>酷柏商品綁定(打好品名會自動找酷柏商品;按「儲存」一起綁定)</legend><div id="cbbl" class="m">' + (id ? '載入中…' : '') + '</div>' +
