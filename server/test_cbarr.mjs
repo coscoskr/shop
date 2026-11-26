@@ -210,6 +210,27 @@ ok(sent.some(x => x.to === 'UYIXUAN0001' && /沒有訂單在等/.test(x.text) &&
 const shop = (await (async () => { const rt = createRuntime({ H: code.H, tableData: load(), kv: KV, props: PROPS, fetchMap: {} }); Object.assign(globalThis, rt.globals); code.__reset(); return code.INTERNAL.shopData_(); })());
 const sp = shop.products.find(p => p.id === 'P296');
 ok(!sp || !sp.ready, 'storefront shows no ready stock for the held surplus ' + JSON.stringify(sp && { ready: sp.ready, stock: sp.stock }));
+// 2026-11-26 管理員在 LINE 確認上架:「上架 全部」/「上架 K…」→ 待到貨 → 已到貨、加進現貨、通知有現貨可以販售;非管理員無效
+ok(sent.some(x => x.to === 'UYIXUAN0001' && /上架 全部/.test(x.text)), 'hold message tells how to confirm by LINE');
+const kid = K296[0].stock_id || K296[0].order_id || Object.values(K296[0]).find(v => /^K\d+$/.test(String(v)));
+let rr = run((I) => I.arrText_('UFAKE000001', '上架 全部'));
+ok(!rr.r && DB['庫存進貨'].find(k => k.product_id === 'P296').arrival_status === '待到貨', 'non-admin cannot list surplus');
+rr = run((I) => I.arrText_('UYIXUAN0001', '待上架'));
+ok(rr.r && new RegExp(kid).test(rr.r.reply), 'list held surplus ' + (rr.r && rr.r.reply));
+rr = run((I) => I.arrText_('UYIXUAN0001', '上架 K99999'));
+ok(rr.r && /找不到/.test(rr.r.reply) && DB['庫存進貨'].find(k => k.product_id === 'P296').arrival_status === '待到貨', 'unknown id → nothing listed');
+sent.length = 0;
+rr = run((I) => I.arrText_('UYIXUAN0001', '上架 ' + kid));
+const K296b = DB['庫存進貨'].filter(k => k.product_id === 'P296');
+ok(rr.r && /已確認上架 1 筆/.test(rr.r.reply) && K296b.length === 1 && K296b[0].arrival_status === '已到貨', 'confirmed → 已到貨 ' + (rr.r && rr.r.reply));
+const shop2 = (await (async () => { const rt = createRuntime({ H: code.H, tableData: load(), kv: KV, props: PROPS, fetchMap: {} }); Object.assign(globalThis, rt.globals); code.__reset(); return code.INTERNAL.shopData_(); })());
+const sp2 = shop2.products.find(p => p.id === 'P296');
+ok(sp2 && sp2.ready, 'storefront shows ready stock after confirm ' + JSON.stringify(sp2 && { ready: sp2.ready, stock: sp2.stock }));
+ok(rr.r && /有現貨可以販售/.test(rr.r.reply), '有現貨可以販售 notified after confirm');
+rr = run((I) => I.arrText_('UYIXUAN0001', '上架 全部'));
+ok(rr.r && /已確認上架/.test(rr.r.reply) && !DB['庫存進貨'].some(k => k.arrival_status === '待到貨' && /酷柏到貨/.test(JSON.stringify(k))), 'confirm all lists the rest ' + (rr.r && rr.r.reply.slice(0, 80)));
+rr = run((I) => I.arrText_('UYIXUAN0001', '上架 全部'));
+ok(rr.r && /目前沒有等確認上架/.test(rr.r.reply), 'nothing left after all confirmed');
 // 對不上的例外:乙瑄也會收到
 aiReply = { items: [{ ref: 1, pid: null, spec: '' }] }; sent.length = 0;
 r = await post({ type: 'arrival', batch: 'b13', items: [{ proid: 9998, specid: 1, title: '【韓國】還沒建立的商品', spec: '標準', qty: 1, price: 10, single: 1 }] });

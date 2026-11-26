@@ -3064,10 +3064,43 @@ function arrText_(uid, text) {
   }
   if (/^([A-Za-z]\s*(刪除|删除|刪|删)[\s,，、]*)+$/.test(text) && cbPend_().length) return { reply: cbPendDrop_(text, '到貨助理') };
   if (/^([A-Za-z]\s*\d{1,2}[\s,，、]*)+$/.test(text) && cbPend_().length) return { reply: cbPick_(text, '到貨助理') };
+  // 2026-11-26 Jack:酷柏到貨多出來的貨(待到貨的庫存進貨)要管理員確認後才自動上架:回「上架 全部」或「上架 K0012 K0015」
+  var mU = text.replace(/\s+/g, ' ').match(/^(?:全部上架|上架\s*全部|上架((?:[\s,，、]*K\d+)+))$/i);
+  if (mU) return { reply: cbHoldUp_(mU[1] ? mU[1].toUpperCase().match(/K\d+/g) : null, uid) };
+  if (/^(待上架|多出來|現貨待確認)$/.test(text)) return { reply: cbHoldText_() };
   if (/^(確認|確定|ok|OK|Ok)$/.test(text)) return { reply: arrApply_() };
   if (cbOn_() && /酷柏|coolbau/i.test(text) && /到貨|到货|入庫|已到/.test(text)) return { reply: '🔄 這看起來是酷柏的到貨通知。酷柏到貨現在會自動同步入帳並通知客人,不需要再轉傳,這次沒有做任何變更。\n(其他廠商的到貨通知照常轉傳即可)' };
   if (/^取消$/.test(text)) { var n = arrPend_().length; arrSave_([]); return { reply: n ? '已取消,沒有任何變更。' : '目前沒有待確認的到貨。' }; }
   return { ai: true };
+}
+/** 酷柏到貨多出來、等確認上架的庫存進貨(待到貨,建立人 酷柏到貨) */
+function cbHeld_() { return rows_('庫存進貨').filter(function (k) { return String(k.到貨狀態) === '待到貨' && String(k.建立人) === '酷柏到貨'; }); }
+function cbHoldText_() {
+  var h = cbHeld_();
+  if (!h.length) return '目前沒有等確認上架的酷柏多出來的貨。';
+  return '❓ 酷柏到貨多出來、等確認上架的貨(' + h.length + ' 筆):\n' + h.map(function (k) { return '・' + k.訂單ID + ' ' + k.品名 + (k.規格 ? '(' + k.規格 + ')' : '') + ' ×' + k.數量; }).join('\n') + '\n回「上架 全部」全部上架;只上架其中幾筆回「上架 K0012 K0015」。';
+}
+/** 管理員確認上架:待到貨 → 已到貨,先照下單順序分給在等的訂單,剩下的加進現貨並通知「有現貨可以販售」。ids 為 null 代表全部 */
+function cbHoldUp_(ids, uid) {
+  var who = '到貨助理(' + String(settings_()['確認人員 ' + uid] || (String(settings_().到貨管理員LINE || '') === String(uid) ? '到貨管理員' : uid)) + ')';
+  var out = [], miss = [], kept = [];
+  lk_(function () {
+    var h = cbHeld_(), want = ids ? ids.map(String) : null;
+    if (want) want.forEach(function (id) { if (!h.some(function (k) { return String(k.訂單ID) === id; })) miss.push(id); });
+    var go = h.filter(function (k) { return !want || want.indexOf(String(k.訂單ID)) >= 0; });
+    RDYN_ = [];
+    go.forEach(function (k) {
+      var n = cp_(k); n.到貨狀態 = '已到貨'; n.到貨操作人 = who; n.到貨時間 = now_(); put_('庫存進貨', k._r, n);
+      log_(who, '確認上架', k.訂單ID + ' ' + k.品名, '酷柏到貨多出來的 ' + k.數量 + ' 件,管理員在 LINE 確認上架');
+      var t = kFifo_(String(k.訂單ID), who);
+      if (/^❓/.test(t)) { kept.push(t); return; } // 可能有訂單在等(寫法不同):維持待到貨,不算上架
+      out.push('・' + k.訂單ID + ' ' + k.品名 + (k.規格 ? '(' + k.規格 + ')' : '') + ' ×' + k.數量 + (t ? '\n  ' + t.split('\n')[0] : ''));
+    });
+  });
+  var tell = RDYN_.length; cbRdyTell_(null);
+  var kt = kept.length ? '\n\n' + kept.join('\n\n') : '';
+  if (!out.length) return (miss.length ? '找不到這些編號(可能已處理或不是酷柏多出來的貨):' + miss.join('、') + '\n' : '') + (kept.length ? kt.slice(2) : cbHoldText_());
+  return '✅ 已確認上架 ' + out.length + ' 筆:\n' + out.join('\n') + (tell ? '\n已通知「有現貨可以販售」。' : '') + (miss.length ? '\n找不到:' + miss.join('、') : '') + kt;
 }
 /** 給解析用的商品清單:商品ID|名稱|規格|待到貨件數(有待到貨的排前面) */
 function arrCands_() {
@@ -3201,7 +3234,7 @@ function arrApply_(plans, why, who) {
       if (!p) { miss.push(s.name + ' 現貨'); return; }
       var inn = rows_('商品_內部').filter(function (r) { return String(r.商品ID) === s.pid; })[0] || {};
       var id = seq_('庫存進貨', 'K');
-      // 酷柏自動入帳多出來(沒有訂單在等)的貨:不自動上現貨,先記成「待到貨」的庫存進貨,等老闆確認後在後台改成已到貨才上架
+      // 酷柏自動入帳多出來(沒有訂單在等)的貨:不自動上現貨,先記成「待到貨」的庫存進貨,等管理員在 LINE 回「上架」(或後台改成已到貨)才上架
       var hold = !!why;
       var row = { '訂單ID': id, '商品ID': s.pid, '品名': String(p.名稱), '規格': s.spec, '數量': s.qty, '到貨狀態': hold ? '待到貨' : '已到貨', '廠商': String(inn.廠商 || ''),
         '成本': s.price !== '' ? s.price : (inn.成本 === undefined ? '' : inn.成本), '成本含稅': inn.成本含稅 || 'N', '貨源': String(inn.貨源 || ''),
@@ -3216,7 +3249,7 @@ function arrApply_(plans, why, who) {
   if (!plans) arrSave_([]);
   var nt = Object.keys(arrived).length ? notifyArrival_(arrived) : { sent: 0, noLine: 0, failed: 0 };
   var t = '✅ 已入帳:客訂到貨 ' + nAs + ' 筆' + (nSur ? '、轉入現貨庫存 ' + nSur + ' 件' : '') + '。';
-  if (nHold) t += '\n❓ 這 ' + nHold + ' 件沒有自動分給訂單、也沒有上現貨(沒有訂單在等,或在等的訂單寫法不同不確定):\n・' + holdTx.join('\n・') + '\n要上架請到後台「訂單明細」把這筆【庫存】改成「已到貨」;不要的請到「庫存表」刪除。';
+  if (nHold) t += '\n❓ 這 ' + nHold + ' 件沒有自動分給訂單、也沒有上現貨(沒有訂單在等,或在等的訂單寫法不同不確定):\n・' + holdTx.join('\n・') + '\n確認後回「上架 全部」就會自動上架成現貨;只上架其中幾筆請回「上架 K0012 K0015」(用上面的編號);不要的請到「庫存表」刪除。';
   if (Object.keys(arrived).length) t += '\n已通知客人 ' + nt.sent + ' 位' + (nt.noLine ? ',' + nt.noLine + ' 位沒有 LINE/Email 請自行聯絡' : '') + '。';
   if (miss.length) t += '\n⚠️ 這些已被別人處理或找不到,略過:' + miss.join('、');
   return t;
