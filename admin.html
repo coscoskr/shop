@@ -1986,7 +1986,7 @@ function drawCodes() {
     fld('備註(選填,只有你看得到)', 'note', cur.note) + '</div>' +
     '<label class="ck"><input type="checkbox" name="on"' + (cur.on ? ' checked' : '') + '> 啟用</label><p class="er" id="cde" role="alert"></p><button class="btn a">' + (CDE ? '儲存' : '新增') + '</button>' + (CDE ? ' <button type="button" class="btn l" data-cd="cancel">取消編輯</button>' : '') + '</form>' +
     '<table style="margin-top:16px"><thead><tr><th>折扣碼</th><th>內容</th><th>狀態</th><th>已使用</th><th>使用期限</th><th>備註</th><th></th></tr></thead><tbody>' +
-    (CD.map(function (x) { return '<tr><td><b>' + esc(x.code) + '</b></td><td>' + (x.min ? '滿 ' + money(x.min) + ' ' : '') + (x.type === '百分比' ? '折 ' + x.value + '%' : '折 ' + money(x.value)) + '</td><td>' + (x.state === '可用' ? '<span class="chip d">可使用</span>' : '<span class="chip">' + esc(x.state) + '</span>') + '</td><td>' + x.used + (x.limit ? ' / ' + x.limit : '') + ' 次</td><td>' + (x.start || x.end ? esc((x.start || '') + ' ~ ' + (x.end || '不限')) : '不限') + '</td><td style="white-space:normal">' + esc(x.note) + '</td><td style="white-space:nowrap"><button class="btn l s" data-cd="edit" data-c="' + esc(x.code) + '">編輯</button> <button class="btn l s" data-cd="tog" data-c="' + esc(x.code) + '">' + (x.on ? '停用' : '啟用') + '</button> <button class="btn l s" data-cd="del" data-c="' + esc(x.code) + '">刪除</button></td></tr>'; }).join('') || '<tr><td colspan="7" class="m">還沒有折扣碼</td></tr>') + '</tbody></table>';
+    (CD.map(function (x) { return '<tr><td><b>' + esc(x.code) + '</b></td><td>' + (x.min ? '滿 ' + money(x.min) + ' ' : '') + (x.type === '百分比' ? '折 ' + x.value + '%' : '折 ' + money(x.value)) + '</td><td>' + (x.state === '可用' ? '<span class="chip d">可使用</span>' : '<span class="chip">' + esc(x.state) + '</span>') + '</td><td>' + x.used + (x.limit ? ' / ' + x.limit : '') + ' 次</td><td>' + (x.start || x.end ? esc((x.start || '') + ' ~ ' + (x.end || '不限')) : '不限') + '</td><td style="white-space:normal">' + esc(x.note) + '</td><td style="white-space:nowrap"><button class="btn l s" data-cd="img" data-c="' + esc(x.code) + '">產生圖片</button> <button class="btn l s" data-cd="edit" data-c="' + esc(x.code) + '">編輯</button> <button class="btn l s" data-cd="tog" data-c="' + esc(x.code) + '">' + (x.on ? '停用' : '啟用') + '</button> <button class="btn l s" data-cd="del" data-c="' + esc(x.code) + '">刪除</button></td></tr>'; }).join('') || '<tr><td colspan="7" class="m">還沒有折扣碼</td></tr>') + '</tbody></table>';
 }
 document.addEventListener('change', function (e) { if (e.target.id === 'cdt') $('#cdl').textContent = e.target.value === '金額' ? '折扣金額(元)' : '折扣 %(例:10 = 折抵 10%,打九折)'; });
 document.addEventListener('submit', function (e) {
@@ -1996,11 +1996,99 @@ document.addEventListener('submit', function (e) {
 document.addEventListener('click', function (e) {
   var b = e.target.closest('[data-cd]'); if (!b) return;
   var c = b.dataset.c, t = b.dataset.cd;
+  if (t === 'img') { cdImg(c); return; }
   if (t === 'edit') { CDE = c; drawCodes(); window.scrollTo(0, 0); }
   else if (t === 'cancel') { CDE = ''; drawCodes(); }
   else if (t === 'tog') { var on = !(CD.filter(function (x) { return x.code === c; })[0] || {}).on; call('adminSetCodeOn', T, c, on).then(function (r) { CD = r; drawCodes(); }).catch(function (er) { tell(er.message); }); }
   else if (t === 'del') ask('刪除折扣碼「' + c + '」?已經下的訂單不受影響。', function () { call('adminDeleteCode', T, c).then(function (r) { CD = r; if (CDE === c) CDE = ''; drawCodes(); }).catch(function (er) { tell(er.message); }); });
 });
+/* ---------- 折扣碼圖片產生器(傳到 LINE 社群用) ---------- */
+var CDIMG = { theme: 'cos' };
+function cdOffTxt(x) {
+  if (x.type === '百分比') { var r = 100 - Number(x.value); return { big: (r % 10 === 0 ? r / 10 : r) + '折', sub: '結帳金額折抵 ' + x.value + '%' }; }
+  return { big: '折 $' + Number(x.value).toLocaleString(), sub: '結帳直接折抵' };
+}
+function cdDate(d) { if (!d) return ''; var p = String(d).split('-'); return Number(p[1]) + '/' + Number(p[2]); }
+function cdImg(code) {
+  var x = CD.filter(function (y) { return y.code === code; })[0]; if (!x) return;
+  var old = $('#cdimg'); if (old) old.remove();
+  var d = document.createElement('div'); d.id = 'cdimg';
+  d.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(40,30,28,.55);display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto';
+  var off = cdOffTxt(x);
+  d.innerHTML = '<div style="background:#fff;border-radius:12px;padding:16px;max-width:920px;width:100%;display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">' +
+    '<canvas id="cdcv" width="1080" height="1350" style="width:min(380px,100%);height:auto;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,.15)"></canvas>' +
+    '<div style="flex:1;min-width:240px"><h3 style="margin:0 0 6px">折扣碼圖片:' + esc(x.code) + '</h3><p class="m" style="margin:0 0 10px">下方文字可以改,圖片會即時更新。尺寸 1080×1350,適合 LINE 社群、IG。</p>' +
+    '<label>標題<input id="cdh" value="社群限定優惠" maxlength="16"></label>' +
+    '<label>優惠內容(大字)<input id="cdb" value="' + esc(off.big) + '" maxlength="12"></label>' +
+    '<label>補充說明<input id="cds" value="' + esc((x.min ? '單筆滿 $' + Number(x.min).toLocaleString() + ' ' : '') + off.sub) + '" maxlength="28"></label>' +
+    '<label>使用期限<input id="cdd" value="' + esc(x.end ? (x.start ? cdDate(x.start) + ' – ' : '即日起 – ') + cdDate(x.end) : '數量有限,用完為止') + '" maxlength="24"></label>' +
+    '<label>小字備註<input id="cdn" value="結帳時於購物車輸入折扣碼即可使用" maxlength="30"></label>' +
+    '<label>風格<select id="cdth"><option value="cos">COS 常態(粉色)</option></select></label>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button type="button" class="btn a" id="cddl">下載圖片</button><button type="button" class="btn l" id="cdcp">複製圖片</button><button type="button" class="btn l" id="cdsh" hidden>分享</button><button type="button" class="btn l" id="cdtx">複製社群文案</button><button type="button" class="btn l" id="cdx">關閉</button></div><p class="m" id="cdmsg" style="margin-top:8px"></p></div></div>';
+  document.body.appendChild(d);
+  var redraw = function () { cdDraw(x); };
+  ['cdh', 'cdb', 'cds', 'cdd', 'cdn', 'cdth'].forEach(function (id) { $('#' + id).addEventListener('input', redraw); $('#' + id).addEventListener('change', redraw); });
+  d.onclick = function (e) { if (e.target === d) d.remove(); };
+  $('#cdx').onclick = function () { d.remove(); };
+  var cv = $('#cdcv'), fname = 'COS折扣碼_' + x.code + '.png', msg = function (t) { $('#cdmsg').textContent = t; };
+  $('#cddl').onclick = function () { var a = document.createElement('a'); a.download = fname; a.href = cv.toDataURL('image/png'); a.click(); msg('已下載 ' + fname); };
+  $('#cdcp').onclick = function () {
+    if (!window.ClipboardItem || !navigator.clipboard) { msg('這個瀏覽器不支援複製圖片,請用「下載圖片」'); return; }
+    cv.toBlob(function (b) { navigator.clipboard.write([new ClipboardItem({ 'image/png': b })]).then(function () { msg('已複製,可以直接到 LINE 貼上'); }, function () { msg('複製失敗,請用「下載圖片」'); }); });
+  };
+  if (navigator.canShare) $('#cdsh').hidden = false;
+  $('#cdsh').onclick = function () { cv.toBlob(function (b) { var f = new File([b], fname, { type: 'image/png' }); if (navigator.canShare({ files: [f] })) navigator.share({ files: [f], text: cdText(x) }).catch(function () {}); else msg('這個裝置不支援分享圖片'); }); };
+  $('#cdtx').onclick = function () { var t = cdText(x); (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () { msg('文案已複製'); }, function () { prompt('請複製文案', t); }); };
+  redraw();
+}
+function cdText(x) {
+  var g = function (id) { return ($('#' + id) || {}).value || ''; };
+  return '🎁 ' + g('cdh') + ' 🎁\n\n' + g('cdb') + (g('cds') ? '|' + g('cds') : '') + '\n\n折扣碼:' + x.code + '\n使用期限:' + g('cdd') + '\n\n' + g('cdn') + '\n👉 https://coscoskr.github.io/shop/';
+}
+function cdDraw(x) {
+  var cv = $('#cdcv'); if (!cv) return; var c = cv.getContext('2d'), W = 1080, H = 1350;
+  var g = function (id) { return ($('#' + id) || {}).value || ''; };
+  var SERIF = '"Cormorant Garamond","Noto Serif TC","Songti TC",serif', SANS = '"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif';
+  var go = function (logo) {
+    c.clearRect(0, 0, W, H);
+    // 底色與紙紋
+    c.fillStyle = '#FFFBFA'; c.fillRect(0, 0, W, H);
+    c.fillStyle = '#FAEEEA'; for (var i = 0; i < 26; i++) { c.beginPath(); c.arc((i * 211) % W, (i * 389) % H, 3 + (i % 4), 0, 6.283); c.fill(); }
+    // 上方粉色帶
+    c.fillStyle = '#DBB0A5'; c.fillRect(0, 0, W, 300);
+    c.fillStyle = '#E8AEA0'; c.beginPath(); c.moveTo(0, 300); c.quadraticCurveTo(W / 2, 360, W, 300); c.lineTo(W, 300); c.fill();
+    c.fillStyle = '#DBB0A5'; c.beginPath(); c.moveTo(0, 298); c.quadraticCurveTo(W / 2, 352, W, 298); c.lineTo(W, 0); c.lineTo(0, 0); c.fill();
+    // logo(轉白)+店名
+    if (logo) { var lh = 96, lw = logo.width * lh / logo.height, t = document.createElement('canvas'); t.width = lw; t.height = lh; var tc = t.getContext('2d'); tc.drawImage(logo, 0, 0, lw, lh); tc.globalCompositeOperation = 'source-in'; tc.fillStyle = '#fff'; tc.fillRect(0, 0, lw, lh); c.drawImage(t, W / 2 - 250, 92, lw, lh); }
+    c.fillStyle = '#fff'; c.textAlign = 'left'; c.textBaseline = 'alphabetic';
+    c.font = '500 76px ' + SERIF; c.fillText('coscos select', W / 2 - 250 + (logo ? 100 : 0) + 14, 160);
+    c.font = '500 26px ' + SANS; c.fillText('K O R E A   S E L E C T   S H O P', W / 2 - 250 + (logo ? 100 : 0) + 18, 208);
+    // 標題
+    c.textAlign = 'center'; c.fillStyle = '#A95B4D'; c.font = '700 58px ' + SANS; c.fillText(g('cdh'), W / 2, 470);
+    c.strokeStyle = '#E8AEA0'; c.lineWidth = 3; c.beginPath(); c.moveTo(W / 2 - 300, 500); c.lineTo(W / 2 - 40, 500); c.moveTo(W / 2 + 40, 500); c.lineTo(W / 2 + 300, 500); c.stroke();
+    c.fillStyle = '#E8AEA0'; c.save(); c.translate(W / 2, 500); c.rotate(Math.PI / 4); c.fillRect(-9, -9, 18, 18); c.restore();
+    // 優惠大字
+    c.fillStyle = '#4B3B37'; var big = g('cdb'), fs = 210; c.font = '700 ' + fs + 'px ' + SANS; while (c.measureText(big).width > W - 160 && fs > 90) { fs -= 10; c.font = '700 ' + fs + 'px ' + SANS; }
+    c.fillText(big, W / 2, 720);
+    c.fillStyle = '#8C7771'; c.font = '500 40px ' + SANS; c.fillText(g('cds'), W / 2, 800);
+    // 折扣碼票券
+    var bx = 150, by = 870, bw = W - 300, bh = 190, r = 26;
+    c.fillStyle = '#fff'; c.strokeStyle = '#A95B4D'; c.lineWidth = 4; c.setLineDash([16, 12]);
+    c.beginPath(); c.moveTo(bx + r, by); c.arcTo(bx + bw, by, bx + bw, by + bh, r); c.arcTo(bx + bw, by + bh, bx, by + bh, r); c.arcTo(bx, by + bh, bx, by, r); c.arcTo(bx, by, bx + bw, by, r); c.closePath(); c.fill(); c.stroke(); c.setLineDash([]);
+    c.fillStyle = '#FFFBFA'; c.beginPath(); c.arc(bx, by + bh / 2, 26, -Math.PI / 2, Math.PI / 2); c.fill(); c.beginPath(); c.arc(bx + bw, by + bh / 2, 26, Math.PI / 2, Math.PI * 1.5); c.fill();
+    c.fillStyle = '#8C7771'; c.font = '600 30px ' + SANS; c.fillText('折扣碼 COUPON CODE', W / 2, by + 58);
+    c.fillStyle = '#A95B4D'; var cf = 84; c.font = '700 ' + cf + 'px ' + SANS; while (c.measureText(x.code).width > bw - 80 && cf > 40) { cf -= 6; c.font = '700 ' + cf + 'px ' + SANS; }
+    c.fillText(x.code, W / 2, by + 150);
+    // 期限與備註
+    c.fillStyle = '#4B3B37'; c.font = '600 40px ' + SANS; c.fillText('使用期限 ' + g('cdd'), W / 2, 1150);
+    c.fillStyle = '#8C7771'; c.font = '400 32px ' + SANS; c.fillText(g('cdn'), W / 2, 1210);
+    c.fillStyle = '#DBB0A5'; c.fillRect(0, H - 70, W, 70);
+    c.fillStyle = '#fff'; c.font = '500 28px ' + SANS; c.fillText('coscoskr.github.io/shop', W / 2, H - 26);
+  };
+  var src = poLogo();
+  var draw = function () { if (!src) return go(null); var im = new Image(); im.onload = function () { go(im); }; im.onerror = function () { go(null); }; im.src = src; };
+  if (document.fonts && document.fonts.load) Promise.all([document.fonts.load('500 76px "Cormorant Garamond"')]).then(draw, draw); else draw();
+}
 var PIMG = [];
 function pimBox() { return '<div style="margin:8px 0"><div class="m">匯款截圖/單據(最多 8 張)</div><div id="pimgs"></div><input type="file" id="pvimf" accept="image/*" multiple> <span class="m" id="pims"></span></div>'; }
 function pimDraw() {
