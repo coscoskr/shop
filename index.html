@@ -206,6 +206,12 @@ dialog{padding:14px 16px}dialog h2{font-size:17px;margin:0 0 8px}#dlg p{margin:6
 <script src="api.js"></script>
 <script>
 var BOOT = {};
+// LINE 登入回來:把登入前記下的畫面(商品 ?p=、分類 ?c= 等)放回網址,後面照一般分享連結的方式打開
+function retUrl0() {
+  try { var r = JSON.parse(localStorage.getItem('lret') || 'null'); localStorage.removeItem('lret');
+    if (!r || Date.now() - (+r.t || 0) > 30 * 60 * 1000) return '';
+    var u = new URLSearchParams(r.s || ''); if (r.p) u.set('p', r.p); var qs = u.toString(); return qs ? '?' + qs : '';
+  } catch (e) { return ''; } }
 try {
   var q0 = new URLSearchParams(location.search), c0 = q0.get('code'), s0 = q0.get('state');
   var lf0 = q0.get('liffClientId') || q0.get('liff.state') || q0.get('liffRedirectUri');
@@ -213,8 +219,8 @@ try {
     var x0 = new XMLHttpRequest(); x0.open('POST', window.COSCOS_API, false); x0.setRequestHeader('Content-Type', 'text/plain');
     x0.send(JSON.stringify({ fn: 'lineCallback', args: [c0, s0] }));
     var j0 = JSON.parse(x0.responseText); BOOT = j0.ok ? (j0.result || {}) : { err: j0.error || 'LINE 登入失敗' };
-    history.replaceState(null, '', location.pathname);
-  } else if (q0.get('error') && !lf0) { BOOT = { err: 'LINE 登入已取消' }; history.replaceState(null, '', location.pathname); }
+    history.replaceState(null, '', location.pathname + retUrl0());
+  } else if (q0.get('error') && !lf0) { BOOT = { err: 'LINE 登入已取消' }; history.replaceState(null, '', location.pathname + retUrl0()); }
 } catch (e0) { BOOT = { err: 'LINE 登入失敗,請稍後再試' }; }
 var D, cart = {}, cat = '', q = '', cur = null, dq = 1, LT = '', QT = null, useCr = false, CODE = '';
 try { LT = localStorage.getItem('lt') || ''; } catch (e) {}
@@ -288,9 +294,10 @@ google.script.run.withSuccessHandler(function (d) {
   var RV = loadView();
   nav(); grid();
   if (RV) afterView(RV);
-  if (BOOT.token) memLoad(function () { show(memList()); hlOrder(); });
+  var PID0 = ''; try { PID0 = new URLSearchParams(location.search).get('p') || ''; } catch (e) {}
+  if (BOOT.token) memLoad(function () { if (PID0 && byId(PID0)) setLg(); else { show(memList()); hlOrder(); } }); // 登入前在看商品 → 登入後留在那個商品
   else if (PEND_S || HL_O || /[?&]m=1/.test(location.search)) { if (LT) { mt = LT; memLoad(function () { show(memList()); hlOrder(); }); } else show(memLogin()); }
-  try { var pid0 = new URLSearchParams(location.search).get('p'); if (pid0 && !BOOT.token) { var pp0 = byId(pid0); if (pp0) { cur = pp0; dq = 1; show(detail(cur)); } } } catch (e0) {}
+  try { var pid0 = new URLSearchParams(location.search).get('p'); if (pid0) { var pp0 = byId(pid0); if (pp0) { cur = pp0; dq = 1; show(detail(cur)); } } } catch (e0) {}
   liffBoot();
   resumeDraft();
 }).withFailureHandler(function (e) { $('#grid').innerHTML = '<p>載入失敗:' + esc(e.message) + '</p>'; }).getShop();
@@ -367,13 +374,36 @@ function setLg() {
   $('#hmi').style.display = hasPic ? 'none' : '';
   $('#hun').textContent = me ? (me.name || '會員') : (LT ? '' : on ? 'LINE 登入' : '會員專區');
 }
+/* 登入後回到原本的畫面:登入前記下正在看的商品/分類,登入回來後自動打開(LINE 登入會離開網站再回來) */
+function retNow() {
+  var u = new URLSearchParams(location.search), dl = document.getElementById('dlg');
+  var pid = (dl && dl.open && (VIEWP || RETP)) || u.get('p') || '';
+  ['code', 'state', 'error', 'error_description', 'liffClientId', 'liffRedirectUri', 'liff.state', 'p', 'm'].forEach(function (k) { u.delete(k); });
+  return { p: String(pid || ''), s: u.toString(), t: Date.now() };
+}
+function retSave() { try { localStorage.setItem('lret', JSON.stringify(retNow())); } catch (e) {} }
+function retLiff() { var r = retNow(), u = new URLSearchParams(r.s); if (r.p) u.set('p', r.p); var qs = u.toString(); return 'https://liff.line.me/' + D.line.liff + (qs ? '?' + qs : ''); }
+function retTake() {
+  var r = null; try { r = JSON.parse(localStorage.getItem('lret') || 'null'); localStorage.removeItem('lret'); } catch (e) {}
+  if (r && Date.now() - (+r.t || 0) > 30 * 60 * 1000) r = null; // 半小時前的不算
+  return r;
+}
+// 登入完成後呼叫:有記下的商品就直接打開那個商品,回傳 true;沒有就回傳 false(照原本流程)
+function retGo(pid0) {
+  var r = retTake(), pid = (r && r.p) || pid0 || '';
+  if (r && r.s) { try { var u = new URL(location.href); u.search = r.s; if (u.href !== location.href) history.replaceState(null, '', u.pathname + u.search); } catch (e) {} }
+  var pp = pid ? byId(pid) : null; if (!pp) return false;
+  try { var u2 = new URL(location.href); u2.searchParams.set('p', pid); history.replaceState(null, '', u2.pathname + u2.search); } catch (e) {}
+  cur = pp; dq = 1; show(detail(cur)); return true;
+}
 function goLogin() {
-  if (D && D.line && D.line.liff) { location.href = 'https://liff.line.me/' + D.line.liff; return; }
+  retSave();
+  if (D && D.line && D.line.liff) { location.href = retLiff(); return; }
   google.script.run.withSuccessHandler(function (u) { location.href = u; }).withFailureHandler(function () { show(loginHtml()); }).lineStart();
 }
 /* 重新整理後停在原來的地方:搜尋字、排序、每頁數量、頁數、篩選、捲動位置、打開中的商品都記在這個分頁(sessionStorage),
    重新整理時還原;分類與品牌本來就記在網址(?c= ?b=)。新開分頁或從別的連結進來就不會帶舊狀態 */
-var VIEWP = '', VIEWT = 0, VIEWH = false;
+var VIEWP = '', VIEWT = 0, VIEWH = false, RETP = ''; // RETP:正在看的商品(跳出登入框時還記得,關掉視窗才清掉)
 try { if ('scrollRestoration' in history) history.scrollRestoration = 'manual'; } catch (e) {}
 function saveView() {
   if (!window.D || !D.products) return;
@@ -398,7 +428,7 @@ function afterView(v) {
 }
 window.addEventListener('scroll', function () { clearTimeout(VIEWT); VIEWT = setTimeout(saveView, 200); }, { passive: true });
 window.addEventListener('pagehide', saveView);
-document.addEventListener('close', function (e) { if (e.target && e.target.id === 'dlg') { VIEWP = ''; saveView(); } }, true);
+document.addEventListener('close', function (e) { if (e.target && e.target.id === 'dlg') { VIEWP = ''; RETP = ''; saveView(); } }, true);
 function urlCat() { try { var u = new URL(location.href), bs = Object.keys(FIL.brands).filter(function (k) { return FIL.brands[k]; }); if (cat) u.searchParams.set('c', cat); else u.searchParams.delete('c'); if (bs.length) u.searchParams.set('b', bs.join(',')); else u.searchParams.delete('b');
   // 搜尋字、現貨/預購、價格範圍、只看有貨、排序也放進網址,複製網址給別人點開就是同一個畫面
   var sp = function (k, v) { if (v !== '' && v != null && v !== false) u.searchParams.set(k, String(v)); else u.searchParams.delete(k); };
@@ -584,7 +614,8 @@ function fireworks(t) {
 }
 function show(h) { if (!VIEWH) VIEWP = ''; VIEWH = false; setLg(); var d = $('#dlg'); d.innerHTML = h; if (!d.open) d.showModal(); d.setAttribute('tabindex', '-1'); try { d.focus({ preventScroll: true }); } catch (x) {} d.style.pointerEvents = 'none'; setTimeout(function () { d.style.pointerEvents = ''; }, 350); if (d.querySelector('#lga')) prepLogin(); }
 function prepLogin() {
-  if (D && D.line && D.line.liff) { var a0 = $('#lga'); if (a0) { a0.href = 'https://liff.line.me/' + D.line.liff; a0.removeAttribute('aria-disabled'); a0.textContent = '使用 LINE 登入'; } return; }
+  var a1 = $('#lga'); if (a1) a1.addEventListener('click', retSave);
+  if (D && D.line && D.line.liff) { var a0 = $('#lga'); if (a0) { a0.href = retLiff(); a0.removeAttribute('aria-disabled'); a0.textContent = '使用 LINE 登入'; } return; }
   google.script.run.withSuccessHandler(function (u) { var a = $('#lga'); if (a) { a.href = u; a.removeAttribute('aria-disabled'); a.textContent = '使用 LINE 登入'; } })
     .withFailureHandler(function (e) { var a = $('#lga'); if (a) a.textContent = 'LINE 登入暫時無法使用'; }).lineStart();
 }
@@ -633,7 +664,7 @@ function spImg(p, u) {
 }
 document.addEventListener('click', function (e) { var b = e.target.closest && e.target.closest('.sgb'); if (b && !b.disabled) spSet(b.dataset.sg, b.dataset.v); });
 function detail(p) {
-  SPC = ''; SPZ = ''; VIEWP = p.id; VIEWH = true; setTimeout(saveView, 0);
+  SPC = ''; SPZ = ''; VIEWP = p.id; RETP = p.id; VIEWH = true; setTimeout(saveView, 0);
   var t = p.tiers.map(function (x) { return '買 ' + x.min + ' 件以上,每件 ' + money(x.price); }).join('<br>');
   return '<div class="tb">' + (!LT && D.line && D.line.on ? '<button type="button" class="lgb" data-a="lgd">LINE 登入</button>' : '') + '<button type="button" class="xb" data-a="x" aria-label="關閉">✕</button></div><h2>' + bn(p) + '</h2>' + (p.imgs && p.imgs.length ? '<img class="big" id="bigimg" src="' + esc(p.imgs[0]) + '" alt="點圖片可放大" data-a="zoom" data-i="0" referrerpolicy="no-referrer"><div class="zh">點圖片可放大</div>' + (p.imgs.length > 1 ? '<div class="th">' + p.imgs.map(function (u, k) { return '<img src="' + esc(u) + '" referrerpolicy="no-referrer" alt="商品圖片 ' + (k + 1) + '" data-a="bigimg" data-i="' + k + '" data-u="' + esc(u) + '" class=""' + (k ? '' : 'on') + '">'; }).join('') + '</div>' : '') : '') +
     '<p><span class="pr">' + money(p.price) + '</span> <span class="tg">' + tag(p) + '</span></p>' + (clTxt(p) ? '<p class="tg" style="color:#d64545;font-weight:700">' + clTxt(p) + ',關團後就不能下單了</p>' : '') + (t ? '<p class="tg">' + t + '</p>' : '') +
@@ -1198,7 +1229,8 @@ function liffBoot() {
       var it = liff.getIDToken(); if (!it) { liff.logout(); liff.login(); return; }
       google.script.run.withSuccessHandler(function (r) {
         LT = r.token; mt = LT; try { localStorage.setItem('lt', LT); sessionStorage.removeItem('liffRetry'); } catch (e) {}
-        try { history.replaceState(null, '', location.pathname); } catch (e) {}
+        try { var u3 = new URLSearchParams(location.search); ['code', 'state', 'liffClientId', 'liffRedirectUri', 'liff.state'].forEach(function (k) { u3.delete(k); }); var s3 = u3.toString(); history.replaceState(null, '', location.pathname + (s3 ? '?' + s3 : '')); } catch (e) {}
+        try { var dl1 = document.getElementById('dlg'); if (!(dl1 && dl1.open)) retGo(); else retTake(); } catch (e) {} // 登入前在看的商品,登入後自動打開
         setLg(); memLoad(function () { setLg(); }); try { xmzAuto(); } catch (e) {}
       }).withFailureHandler(function (e) {
         var tried = ''; try { tried = sessionStorage.getItem('liffRetry') || ''; sessionStorage.setItem('liffRetry', '1'); } catch (x) {}
