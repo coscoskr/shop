@@ -290,4 +290,30 @@ const nP = DB['商品'].find(x => x.name === '無極限控油定妝噴霧100ml')
 ok(DB['商品'].length === nP0 + 1 && nP && setv('酷柏對照 1163|*') === nP.id + '|' && setv('酷柏品名 1163') === '【美妝】SHU UEMURA植村秀無極限控油定妝噴霧100ml', 'new product + binding in one save ' + (nP && nP.id));
 er = ''; try { run((I) => I.adminSaveProduct(TK, { name: '測試錯規格', price: 1, type: '預購', unlimited: true, specs: ['黑'], cats: [], vendor: '酷柏', on: false, cb: { proid: 1164, title: 'x', single: true, cspec: '白' } })); } catch (e) { er = String(e.message); }
 ok(/不在這個商品裡/.test(er), 'bad spec in save → error: ' + er);
+// 20) 2026-11-26 到貨撤回:酷柏改回未到貨/取消 → 待對應拿掉、庫存進貨扣回、已分給客人的列給管理員;重送不重複;撤回後再到貨會重新入帳
+sent.length = 0;
+r = await post({ type: 'arrival', batch: 'b40', items: [{ proid: 9997, specid: 1, title: '【韓國】撤回測試商品', spec: '標準', qty: 2, price: 50, lots: [[2, 50, 'w7001']], single: 1 }] });
+const pq = () => (JSON.parse(setv('酷柏待對應') || '[]').find(x => x.proid === '9997') || { qty: 0 }).qty;
+ok(r.body.pending >= 1 && pq() === 2, 'unmatched item waiting in pending (2)');
+const k901 = () => DB['庫存進貨'].filter(k => k.product_id === 'P073');
+const k901n = k901().reduce((s, k) => s + Number(k.qty), 0);
+ok(k901n >= 1, 'w901 sits in 庫存進貨 (' + k901n + ')');
+r = await post({ type: 'revert', batch: 'rv1', revert: [
+  { wid: 'w7001', at: '20261126100000', qty: 1, proid: 9997, specid: 1, title: '【韓國】撤回測試商品', spec: '標準', why: '改回未到貨' },
+  { wid: 'w901', at: '20261126100000', qty: 1, proid: 6900, specid: 24001, title: '【韓國】Hetras 室內固體擴香', spec: '12水仙花', why: '已取消' },
+  { wid: 'w500', at: '20261126100000', qty: 1, proid: 7383, specid: 23964, title: '【韓國】hetras沐浴乳1013ml系列', spec: 'Flower Park', why: '改回未到貨' },
+  { wid: '424242', at: '20261126100000', qty: 3, proid: 1, specid: 1, title: '沒入帳過', spec: '', why: '已取消' }] });
+ok(r.status === 200 && r.body.ok && typeof r.body.reverted === 'number', 'revert accepted ' + JSON.stringify(r.body));
+ok(pq() === 1, 'pending: 1 of 2 removed');
+ok(k901().reduce((s, k) => s + Number(k.qty), 0) === k901n - 1, 'stock-in for w901 cut by 1');
+ok(r.body.reverted === 2 && r.body.none === 3, 'reverted 2 (pending 1 + stock 1), 3 never booked');
+ok(r.body.manual.length === 1 && /O12/.test(r.body.manual[0]) && l12.arrival_status === '已到貨', 'order line (O12) NOT changed automatically, listed for manual ' + JSON.stringify(r.body.manual));
+ok(sent.some(x => x.to === 'UADMIN' && /酷柏到貨撤回/.test(x.text) && /要人工處理/.test(x.text)), 'admins told');
+const stockAfter = k901().reduce((s, k) => s + Number(k.qty), 0);
+r = await post({ type: 'revert', batch: 'rv1', revert: [{ wid: 'w901', at: '20261126100000', qty: 1, title: 'x', why: '已取消' }] });
+ok(r.body.dup === true && k901().reduce((s, k) => s + Number(k.qty), 0) === stockAfter, 'same revert batch resent → nothing more cut');
+r = await post({ type: 'arrival', batch: 'b41', items: [{ proid: 6900, specid: 24001, title: '【韓國】Hetras 室內固體擴香', spec: '12水仙花', qty: 1, price: 300, lots: [[1, 300, 'w901']], single: 0 }] });
+ok(!r.body.already && r.body.stock === 1, 'after revert, real arrival of w901 is booked again ' + JSON.stringify(r.body));
+r = await post({ type: 'arrival', batch: 'b42', items: [] });
+ok(r.status === 200 && r.body.ok, 'old-style call without revert still fine');
 console.log(fails ? fails + ' FAILED' : 'ALL PASSED');
