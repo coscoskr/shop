@@ -1672,6 +1672,29 @@ function ordAdj_(u, oid, d) {
     log_(u.acc, '調整訂單優惠', oid, msg + ';合計 ' + o.總額 + '→' + n.總額);
   })();
 }
+/** 後台改了訂單品項(數量/單價)使商品金額變動時,重算訂單的優惠折抵。
+ * 折扣碼:依折扣碼類型重算(百分比照新金額、固定金額不超過商品金額);新金額未達最低消費就擋下,請先移除折扣碼。
+ * 折數類(會員等級、活動折數):照新舊商品金額比例調整。固定金額類(活動折金額、手動調整):金額不變,但不超過商品金額。
+ * 訂單已有品項建立出貨單(優惠已分到出貨單)就不動。回傳 null 表示不用改。 */
+function discReprice_(o, oldSub, sub) {
+  var old = Number(o.優惠折抵 || 0), nm = String(o.優惠名稱 || ''), code = String(o.折扣碼 || '');
+  if (old <= 0 && !code) return null;
+  if (rows_('訂單明細').some(function (x) { return String(x.訂單ID) === String(o.訂單ID) && x.出貨單ID; })) return null;
+  var amt, cr = code ? codes_().filter(function (r) { return String(r.折扣碼).toLowerCase() === code.toLowerCase(); })[0] : null;
+  if (cr) {
+    var mn = Number(cr.最低消費) || 0;
+    if (mn > sub) throw new Error('改完後商品金額 NT$ ' + sub + ',未達折扣碼「' + cr.折扣碼 + '」最低消費 NT$ ' + mn + '。請先在上方「折扣碼」清空並套用調整,再改數量');
+    var cv = Number(cr.數值); amt = String(cr.類型) === '百分比' ? Math.round(sub * cv / 100) : Math.min(cv, sub);
+  } else {
+    var act = rows_('活動').filter(function (a) { return String(a.名稱) === nm; })[0];
+    var fixed = /^手動調整/.test(nm) || (act && a_(act) === '折金額') || (!act && !/優惠$/.test(nm) && !code);
+    amt = fixed ? Math.min(old, sub) : (oldSub > 0 ? Math.round(old * sub / oldSub) : 0);
+  }
+  amt = Math.max(0, Math.min(amt, sub));
+  if (amt === old) return null;
+  return { amt: amt, name: amt ? (nm || (cr ? '折扣碼 ' + cr.折扣碼 : '手動調整')) : (cr ? nm : ''), code: code, msg: '優惠折抵 ' + old + '→' + amt + (nm ? '(' + nm + ')' : '') };
+}
+function a_(a) { return String(a.類型 || ''); }
 function adminUpdateOrder(tk, oid, d) {
   var u = me_(tk);
   lk_(function () {
@@ -1755,8 +1778,10 @@ function adminEditLineFull(tk, oid, pid, d) {
     if (arr === '已到貨' && String(l.到貨狀態) !== '已到貨') cbPendSettle_([{ pid: n.商品ID, spec: n.規格, qty: n.數量 }], u.acc);
     var sub = 0;
     rows_('訂單明細').forEach(function (x) { if (String(x.訂單ID) === oid) sub += Number(x.小計); });
-    var on = cp_(o);
-    on.商品金額 = sub; on.總額 = tot_(sub, o, 0);
+    var on = cp_(o), oldSub = Number(o.商品金額) || 0;
+    on.商品金額 = sub;
+    if (sub !== oldSub) { var rp = discReprice_(o, oldSub, sub); if (rp) { on.優惠折抵 = rp.amt; on.優惠名稱 = rp.name; on.折扣碼 = rp.code; extra += ';' + rp.msg; } }
+    on.總額 = tot_(sub, on, 0);
     put_('訂單', o._r, on);
     log_(u.acc, '修改訂單品項', oid + ' ' + l.品名, '品名:' + l.品名 + '→' + name + ';數量:' + l.數量 + '→' + q + ';單價:' + l.單價 + '→' + up + ';到貨:' + l.到貨狀態 + '→' + arr + extra);
   });
