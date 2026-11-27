@@ -25,7 +25,7 @@ DB['商品'].push(P('T1', { name: '【測試】樣式' }), P('S0', { stock: 0 })
 x = run((I) => I.xmzLaunch_('admin')); ok(x.pushes.length === 0, 'no launch for test/soldout/off/other');
 DB['商品'].push(P('G1', { name: '水水500元交換禮物' }));
 x = run((I) => I.xmzLaunch_('admin')); const js = JSON.stringify(x.pushes);
-ok(x.pushes.length === 1 && /multicast/.test(js) && js.includes(U1) && js.includes(U2) && js.includes('c=%E8%81%96'), 'launch multicast');
+ok(x.pushes.length === 1 && /multicast/.test(js) && js.includes(U1) && js.includes(U2) && js.includes('c=%E8%81%96') && js.includes('水水500元交換禮物  NT$500'), 'launch multicast');
 x = run((I) => I.xmzLaunch_('admin')); ok(x.pushes.length === 0, 'only once');
 x = run((I) => I.memberXmasSub(tok.A)); ok(x.r.live, 'after launch live flag');
 console.log(fails ? fails + ' FAILED' : 'ALL PASSED');

@@ -862,8 +862,9 @@ function adminDeleteProduct(tk, id) {
  * 專區第一次有「可以買的商品」上架(上架中、沒關團、庫存不是 0、品名沒有【測試】)→ 一次通知所有登記的客人,只發一次。 */
 var XMZ_CAT_ = '聖誕專區';
 function xmzSubs_() { return String(settings_()['聖誕專區訂閱'] || '').split(',').filter(function (x) { return /^U[0-9a-f]{32}$/.test(x); }); }
-function xmzLive_() {
-  return rows_('商品').some(function (p) {
+function xmzLive_() { return xmzItems_().length > 0; }
+function xmzItems_() {
+  return rows_('商品').filter(function (p) {
     if (!onSale_(p) || String(p.名稱).indexOf('【測試】') >= 0) return false;
     if (!cs_(p.類別).some(function (c) { return c === XMZ_CAT_ || c.indexOf(XMZ_CAT_ + '/') === 0; })) return false;
     return pub_(p).stock !== 0; // 跟前台「已售完」同一套判斷(含預購商品的現貨)
@@ -884,13 +885,13 @@ function memberXmasSub(tk) {
 /** 商品存檔/批次上架後呼叫(呼叫端已在鎖裡):專區第一次有可買的商品 → 通知所有登記的客人 */
 function xmzLaunch_(who) {
   if (String(settings_()['聖誕專區上線通知'] || '')) return;
-  if (!xmzLive_()) return;
+  var its = xmzItems_(); if (!its.length) return;
   var subs = xmzSubs_();
   setSet_('聖誕專區上線通知', now_() + ' 通知 ' + subs.length + ' 位');
   log_(who || '系統', '聖誕專區上線通知', '', '專區有商品上架,通知已登記的 ' + subs.length + ' 位客人');
   if (!subs.length) return;
   var url = appUrl_() || 'https://coscoskr.github.io/shop/';
-  var text = '🎄 coscos 聖誕專區上線囉!\n\n您登記的聖誕專區已經開放,交換禮物、聖誕大禮包都在這裡,數量有限,先逛先選 🎁\n\n👉 ' + url + (url.indexOf('?') >= 0 ? '&' : '?') + 'c=' + encodeURIComponent(XMZ_CAT_);
+  var text = '🎄 coscos 聖誕專區上線囉!\n\n您登記的聖誕專區已經開放,數量有限,先逛先選 🎁\n\n' + its.slice(0, 5).map(function (p) { return '🎁 ' + p.名稱 + '  NT$' + Number(p.單價 || 0); }).join('\n') + (its.length > 5 ? '\n…還有 ' + (its.length - 5) + ' 項' : '') + '\n\n👉 ' + url + (url.indexOf('?') >= 0 ? '&' : '?') + 'c=' + encodeURIComponent(XMZ_CAT_);
   var tkn = prop_('LINE_MSG_TOKEN'); if (!tkn) return;
   for (var i = 0; i < subs.length; i += 500) {
     try {
