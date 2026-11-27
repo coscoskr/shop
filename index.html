@@ -345,7 +345,7 @@ function xmasZone() {
   if (has) { location.href = location.pathname + '?c=' + encodeURIComponent('聖誕專區'); return; }
   var old = $('#wbox'); if (old) old.remove();
   var d = document.createElement('div'); d.id = 'wbox'; d.setAttribute('role', 'alertdialog'); d.setAttribute('aria-modal', 'true');
-  d.innerHTML = '<div class="cdb xzb"><svg viewBox="0 0 130 90" width="96" height="66" aria-hidden="true"><rect x="6" y="36" width="52" height="50" rx="3" fill="#2F7A52"/><rect x="28" y="36" width="8" height="50" fill="#E8C15A"/><rect x="2" y="28" width="60" height="12" rx="3" fill="#256845"/><rect x="28" y="28" width="8" height="12" fill="#E8C15A"/><path d="M32 28 Q18 10 14 22 Q14 30 32 28 Q46 30 50 22 Q46 10 32 28Z" fill="none" stroke="#E8C15A" stroke-width="4"/><rect x="64" y="52" width="40" height="34" rx="3" fill="#B23A3A"/><rect x="80" y="52" width="7" height="34" fill="#fff"/><rect x="60" y="45" width="48" height="10" rx="3" fill="#C9524A"/><rect x="80" y="45" width="7" height="10" fill="#fff"/><path d="M83 45 Q72 32 69 41 Q70 47 83 45 Q96 47 97 41 Q94 32 83 45Z" fill="none" stroke="#fff" stroke-width="3.5"/></svg><p style="font:600 13px/1 sans-serif;letter-spacing:2px;color:#B23A3A;margin:10px 0 6px">聖誕專區</p><p style="font-size:19px;font-weight:700;line-height:1.45;margin:0 0 8px">驚喜準備中<br><span style="font-size:15px;font-weight:600;color:#7A4A3E">' + (new Date() < new Date('2026-12-01T00:00:00+08:00') ? '預計 12/1 上線' : '即將上線,敬請期待') + '</span></p><p class="ds" style="margin:0 0 16px;line-height:1.6">交換禮物、聖誕大禮包即將登場<br>按下方按鈕,上線時用 LINE 通知您</p><button type="button" class="btn a" id="wok">🔔 上線通知我</button><p id="xzm" class="ds" style="margin:10px 0 0;font-size:13px" hidden></p></div>';
+  d.innerHTML = '<div class="cdb xzb">' + xmCat('xzc0', 120) + '<p style="font:600 13px/1 sans-serif;letter-spacing:2px;color:#B23A3A;margin:10px 0 6px">聖誕專區</p><p style="font-size:19px;font-weight:700;line-height:1.45;margin:0 0 8px">驚喜準備中<br><span style="font-size:15px;font-weight:600;color:#7A4A3E">' + (new Date() < new Date('2026-12-01T00:00:00+08:00') ? '預計 12/1 上線' : '即將上線,敬請期待') + '</span></p><p class="ds" style="margin:0 0 16px;line-height:1.6">交換禮物、聖誕大禮包即將登場<br>按下方按鈕,上線時用 LINE 通知您</p><button type="button" class="btn a" id="wok">🔔 上線通知我</button><p id="xzm" class="ds" style="margin:10px 0 0;font-size:13px" hidden></p></div>';
   document.body.appendChild(d);
   var b = $('#wok'); b.focus(); b.onclick = function () { xmzSub(b); };
   d.onclick = function (e) { if (e.target === d) d.remove(); };
@@ -1306,6 +1306,31 @@ function xmasOn(d) {
   if (q === '0') return false;
   return String((d && d.deco) || '') === '聖誕節';
 }
+/* 聖誕貓咪(原創插圖):橘虎斑貓戴聖誕帽、掛鈴鐺項圈,從禮物盒後面探頭,尾巴會輕輕擺動 */
+function xmCat(cls, w) {
+  return '<svg class="' + cls + '" viewBox="0 -36 130 126"' + (w ? ' width="' + w + '"' : '') + ' aria-hidden="true">' +
+    '<path class="xmt" d="M54 40 Q74 30 68 8 Q66 0 60 4" fill="none" stroke="#E39A55" stroke-width="7" stroke-linecap="round"/>' +
+    '<path class="xmt" d="M66 14 l5 -2 M68 22 l5 0" stroke="#C97B3A" stroke-width="2.4" stroke-linecap="round"/>' +
+    '<rect x="17" y="12" width="30" height="18" rx="8" fill="#EBA866"/>' +
+    '<path d="M18 21 Q32 27 46 21 L46 25 Q32 31 18 25Z" fill="#C8403A"/><circle cx="32" cy="28" r="3.4" fill="#E8C15A" stroke="#B8902F" stroke-width="1"/>' +
+    '<path d="M15 2 L17 -19 L29 -8Z M35 -8 L47 -19 L49 2Z" fill="#EBA866"/><path d="M18 -2 L19 -13 L25 -7Z" fill="#F4B7A8"/>' +
+    '<ellipse cx="32" cy="5" rx="19" ry="15.5" fill="#EBA866"/>' +
+    '<path d="M27 -9 l1 5 M32 -10 l0 5.5 M37 -9 l-1 5" stroke="#C97B3A" stroke-width="2.2" stroke-linecap="round"/>' +
+    '<path d="M13.5 4 l4 1 M13.5 9 l4 -0.5 M50.5 4 l-4 1 M50.5 9 l-4 -0.5" stroke="#C97B3A" stroke-width="2" stroke-linecap="round"/>' +
+    '<ellipse cx="27.5" cy="11.5" rx="6" ry="4.6" fill="#FFF6EC"/><ellipse cx="36.5" cy="11.5" rx="6" ry="4.6" fill="#FFF6EC"/>' +
+    '<path d="M21.5 3.5 Q25 0 28.5 3.5 M35.5 3.5 Q39 0 42.5 3.5" stroke="#4B3B37" stroke-width="2.3" fill="none" stroke-linecap="round"/>' +
+    '<path d="M30.3 8.6 h3.4 l-1.7 2.2Z" fill="#E38C86"/><path d="M28.5 13 Q30.3 14.8 32 12.6 Q33.7 14.8 35.5 13" stroke="#4B3B37" stroke-width="1.4" fill="none" stroke-linecap="round"/>' +
+    '<path d="M22 12 l-12 -2 M22 14 l-11 2 M42 12 l12 -2 M42 14 l11 2" stroke="#8A6A5A" stroke-width="1" stroke-linecap="round" opacity=".7"/>' +
+    '<circle cx="20" cy="9" r="3.2" fill="#F2A99A" opacity=".6"/><circle cx="44" cy="9" r="3.2" fill="#F2A99A" opacity=".6"/>' +
+    '<g transform="rotate(18 40 -10)"><path d="M28 -10 Q33 -36 54 -32 Q48 -22 52 -10Z" fill="#D8403A"/><circle cx="54.5" cy="-32" r="4.6" fill="#FFFDF8"/><rect x="25" y="-13" width="30" height="7.5" rx="3.75" fill="#FFFDF8"/></g>' +
+    '<rect x="6" y="36" width="52" height="50" rx="3" fill="#2F7A52"/><rect x="28" y="36" width="8" height="50" fill="#E8C15A"/><rect x="2" y="28" width="60" height="12" rx="3" fill="#256845"/><rect x="28" y="28" width="8" height="12" fill="#E8C15A"/>' +
+    '<ellipse cx="21" cy="28" rx="6.5" ry="4.3" fill="#F6C48C"/><ellipse cx="43" cy="28" rx="6.5" ry="4.3" fill="#F6C48C"/>' +
+    '<path d="M19 26.5 v2.5 M23 26.5 v2.5 M41 26.5 v2.5 M45 26.5 v2.5" stroke="#C97B3A" stroke-width="1.1" stroke-linecap="round"/>' +
+    '<rect x="64" y="52" width="40" height="34" rx="3" fill="#FFFDF8"/><rect x="80" y="52" width="7" height="34" fill="#D8403A"/><rect x="60" y="45" width="48" height="10" rx="3" fill="#F2EEE6"/><rect x="80" y="45" width="7" height="10" fill="#D8403A"/>' +
+    '<path d="M83 45 Q72 32 69 41 Q70 47 83 45 Q96 47 97 41 Q94 32 83 45Z" fill="none" stroke="#D8403A" stroke-width="3.5"/>' +
+    '<rect x="108" y="64" width="20" height="22" rx="2" fill="#E8C15A"/><rect x="116" y="64" width="5" height="22" fill="#2F7A52"/>' +
+  '</svg>';
+}
 function xmas(d) {
   if (!xmasOn(d) || document.getElementById('xmcss')) return;
   var css = document.createElement('style'); css.id = 'xmcss';
@@ -1323,8 +1348,10 @@ function xmas(d) {
       '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="30" viewBox="0 0 120 30"><path d="M0 8 Q30 26 60 8 T120 8" fill="none" stroke="#1F5A3E" stroke-width="7" stroke-linecap="round"/><path d="M0 8 Q30 26 60 8 T120 8" fill="none" stroke="#2F7A52" stroke-width="3" stroke-dasharray="2 4" stroke-linecap="round"/><circle cx="18" cy="18" r="4.2" fill="#E8C15A"/><circle cx="44" cy="19" r="4.2" fill="#F4F1EA"/><circle cx="78" cy="18" r="4.2" fill="#E8C15A"/><circle cx="102" cy="19" r="4.2" fill="#F4F1EA"/><circle cx="17" cy="17" r="1.2" fill="#fff" opacity=".8"/><circle cx="77" cy="17" r="1.2" fill="#fff" opacity=".8"/></svg>') +
       '") repeat-x bottom/120px 30px}' +
     'body.xm .hero .xms,body.xm .hero .xmb{position:absolute;bottom:20px;z-index:1;pointer-events:none}' +
-    'body.xm .hero .xms{right:3%;height:124px}body.xm .hero .xmb{left:3%;height:86px}' +
-    '@media(max-width:699px){body.xm .hero .xms{height:74px;right:2px;bottom:22px}body.xm .hero .xmb{height:50px;left:2px;bottom:22px}body.xm .hero .wm{font-size:26px}body.xm .hero .mkw{height:44px}}' +
+    'body.xm .hero .xms{right:3%;height:124px}body.xm .hero .xmb{left:3%;height:120px}' +
+    '.xmt{transform-box:fill-box;transform-origin:0% 100%;animation:xmtw 2.6s ease-in-out infinite}@keyframes xmtw{0%,100%{transform:rotate(0)}50%{transform:rotate(-14deg)}}' +
+    '@media (prefers-reduced-motion:reduce){.xmt{animation:none}}' +
+    '@media(max-width:699px){body.xm .hero .xms{height:74px;right:2px;bottom:22px}body.xm .hero .xmb{height:84px;left:2px;bottom:22px}body.xm .hero .wm{font-size:26px}body.xm .hero .mkw{height:44px}}' +
     'body.xm #cb .xmh{position:absolute;top:4px;left:50%;width:20px;height:15px;transform:translateX(-62%) rotate(-12deg);pointer-events:none}' +
     '#xmsnow{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:40}' +
     'body.xm .c .im{position:relative}';
@@ -1347,14 +1374,8 @@ function xmas(d) {
         '<circle cx="59" cy="88" r="4.6" fill="#E89A86"/>' +
         '<circle cx="44" cy="89" r="4" fill="#F2A99A" opacity=".55"/><circle cx="74" cy="89" r="4" fill="#F2A99A" opacity=".55"/>' +
       '</svg>' +
-      // 禮物
-      '<svg class="xmb" viewBox="0 0 130 90" aria-hidden="true">' +
-        '<rect x="6" y="36" width="52" height="50" rx="3" fill="#2F7A52"/><rect x="28" y="36" width="8" height="50" fill="#E8C15A"/><rect x="2" y="28" width="60" height="12" rx="3" fill="#256845"/><rect x="28" y="28" width="8" height="12" fill="#E8C15A"/>' +
-        '<path d="M32 28 Q18 10 14 22 Q14 30 32 28 Q46 30 50 22 Q46 10 32 28Z" fill="none" stroke="#E8C15A" stroke-width="4"/>' +
-        '<rect x="64" y="52" width="40" height="34" rx="3" fill="#FFFDF8"/><rect x="80" y="52" width="7" height="34" fill="#D8403A"/><rect x="60" y="45" width="48" height="10" rx="3" fill="#F2EEE6"/><rect x="80" y="45" width="7" height="10" fill="#D8403A"/>' +
-        '<path d="M83 45 Q72 32 69 41 Q70 47 83 45 Q96 47 97 41 Q94 32 83 45Z" fill="none" stroke="#D8403A" stroke-width="3.5"/>' +
-        '<rect x="108" y="64" width="20" height="22" rx="2" fill="#E8C15A"/><rect x="116" y="64" width="5" height="22" fill="#2F7A52"/>' +
-      '</svg>' +
+      // 禮物+聖誕貓咪(原創插圖)
+      xmCat('xmb') +
       '<div class="xmg" aria-hidden="true"></div>');
   }
   var cb = document.getElementById('cb');
