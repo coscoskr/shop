@@ -227,7 +227,20 @@ function expView() {
   $('#v').innerHTML = '<h2 style="margin-top:0">支出</h2><p class="m">記錄每一筆支出(運費、包材、廣告、雜支…)。月結會自動把當月支出加進去。</p><div id="exb"><p class="m">載入中…</p></div>';
   call('adminExpenses', T, EXF).then(function (r) { EX = r; expDraw(); }).catch(function (e) { $('#exb').innerHTML = '<p class="er">' + esc(e.message) + '</p>'; });
 }
+/** 修改支出:跳視窗(用同一份表單,改完重畫列表) */
+function expEdit(x) {
+  if (!x) return; var old = $('#exedit'); if (old) old.remove();
+  expDraw(x); var f = $('#exf'); if (!f) return;
+  var d = document.createElement('div'); d.id = 'exedit';
+  d.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(40,30,28,.55);display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto';
+  var box = document.createElement('div'); box.style.cssText = 'background:#fff;border-radius:12px;padding:18px;max-width:900px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.25)';
+  box.innerHTML = '<h3 style="margin:0 0 10px">修改支出</h3>'; f.parentNode.insertBefore(Object.assign(document.createElement('p'), { className: 'm', textContent: '正在修改一筆支出(在跳出的視窗裡)' }), f);
+  box.appendChild(f); d.appendChild(box); document.body.appendChild(d);
+  d.onclick = function (e) { if (e.target === d) { d.remove(); expDraw(); } };
+  var i = f.querySelector('input[name="item"]'); if (i) i.focus();
+}
 function expDraw(edit) {
+  var om = $('#exedit'); if (om && !edit) om.remove();
   var r = EX, e = edit || {}, tot = r.list.reduce(function (a, x) { return a + x.amt; }, 0);
   var catOpt = function (v) { return '<option value="">(選擇類別)</option>' + r.cats.map(function (c) { return '<option' + (c === v ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join(''); };
   $('#exb').innerHTML = '<form id="exf" class="fb" style="align-items:flex-end;flex-wrap:wrap;gap:8px"><input type="hidden" name="eid" value="' + esc(e.id || '') + '">' +
@@ -252,7 +265,7 @@ document.addEventListener('click', function (ev) {
   var b = ev.target.closest('#exgo,#excx,[data-exe],[data-exd],[data-mo],[data-mod],[data-moe]'); if (!b) return;
   if (b.id === 'exgo') { EXF.from = $('#exfr').value; EXF.to = $('#exto').value; expView(); return; }
   if (b.id === 'excx') { expDraw(); return; }
-  if (b.dataset.exe) { expDraw(EX.list.filter(function (x) { return x.id === b.dataset.exe; })[0]); window.scrollTo(0, 0); return; }
+  if (b.dataset.exe) { expEdit(EX.list.filter(function (x) { return x.id === b.dataset.exe; })[0]); return; }
   if (b.dataset.exd) { var x = EX.list.filter(function (y) { return y.id === b.dataset.exd; })[0]; ask('確定刪除這筆支出?\n' + x.date + ' ' + x.item + ' ' + money(x.amt), function () { call('adminDeleteExpense', T, x.id, EXF).then(function (r) { EX = r; expDraw(); }).catch(function (e) { tell(e.message); }); }); return; }
   if (b.dataset.mo) { var k = b.dataset.mo; if (k === 'prev' || k === 'next') { var y = Number(MYM.slice(0, 4)), m = Number(MYM.slice(5)) + (k === 'next' ? 1 : -1); if (m < 1) { m = 12; y--; } if (m > 12) { m = 1; y++; } MYM = y + '-' + ('0' + m).slice(-2); monthView(); } return; }
   if (b.dataset.moe) { var kd = b.dataset.moe.split(':'), list = kd[0] === 'staff' ? MO.staff : MO.fixed; moForm(kd[0], list.filter(function (z) { return z.id === kd[1]; })[0] || {}); return; }
@@ -1972,35 +1985,54 @@ function codeView() {
   $('#v').innerHTML = '<p class="m">載入中…</p>';
   call('adminCodes', T).then(function (r) { CD = r; CDE = ''; drawCodes(); }).catch(function (e) { $('#v').innerHTML = '<p class="er">' + esc(e.message) + '</p>'; });
 }
-function drawCodes() {
-  var cur = CD.filter(function (x) { return x.code === CDE; })[0] || { code: '', type: '百分比', value: '', note: '', on: true, limit: '', start: '', end: '' };
-  $('#v').innerHTML = '<h2 style="margin-top:0">折扣碼</h2><p class="m">客人在前台購物車輸入折扣碼就能折抵(遊客也可用)。每個折扣碼擇一:折百分比,或折固定金額;大小寫不分。和會員、活動優惠不疊加,系統自動取最划算的一個。</p>' +
-    '<form id="cdf" style="max-width:760px;border:1px solid var(--line);padding:12px;border-radius:4px"><h3 style="margin:0 0 8px">' + (CDE ? '編輯折扣碼:' + esc(CDE) : '新增折扣碼') + '</h3><div class="g">' +
+function cdForm(cur, edit) {
+  return '<form class="cdf" data-old="' + esc(edit ? cur.code : '') + '"' + (edit ? '' : ' style="max-width:760px;border:1px solid var(--line);padding:12px;border-radius:4px"') + '><h3 style="margin:0 0 8px">' + (edit ? '編輯折扣碼:' + esc(cur.code) : '新增折扣碼') + '</h3><div class="g">' +
     fld('折扣碼名稱(客人要輸入的文字)', 'code', cur.code) +
-    '<label>折扣方式<select name="type" id="cdt"><option' + (cur.type === '百分比' ? ' selected' : '') + '>百分比</option><option' + (cur.type === '金額' ? ' selected' : '') + '>金額</option></select></label>' +
-    '<label><span id="cdl">' + (cur.type === '金額' ? '折扣金額(元)' : '折扣 %(例:10 = 折抵 10%,打九折)') + '</span><input name="value" type="number" min="1" step="1" value="' + esc(cur.value) + '" inputmode="numeric"></label>' +
+    '<label>折扣方式<select name="type"><option' + (cur.type === '百分比' ? ' selected' : '') + '>百分比</option><option' + (cur.type === '金額' ? ' selected' : '') + '>金額</option></select></label>' +
+    '<label><span class="cdl">' + (cur.type === '金額' ? '折扣金額(元)' : '折扣 %(例:10 = 折抵 10%,打九折)') + '</span><input name="value" type="number" min="1" step="1" value="' + esc(cur.value) + '" inputmode="numeric"></label>' +
     '<label>最低消費門檻(選填,商品金額滿多少才能用;例:5000)<input name="min" type="number" min="1" step="1" inputmode="numeric" value="' + (cur.min || '') + '"></label>' +
     '<label>使用數量上限(選填,空白=不限)<input name="limit" type="number" min="1" step="1" inputmode="numeric" value="' + (cur.limit || '') + '"></label>' +
     '<label>開始日(選填)<input name="start" type="date" value="' + esc(cur.start || '') + '"></label>' +
     '<label>截止日(選填,當天可用到 23:59)<input name="end" type="date" value="' + esc(cur.end || '') + '"></label>' +
     fld('備註(選填,只有你看得到)', 'note', cur.note) + '</div>' +
-    '<label class="ck"><input type="checkbox" name="on"' + (cur.on ? ' checked' : '') + '> 啟用</label><p class="er" id="cde" role="alert"></p><button class="btn a">' + (CDE ? '儲存' : '新增') + '</button>' + (CDE ? ' <button type="button" class="btn l" data-cd="cancel">取消編輯</button>' : '') + '</form>' +
+    '<label class="ck"><input type="checkbox" name="on"' + (cur.on ? ' checked' : '') + '> 啟用</label><p class="er cde" role="alert"></p><button class="btn a">' + (edit ? '儲存' : '新增') + '</button>' + (edit ? ' <button type="button" class="btn l" data-cd="cancel">取消</button>' : '') + '</form>';
+}
+function drawCodes() {
+  var blank = { code: '', type: '百分比', value: '', note: '', on: true, limit: '', start: '', end: '' };
+  $('#v').innerHTML = '<h2 style="margin-top:0">折扣碼</h2><p class="m">客人在前台購物車輸入折扣碼就能折抵(遊客也可用)。每個折扣碼擇一:折百分比,或折固定金額;大小寫不分。和會員、活動優惠不疊加,系統自動取最划算的一個。</p>' +
+    cdForm(blank, false) +
     '<table style="margin-top:16px"><thead><tr><th>折扣碼</th><th>內容</th><th>狀態</th><th>已使用</th><th>使用期限</th><th>備註</th><th></th></tr></thead><tbody>' +
     (CD.map(function (x) { return '<tr><td><b>' + esc(x.code) + '</b></td><td>' + (x.min ? '滿 ' + money(x.min) + ' ' : '') + (x.type === '百分比' ? '折 ' + x.value + '%' : '折 ' + money(x.value)) + '</td><td>' + (x.state === '可用' ? '<span class="chip d">可使用</span>' : '<span class="chip">' + esc(x.state) + '</span>') + '</td><td>' + x.used + (x.limit ? ' / ' + x.limit : '') + ' 次</td><td>' + (x.start || x.end ? esc((x.start || '') + ' ~ ' + (x.end || '不限')) : '不限') + '</td><td style="white-space:normal">' + esc(x.note) + '</td><td style="white-space:nowrap"><button class="btn l s" data-cd="img" data-c="' + esc(x.code) + '">產生圖片</button> <button class="btn l s" data-cd="edit" data-c="' + esc(x.code) + '">編輯</button> <button class="btn l s" data-cd="tog" data-c="' + esc(x.code) + '">' + (x.on ? '停用' : '啟用') + '</button> <button class="btn l s" data-cd="del" data-c="' + esc(x.code) + '">刪除</button></td></tr>'; }).join('') || '<tr><td colspan="7" class="m">還沒有折扣碼</td></tr>') + '</tbody></table>';
 }
-document.addEventListener('change', function (e) { if (e.target.id === 'cdt') $('#cdl').textContent = e.target.value === '金額' ? '折扣金額(元)' : '折扣 %(例:10 = 折抵 10%,打九折)'; });
+/** 編輯折扣碼:跳視窗 */
+function cdEdit(code) {
+  var cur = CD.filter(function (x) { return x.code === code; })[0]; if (!cur) return;
+  cdEditClose();
+  var d = document.createElement('div'); d.id = 'cdedit';
+  d.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(40,30,28,.55);display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto';
+  d.innerHTML = '<div style="background:#fff;border-radius:12px;padding:18px;max-width:760px;width:100%;max-height:92vh;overflow:auto;box-shadow:0 10px 40px rgba(0,0,0,.25)">' + cdForm(cur, true) + '</div>';
+  document.body.appendChild(d);
+  d.onclick = function (e) { if (e.target === d) cdEditClose(); };
+  var f = d.querySelector('input[name="code"]'); if (f) f.focus();
+}
+function cdEditClose() { var d = $('#cdedit'); if (d) d.remove(); }
+document.addEventListener('keydown', function (e) { if (e.key === 'Escape') cdEditClose(); });
+document.addEventListener('change', function (e) { var f = e.target.closest && e.target.closest('form.cdf'); if (f && e.target.name === 'type') f.querySelector('.cdl').textContent = e.target.value === '金額' ? '折扣金額(元)' : '折扣 %(例:10 = 折抵 10%,打九折)'; });
 document.addEventListener('submit', function (e) {
-  var f = e.target; if (f.id !== 'cdf') return; e.preventDefault();
-  call('adminSaveCode', T, { old: CDE, code: f.code.value, type: f.type.value, value: f.value.value, note: f.note.value, limit: f.limit.value, min: f.min.value, start: f.start.value, end: f.end.value, on: f.on.checked }).then(function (r) { CD = r; CDE = ''; drawCodes(); }).catch(fail('#cde'));
+  var f = e.target; if (!f.classList || !f.classList.contains('cdf')) return; e.preventDefault();
+  var er = f.querySelector('.cde'), btn = f.querySelector('button.a'); if (er) er.textContent = ''; if (btn) btn.disabled = true;
+  call('adminSaveCode', T, { old: f.dataset.old || '', code: f.code.value, type: f.type.value, value: f.value.value, note: f.note.value, limit: f.limit.value, min: f.min.value, start: f.start.value, end: f.end.value, on: f.on.checked })
+    .then(function (r) { CD = r; var wasEdit = !!f.dataset.old; cdEditClose(); drawCodes(); if (wasEdit) tell('已儲存'); })
+    .catch(function (err) { if (btn) btn.disabled = false; if (er) er.textContent = err.message; });
 });
 document.addEventListener('click', function (e) {
   var b = e.target.closest('[data-cd]'); if (!b) return;
   var c = b.dataset.c, t = b.dataset.cd;
   if (t === 'img') { cdImg(c); return; }
-  if (t === 'edit') { CDE = c; drawCodes(); window.scrollTo(0, 0); }
-  else if (t === 'cancel') { CDE = ''; drawCodes(); }
+  if (t === 'edit') { cdEdit(c); }
+  else if (t === 'cancel') { cdEditClose(); }
   else if (t === 'tog') { var on = !(CD.filter(function (x) { return x.code === c; })[0] || {}).on; call('adminSetCodeOn', T, c, on).then(function (r) { CD = r; drawCodes(); }).catch(function (er) { tell(er.message); }); }
-  else if (t === 'del') ask('刪除折扣碼「' + c + '」?已經下的訂單不受影響。', function () { call('adminDeleteCode', T, c).then(function (r) { CD = r; if (CDE === c) CDE = ''; drawCodes(); }).catch(function (er) { tell(er.message); }); });
+  else if (t === 'del') ask('刪除折扣碼「' + c + '」?已經下的訂單不受影響。', function () { call('adminDeleteCode', T, c).then(function (r) { CD = r; drawCodes(); }).catch(function (er) { tell(er.message); }); });
 });
 /* ---------- 折扣碼圖片產生器(傳到 LINE 社群用) ---------- */
 var CDIMG = { theme: 'cos' };
