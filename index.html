@@ -266,6 +266,7 @@ google.script.run.withSuccessHandler(function (d) {
   D = d; DLOAD = Date.now(); restoreCart(); drawFt(); $('#store').textContent = d.store || 'coscos韓國選物店'; document.title = d.store || 'coscos韓國選物店';
   if (d.notice) promo(String(d.notice));
   try { xmas(d); } catch (e) {}
+  if (LT) { try { xmzAuto(); } catch (e) {} }
   if (BOOT.err) { $('#notice').hidden = false; $('#notice').textContent = BOOT.err; }
   if (LT && !BOOT.token) {
     LCHK = true;
@@ -335,11 +336,26 @@ function xmasZone() {
   if (has) { location.href = location.pathname + '?c=' + encodeURIComponent('聖誕專區'); return; }
   var old = $('#wbox'); if (old) old.remove();
   var d = document.createElement('div'); d.id = 'wbox'; d.setAttribute('role', 'alertdialog'); d.setAttribute('aria-modal', 'true');
-  d.innerHTML = '<div class="cdb xzb"><svg viewBox="0 0 130 90" width="96" height="66" aria-hidden="true"><rect x="6" y="36" width="52" height="50" rx="3" fill="#2F7A52"/><rect x="28" y="36" width="8" height="50" fill="#E8C15A"/><rect x="2" y="28" width="60" height="12" rx="3" fill="#256845"/><rect x="28" y="28" width="8" height="12" fill="#E8C15A"/><path d="M32 28 Q18 10 14 22 Q14 30 32 28 Q46 30 50 22 Q46 10 32 28Z" fill="none" stroke="#E8C15A" stroke-width="4"/><rect x="64" y="52" width="40" height="34" rx="3" fill="#B23A3A"/><rect x="80" y="52" width="7" height="34" fill="#fff"/><rect x="60" y="45" width="48" height="10" rx="3" fill="#C9524A"/><rect x="80" y="45" width="7" height="10" fill="#fff"/><path d="M83 45 Q72 32 69 41 Q70 47 83 45 Q96 47 97 41 Q94 32 83 45Z" fill="none" stroke="#fff" stroke-width="3.5"/></svg><p style="font:600 13px/1 sans-serif;letter-spacing:2px;color:#B23A3A;margin:10px 0 6px">聖誕專區</p><p style="font-size:20px;font-weight:700;margin:0 0 6px">【驚喜準備中，預計12/1上線】</p><p class="ds" style="margin:0 0 14px">交換禮物、聖誕大禮包即將登場,敬請期待!</p><button type="button" class="btn a" id="wok">好期待!</button></div>';
+  d.innerHTML = '<div class="cdb xzb"><svg viewBox="0 0 130 90" width="96" height="66" aria-hidden="true"><rect x="6" y="36" width="52" height="50" rx="3" fill="#2F7A52"/><rect x="28" y="36" width="8" height="50" fill="#E8C15A"/><rect x="2" y="28" width="60" height="12" rx="3" fill="#256845"/><rect x="28" y="28" width="8" height="12" fill="#E8C15A"/><path d="M32 28 Q18 10 14 22 Q14 30 32 28 Q46 30 50 22 Q46 10 32 28Z" fill="none" stroke="#E8C15A" stroke-width="4"/><rect x="64" y="52" width="40" height="34" rx="3" fill="#B23A3A"/><rect x="80" y="52" width="7" height="34" fill="#fff"/><rect x="60" y="45" width="48" height="10" rx="3" fill="#C9524A"/><rect x="80" y="45" width="7" height="10" fill="#fff"/><path d="M83 45 Q72 32 69 41 Q70 47 83 45 Q96 47 97 41 Q94 32 83 45Z" fill="none" stroke="#fff" stroke-width="3.5"/></svg><p style="font:600 13px/1 sans-serif;letter-spacing:2px;color:#B23A3A;margin:10px 0 6px">聖誕專區</p><p style="font-size:19px;font-weight:700;line-height:1.45;margin:0 0 8px">驚喜準備中<br><span style="font-size:15px;font-weight:600;color:#7A4A3E">預計 12/1 上線</span></p><p class="ds" style="margin:0 0 16px;line-height:1.6">交換禮物、聖誕大禮包即將登場<br>按下方按鈕,上線時用 LINE 通知您</p><button type="button" class="btn a" id="wok">🔔 上線通知我</button><p id="xzm" class="ds" style="margin:10px 0 0;font-size:13px" hidden></p></div>';
   document.body.appendChild(d);
-  var b = $('#wok'); b.focus(); b.onclick = function () { d.remove(); };
+  var b = $('#wok'); b.focus(); b.onclick = function () { xmzSub(b); };
   d.onclick = function (e) { if (e.target === d) d.remove(); };
 }
+// 「上線通知我」:要 LINE 登入才能通知;沒登入先記著,登入回來自動登記
+function xmzSub(b) {
+  var m = $('#xzm');
+  if (!LT) { try { sessionStorage.setItem('xmsub', '1'); } catch (e) {} if (m) { m.hidden = false; m.textContent = '請先用 LINE 登入,登入後會自動幫您登記'; } setTimeout(goLogin, 600); return; }
+  if (b) { b.disabled = true; b.textContent = '登記中…'; }
+  google.script.run.withSuccessHandler(function (r) {
+    try { sessionStorage.removeItem('xmsub'); } catch (e) {}
+    var t = r && r.already ? '您已經登記過囉,上線會用 LINE 通知您 🎄' : '登記完成!已傳 LINE 訊息給您,上線會第一時間通知 🎁';
+    if (b) { b.textContent = '✓ 已登記'; } if (m) { m.hidden = false; m.textContent = t; } else toast(t);
+  }).withFailureHandler(function (e) {
+    if (b) { b.disabled = false; b.textContent = '🔔 上線通知我'; }
+    var t = (e && e.message) || '登記失敗,請稍後再試'; if (m) { m.hidden = false; m.textContent = t; } else toast(t);
+  }).memberXmasSub(LT);
+}
+function xmzAuto() { var f = ''; try { f = sessionStorage.getItem('xmsub') || ''; } catch (e) {} if (f && LT) { xmasZone(); xmzSub($('#wok')); } }
 function setLg() {
   var m = $('#hm'); if (!m) return;
   var on = !!(D && D.line && D.line.on), me = LT && MD && MD.me, hasPic = !!(me && me.pic), p = $('#hup');
@@ -1181,7 +1197,7 @@ function liffBoot() {
       google.script.run.withSuccessHandler(function (r) {
         LT = r.token; mt = LT; try { localStorage.setItem('lt', LT); sessionStorage.removeItem('liffRetry'); } catch (e) {}
         try { history.replaceState(null, '', location.pathname); } catch (e) {}
-        setLg(); memLoad(function () { setLg(); });
+        setLg(); memLoad(function () { setLg(); }); try { xmzAuto(); } catch (e) {}
       }).withFailureHandler(function (e) {
         var tried = ''; try { tried = sessionStorage.getItem('liffRetry') || ''; sessionStorage.setItem('liffRetry', '1'); } catch (x) {}
         if (!tried) { try { liff.logout(); } catch (x) {} liff.login(); return; }

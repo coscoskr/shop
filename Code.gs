@@ -838,6 +838,7 @@ function adminSaveProduct(tk, d) {
     put_('商品_內部', oi ? oi._r : 0, inn);
     log_(u.acc, old ? '修改商品' : '新增商品', id + ' ' + name, old ? [diff_(old, row), diff_(oi, inn)].filter(function (x) { return x && x !== '新增'; }).join(';') : '新增');
     [].concat(d.cb || []).slice(0, 20).forEach(function (x) { if (x && x.proid) cbBindDo_(u, id, x); }); // 同一次儲存一起綁定酷柏商品(可一次綁多個顏色;規格不對會整筆不存,畫面會顯示原因)
+    try { xmzLaunch_(u.acc); } catch (e) {}
     return adminProducts_();
   } finally { L.releaseLock(); }
 }
@@ -856,6 +857,48 @@ function adminDeleteProduct(tk, id) {
   } finally { L.releaseLock(); }
 }
 /** 商品批次上架 / 下架 / 刪除 */
+/* ---------- 聖誕專區上線通知 ----------
+ * 客人在前台按「上線通知我」(要 LINE 登入)→ 記在設定「聖誕專區訂閱」(LINE ID 用逗號分開),並傳一則確認訊息。
+ * 專區第一次有「可以買的商品」上架(上架中、沒關團、庫存不是 0、品名沒有【測試】)→ 一次通知所有登記的客人,只發一次。 */
+var XMZ_CAT_ = '聖誕專區';
+function xmzSubs_() { return String(settings_()['聖誕專區訂閱'] || '').split(',').filter(function (x) { return /^U[0-9a-f]{32}$/.test(x); }); }
+function xmzLive_() {
+  return rows_('商品').some(function (p) {
+    if (!onSale_(p) || String(p.名稱).indexOf('【測試】') >= 0) return false;
+    if (!cs_(p.類別).some(function (c) { return c === XMZ_CAT_ || c.indexOf(XMZ_CAT_ + '/') === 0; })) return false;
+    return pub_(p).stock !== 0; // 跟前台「已售完」同一套判斷(含預購商品的現貨)
+  });
+}
+function memberXmasSub(tk) {
+  var ctx = mem_(tk); if (!ctx.lid) throw new Error('請先用 LINE 登入,上線時才能用 LINE 通知您');
+  var already = false, live = false;
+  lk_(function () {
+    var a = xmzSubs_(); live = !!String(settings_()['聖誕專區上線通知'] || '');
+    if (a.indexOf(ctx.lid) >= 0) { already = true; return; }
+    a.push(ctx.lid); setSet_('聖誕專區訂閱', a.join(','));
+    log_('客人', '聖誕專區上線通知登記', ctx.lid.slice(0, 8) + '…', '目前共 ' + a.length + ' 位');
+  });
+  if (!already && !live) pushLine_(ctx.lid, '🎄 已收到您的聖誕專區上線通知登記!\n\n交換禮物、聖誕大禮包正在準備中,專區一上線我們會第一時間用 LINE 通知您 🎁\n\n— coscos 韓國選物店');
+  return { ok: true, already: already, live: live };
+}
+/** 商品存檔/批次上架後呼叫(呼叫端已在鎖裡):專區第一次有可買的商品 → 通知所有登記的客人 */
+function xmzLaunch_(who) {
+  if (String(settings_()['聖誕專區上線通知'] || '')) return;
+  if (!xmzLive_()) return;
+  var subs = xmzSubs_();
+  setSet_('聖誕專區上線通知', now_() + ' 通知 ' + subs.length + ' 位');
+  log_(who || '系統', '聖誕專區上線通知', '', '專區有商品上架,通知已登記的 ' + subs.length + ' 位客人');
+  if (!subs.length) return;
+  var url = appUrl_() || 'https://coscoskr.github.io/shop/';
+  var text = '🎄 coscos 聖誕專區上線囉!\n\n您登記的聖誕專區已經開放,交換禮物、聖誕大禮包都在這裡,數量有限,先逛先選 🎁\n\n👉 ' + url + (url.indexOf('?') >= 0 ? '&' : '?') + 'c=' + encodeURIComponent(XMZ_CAT_);
+  var tkn = prop_('LINE_MSG_TOKEN'); if (!tkn) return;
+  for (var i = 0; i < subs.length; i += 500) {
+    try {
+      UrlFetchApp.fetch('https://api.line.me/v2/bot/message/multicast', { method: 'post', contentType: 'application/json', headers: { Authorization: 'Bearer ' + tkn }, muteHttpExceptions: true,
+        payload: JSON.stringify({ to: subs.slice(i, i + 500), messages: [{ type: 'text', text: text }] }) });
+    } catch (e) {}
+  }
+}
 function adminBatchProducts(tk, ids, op) {
   var u = me_(tk), done = 0, skip = [];
   if (['on', 'off', 'delete'].indexOf(op) < 0) throw new Error('未知的操作');
@@ -882,6 +925,7 @@ function adminBatchProducts(tk, ids, op) {
       }
       done++;
     });
+    if (op === 'on') xmzLaunch_(u.acc);
   });
   var label = { on: '上架', off: '下架', delete: '刪除' }[op];
   return { products: adminProducts_(), msg: '已' + label + ' ' + done + ' 項商品' + (skip.length ? ',略過 ' + skip.length + ' 項:\n' + skip.join('\n') : '') };
