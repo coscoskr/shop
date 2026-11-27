@@ -381,6 +381,8 @@ function nav() {
     var k = c.split('/')[0]; if (big.indexOf(k) < 0) big.push(k);
     if (c.indexOf('/') >= 0) (subs[k] = subs[k] || []).push(c);
   });
+  // 聖誕裝飾開著時,「聖誕專區」排在最前面
+  if (big.indexOf('聖誕專區') > 0 && typeof xmasOn === 'function' && xmasOn(D)) { big.splice(big.indexOf('聖誕專區'), 1); big.unshift('聖誕專區'); }
   var bl = []; D.products.forEach(function (p) { if (p.brand && bl.indexOf(p.brand) < 0) bl.push(p.brand); });
   if (bl.length) { big.unshift('@品牌'); subs['@品牌'] = bl.sort(function (a, b) { return a.toLowerCase() < b.toLowerCase() ? -1 : 1; }).map(function (b) { return '@品牌/' + b; }); }
   MENU = { big: big, subs: subs }; drawMenu();
