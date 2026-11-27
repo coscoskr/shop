@@ -1137,7 +1137,7 @@ function memberOrders(tk) {
     return { id: String(r.訂單ID), nm: String(r.姓名), ph: String(r.電話), at: String(r.下單時間), st: String(r.狀態), sub: Number(r.商品金額), disc: Number(r.優惠折抵), cred: Number(r.購物金折抵), code: String(r.折扣碼 || ''), dname: String(r.優惠名稱 || ''), total: Number(r.總額), items: items[r.訂單ID] || [] };
   });
   var ships = Object.keys(sh).map(function (k) { return sh[k]; }).sort(function (a, b) { return a.id < b.id ? 1 : -1; });
-  return { bank: String(settings_().匯款資訊 || ''), free: Number(settings_().免運門檻) || 0, fee: Number(settings_().宅配運費) || 0, feeCvs: Number(settings_().店到店運費) || 0, me: ctx.lid ? meInfo_(ctx.lid) : null, orders: orders, ships: ships };
+  return { bank: String(settings_().匯款資訊 || ''), free: Number(settings_().免運門檻) || 0, fee: Number(settings_().宅配運費) || 0, feeCvs: Number(settings_().店到店運費) || 0, me: ctx.lid ? meInfo_(ctx.lid) : null, orders: orders, ships: ships, xmzSub: !!ctx.lid && xmzSubs_().indexOf(ctx.lid) >= 0 };
 }
 /** 會員自己修改基本資料(姓名、電話、Email、預設收件地址);只有 LINE 會員可用 */
 function memberSaveProfile(tk, d) {

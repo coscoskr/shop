@@ -348,23 +348,29 @@ function xmasZone() {
   d.innerHTML = '<div class="cdb xzb">' + xmCat('xzc0', 120) + '<p style="font:600 13px/1 sans-serif;letter-spacing:2px;color:#B23A3A;margin:10px 0 6px">聖誕專區</p><p style="font-size:19px;font-weight:700;line-height:1.45;margin:0 0 8px">驚喜準備中<br><span style="font-size:15px;font-weight:600;color:#7A4A3E">' + (new Date() < new Date('2026-12-01T00:00:00+08:00') ? '預計 12/1 上線' : '即將上線,敬請期待') + '</span></p><p class="ds" style="margin:0 0 16px;line-height:1.6">交換禮物、聖誕大禮包即將登場<br>按下方按鈕,上線時用 LINE 通知您</p><button type="button" class="btn a" id="wok">🔔 上線通知我</button><p id="xzm" class="ds" style="margin:10px 0 0;font-size:13px" hidden></p></div>';
   document.body.appendChild(d);
   var b = $('#wok'); b.focus(); b.onclick = function () { xmzSub(b); };
+  if (xmzDone()) xmzMark(b, '您已經登記過囉,上線會用 LINE 通知您 🎄');
   d.onclick = function (e) { if (e.target === d) d.remove(); };
 }
 // 「上線通知我」:要 LINE 登入才能通知;沒登入先記著,登入回來自動登記
+// 每位客人只能登記一次:登記過(伺服器記錄或這台裝置記錄)按鈕就變成「已登記」不能再按
+function xmzDone() { var f = ''; try { f = localStorage.getItem('xmsubd') || ''; } catch (e) {} return !!(MD && MD.xmzSub) || (!!f && !!LT && f === LT.slice(0, 12)); }
+function xmzMark(b, t) { if (b) { b.disabled = true; b.textContent = '✓ 已登記'; b.style.opacity = '.75'; b.style.cursor = 'default'; } var m = $('#xzm'); if (m && t) { m.hidden = false; m.textContent = t; } }
 function xmzSub(b) {
+  if (xmzDone()) { xmzMark(b, '您已經登記過囉,上線會用 LINE 通知您 🎄'); return; }
   var m = $('#xzm');
   if (!LT) { try { sessionStorage.setItem('xmsub', '1'); } catch (e) {} if (m) { m.hidden = false; m.textContent = '請先用 LINE 登入,登入後會自動幫您登記'; } setTimeout(goLogin, 600); return; }
   if (b) { b.disabled = true; b.textContent = '登記中…'; }
   google.script.run.withSuccessHandler(function (r) {
     try { sessionStorage.removeItem('xmsub'); } catch (e) {}
     var t = r && r.already ? '您已經登記過囉,上線會用 LINE 通知您 🎄' : '登記完成!已傳 LINE 訊息給您,上線會第一時間通知 🎁';
-    if (b) { b.textContent = '✓ 已登記'; } if (m) { m.hidden = false; m.textContent = t; } else toast(t);
+    if (MD) MD.xmzSub = true; try { localStorage.setItem('xmsubd', LT.slice(0, 12)); } catch (e) {}
+    if (b) xmzMark(b); if (m) { m.hidden = false; m.textContent = t; } else toast(t);
   }).withFailureHandler(function (e) {
     if (b) { b.disabled = false; b.textContent = '🔔 上線通知我'; }
     var t = (e && e.message) || '登記失敗,請稍後再試'; if (m) { m.hidden = false; m.textContent = t; } else toast(t);
   }).memberXmasSub(LT);
 }
-function xmzAuto() { var f = ''; try { f = sessionStorage.getItem('xmsub') || ''; } catch (e) {} if (f && LT) { xmasZone(); xmzSub($('#wok')); } }
+function xmzAuto() { var f = ''; try { f = sessionStorage.getItem('xmsub') || ''; } catch (e) {} if (f && LT) { try { sessionStorage.removeItem('xmsub'); } catch (e) {} xmasZone(); xmzSub($('#wok')); } }
 function setLg() {
   var m = $('#hm'); if (!m) return;
   var on = !!(D && D.line && D.line.on), me = LT && MD && MD.me, hasPic = !!(me && me.pic), p = $('#hup');
