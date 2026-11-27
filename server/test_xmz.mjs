@@ -13,6 +13,7 @@ const PROPS = { LINE_MSG_TOKEN: 'tok', APP_URL: 'https://coscoskr.github.io/shop
 const run = (fn) => { const rt = createRuntime({ H: code.H, tableData: load(), kv: KV, props: PROPS, fetchMap: {} }); Object.assign(globalThis, rt.globals); code.__reset(); let r, err; try { r = fn(code.INTERNAL); } catch (e) { err = e; } apply(rt.collectOps()); return { r, err, pushes: rt.fetchQueue || [] }; };
 let fails = 0; const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) fails++; };
 run((I) => { I.setup(); });
+const AD = (I, go) => { CacheService.getScriptCache().put('t_x', JSON.stringify({ acc: 'admin' })); return I.adminXmasNotify('x', go); };
 const U1 = 'U' + '1'.repeat(32), U2 = 'U' + '2'.repeat(32);
 const tok = {}; for (const [k, u] of [['A', U1], ['B', U2]]) { const t = 'L' + k + 'x'.repeat(20); tok[k] = t; run((I) => { DB['登入階段'].push({ hash: I.sha_(t), line_id: u, expires: '2099-01-01 00:00:00' }); }); }
 let x = run((I) => I.memberXmasSub(tok.A)); ok(x.r && x.r.ok && !x.r.already && x.pushes.length === 1 && /聖誕專區/.test(JSON.stringify(x.pushes[0])), 'sub A + confirm push');
@@ -22,10 +23,12 @@ x = run((I) => I.memberXmasSub('')); ok(!!x.err, 'need login');
 const subs = run((I) => I.settings_()['聖誕專區訂閱']).r; ok(subs === U1 + ',' + U2, 'subs ' + subs);
 const P = (id, o) => ({ id, name: '商品' + id, categories: '聖誕專區/交換禮物專區', sale_type: '現貨', price: 500, stock: 5, on_sale: 'Y', ...o });
 DB['商品'].push(P('T1', { name: '【測試】樣式' }), P('S0', { stock: 0 }), P('OFF', { on_sale: '' }), P('X', { categories: '保養' }));
-x = run((I) => I.xmzLaunch_('admin')); ok(x.pushes.length === 0, 'no launch for test/soldout/off/other');
+x = run((I) => I.xmzItems_().length); ok(x.r === 0, 'no items for test/soldout/off/other');
+x = run((I) => AD(I, true)); ok(!!x.err && /還沒有可以買/.test(x.err.message), 'no items -> error ' + (x.err && x.err.message));
 DB['商品'].push(P('G1', { name: '水水500元交換禮物' }));
-x = run((I) => I.xmzLaunch_('admin')); const js = JSON.stringify(x.pushes);
+x = run((I) => AD(I, false)); ok(x.r.subs === 2 && x.r.items.length === 1 && !x.r.sent && x.pushes.length === 0, 'preview no push');
+x = run((I) => AD(I, true)); const js = JSON.stringify(x.pushes);
 ok(x.pushes.length === 1 && /multicast/.test(js) && js.includes(U1) && js.includes(U2) && js.includes('c=%E8%81%96') && js.includes('水水500元交換禮物  NT$500'), 'launch multicast');
-x = run((I) => I.xmzLaunch_('admin')); ok(x.pushes.length === 0, 'only once');
+x = run((I) => AD(I, true)); ok(!!x.err && /已經通知過/.test(x.err.message) && x.pushes.length === 0, 'only once');
 x = run((I) => I.memberXmasSub(tok.A)); ok(x.r.live, 'after launch live flag');
 console.log(fails ? fails + ' FAILED' : 'ALL PASSED');

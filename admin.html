@@ -1022,6 +1022,15 @@ document.addEventListener('click', function (e) {
   call('adminConfirmUnbind', T, b.getAttribute('data-cfun')).then(function (r) { SG.arr.cf = r.confirmers; drawSettings(); }).catch(function (x) { alert(x.message); });
 });
 document.addEventListener('click', function (e) {
+  var b = e.target.closest('#xmzgo'); if (!b) return;
+  b.disabled = true;
+  call('adminXmasNotify', T, false).then(function (r) {
+    var ok = confirm('要用 LINE 通知 ' + r.subs + ' 位客人「聖誕專區上線」嗎?只能發一次。\n\n通知會列出目前可買的 ' + r.items.length + ' 項商品:\n' + r.items.slice(0, 15).join('\n') + (r.items.length > 15 ? '\n…' : ''));
+    if (!ok) { b.disabled = false; return; }
+    return call('adminXmasNotify', T, true).then(function (r2) { SG.xmz.sent = r2.sent; drawSettings(); alert('已通知 ' + r2.subs + ' 位客人'); });
+  }).catch(function (x) { b.disabled = false; alert(x.message); });
+});
+document.addEventListener('click', function (e) {
   var b = e.target.closest('#arrcode,#arrunb'); if (!b) return;
   if (b.id === 'arrunb') { if (!confirm('確定解除到貨管理員綁定?')) return; call('adminArrivalUnbind', T).then(function () { SG.arr.bound = false; drawSettings(); }).catch(function (x) { alert(x.message); }); return; }
   call('adminArrivalCode', T).then(function (r) { $('#arrbox').innerHTML = '<div class="warn">請用要當管理員的 LINE,對官方帳號傳這句話(綁定碼只能用一次):\n綁定管理員 ' + esc(r.code) + '</div>'; }).catch(function (x) { alert(x.message); });
@@ -1030,6 +1039,7 @@ function drawSettings() {
   var v = SG.values, l = SG.line;
   function ta(k, rows) { return '<label class="f">' + k + '<textarea name="' + k + '" rows="' + rows + '">' + esc(v[k]) + '</textarea></label>'; }
   $('#v').innerHTML = '<h2 style="margin-top:0">設定</h2>' +
+    (SG.xmz ? '<div class="warn" id="xmzbox" style="white-space:normal">🎄 <b>聖誕專區上線通知</b>:已有 <b>' + SG.xmz.subs + '</b> 位客人按「上線通知我」;專區目前有 <b>' + SG.xmz.items + '</b> 項可以買的商品。<br>' + (SG.xmz.sent ? '✅ 已通知客人:' + esc(SG.xmz.sent) : '上架商品不會自動通知。全部上架好後再按這個按鈕,一次用 LINE 通知所有登記的客人(只能發一次)。<br><button type="button" class="btn" id="xmzgo" style="margin-top:8px">通知客人聖誕專區上線</button>') + '</div>' : '') +
     '<div class="warn">LINE 登入:' + (l.login ? '已設定' : '尚未設定(缺 LINE_LOGIN_SECRET)') + ';LINE 推播:' + (l.msg ? '已設定' : '尚未設定(缺 LINE_MSG_TOKEN)') + '\n網站網址(LINE Callback URL 要填這個):' + esc(l.url) + '</div>' +
     '<form id="stf" style="max-width:760px"><div class="g">' + fld('店名', '店名', v.店名) + fld('店到店運費', '店到店運費', v.店到店運費, 'number') + fld((LOGI ? '超商取貨付款' : '賣貨便') + '運費', '賣貨便運費', v.賣貨便運費, 'number') + fld('宅配運費', '宅配運費', v.宅配運費, 'number') + fld('免運門檻(訂單金額扣掉優惠後滿多少免運)', '免運門檻', v.免運門檻, 'number') +
     fld('購物金折抵級距(滿多少=最多折多少,逗號分隔;有填就以這個為準)', '購物金折抵級距', v.購物金折抵級距) + fld('購物金使用門檻(訂單滿多少才能用;級距留空時才用)', '購物金使用門檻', v.購物金使用門檻, 'number') + fld('購物金折抵上限(每筆最多折幾元,空白=不限)', '購物金折抵上限', v.購物金折抵上限, 'number') + fld('購物金預設有效天數', '購物金預設有效天數', v.購物金預設有效天數, 'number') +
