@@ -329,7 +329,7 @@ function getShop() {
 function shopData_() {
   var st = settings_(); RDYC_ = null;
   return { payLive: prop_('ECPAY_PAY_LIVE') === '1', logiLive: prop_('ECPAY_LOGI_LIVE') === '1', instLive: prop_('ECPAY_INST_LIVE') === '1', bnplLive: prop_('ECPAY_BNPL_LIVE') === '1',
-    store: st.店名 || '', notice: st.公告 || '', creditNote: st.購物金注意事項 === undefined ? defSet_('購物金注意事項') : String(st.購物金注意事項 || ''), free: Number(st.免運門檻) || 0, fee: Number(st.宅配運費) || 0, feeCvs: Number(st.店到店運費) || 0,
+    store: st.店名 || '', notice: st.公告 || '', deco: String(st.節慶裝飾 || ''), creditNote: st.購物金注意事項 === undefined ? defSet_('購物金注意事項') : String(st.購物金注意事項 || ''), free: Number(st.免運門檻) || 0, fee: Number(st.宅配運費) || 0, feeCvs: Number(st.店到店運費) || 0,
     line: { on: lineOn_(), liff: prop_('LIFF_ID'), friend: String(st.加好友連結 || ''), community: String(st.LINE社群連結 || '') },
     biz: { name: String(st.公司名稱 || ''), addr: String(st.公司地址 || ''), tax: /^\d+$/.test(String(st.統一編號 || '')) ? ('00000000' + st.統一編號).slice(-8) : String(st.統一編號 || ''), ig: String(st.IG連結 || '') },
     cats: cats_(), products: rows_('商品').filter(onSale_).map(pub_)
@@ -4140,7 +4140,7 @@ function adminDeleteActivity(tk, id) {
   });
   return adminActivities(tk);
 }
-var SET_KEYS = ['店名', '店到店運費', '賣貨便運費', '宅配運費', '免運門檻', '匯款資訊', '公告', '購物金折抵級距', '購物金使用門檻', '購物金折抵上限', '購物金預設有效天數', '購物金注意事項', '到貨通知內容', '下單成功通知內容', '出貨通知內容', '出貨單成立通知內容', '賣貨便成立通知內容', '分享回饋通知內容', '可自取通知內容', '發票開立通知內容', '到店通知內容', '寄件人姓名', '寄件人手機', '退回通知內容', '送達通知內容', '未收到匯款通知內容', '物流追蹤連結', '加好友連結', '公司名稱', '公司地址', '統一編號', 'IG連結', 'LINE社群連結'];
+var SET_KEYS = ['店名', '店到店運費', '賣貨便運費', '宅配運費', '免運門檻', '匯款資訊', '公告', '購物金折抵級距', '購物金使用門檻', '購物金折抵上限', '購物金預設有效天數', '購物金注意事項', '到貨通知內容', '下單成功通知內容', '出貨通知內容', '出貨單成立通知內容', '賣貨便成立通知內容', '分享回饋通知內容', '可自取通知內容', '發票開立通知內容', '到店通知內容', '寄件人姓名', '寄件人手機', '退回通知內容', '送達通知內容', '未收到匯款通知內容', '物流追蹤連結', '加好友連結', '公司名稱', '公司地址', '統一編號', 'IG連結', 'LINE社群連結', '節慶裝飾'];
 function defSet_(k) { var r = DEFAULT_SETTINGS.filter(function (x) { return x[0] === k; })[0]; return r ? r[1] : ''; }
 function adminSettings(tk) {
   me_(tk); var s = settings_(), o = {};
@@ -4154,6 +4154,7 @@ function adminSaveSettings(tk, v) {
     if (String(v.購物金折抵上限).trim() !== '' && !(Number(v.購物金折抵上限) >= 0)) throw new Error('購物金折抵上限請填數字,或留空代表不限制');
     if (String(v.購物金折抵級距 || '').trim() && !String(v.購物金折抵級距).trim().split(/[,，\s]+/).every(function (x) { return /^\d+=\d+$/.test(x); })) throw new Error('購物金折抵級距格式:滿多少=折多少,用逗號分隔,例如 500=50,1000=150;留空代表改用門檻+上限');
     ['加好友連結', 'IG連結', 'LINE社群連結'].forEach(function (k) { if (String(v[k] || '').trim() && !/^https:\/\//.test(String(v[k]).trim())) throw new Error(k + '需以 https:// 開頭'); });
+    if (v.節慶裝飾 !== undefined && ['', '聖誕節'].indexOf(String(v.節慶裝飾)) < 0) throw new Error('節慶裝飾只能選 關閉 或 聖誕節');
     var cur = rows_('設定'), ch = [];
     SET_KEYS.forEach(function (k) {
       if (v[k] === undefined) return;

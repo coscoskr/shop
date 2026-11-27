@@ -265,6 +265,7 @@ function promo(t) {
 google.script.run.withSuccessHandler(function (d) {
   D = d; DLOAD = Date.now(); restoreCart(); drawFt(); $('#store').textContent = d.store || 'coscos韓國選物店'; document.title = d.store || 'coscos韓國選物店';
   if (d.notice) promo(String(d.notice));
+  try { xmas(d); } catch (e) {}
   if (BOOT.err) { $('#notice').hidden = false; $('#notice').textContent = BOOT.err; }
   if (LT && !BOOT.token) {
     LCHK = true;
@@ -1226,6 +1227,91 @@ function lbOpen(imgs, i) {
   }
   w.addEventListener('pointerup', up); w.addEventListener('pointercancel', up);
   go(0);
+}
+</script>
+<script>
+/* ---------- 節慶裝飾:聖誕節(後台「設定」→ 節慶裝飾;網址加 ?xmas=1 只在自己的瀏覽器預覽,?xmas=0 關閉預覽) ---------- */
+function xmasOn(d) {
+  var q = (location.search.match(/[?&]xmas=([01])/) || [])[1];
+  try { if (q) sessionStorage.setItem('xmas', q); q = q || sessionStorage.getItem('xmas'); } catch (e) {}
+  if (q === '1') return true;
+  if (q === '0') return false;
+  return String((d && d.deco) || '') === '聖誕節';
+}
+function xmas(d) {
+  if (!xmasOn(d) || document.getElementById('xmcss')) return;
+  var css = document.createElement('style'); css.id = 'xmcss';
+  css.textContent =
+    'body.xm{--acc:#B23A3A}' +
+    'body.xm nav button.on{background:#2F6B4F;border-color:#2F6B4F}' +
+    'body.xm header{border-bottom:0;box-shadow:0 1px 0 var(--line)}' +
+    'body.xm header::after{content:"";position:absolute;left:0;right:0;bottom:-4px;height:4px;background:repeating-linear-gradient(-45deg,#B23A3A 0 8px,#fff 8px 16px,#2F6B4F 16px 24px,#fff 24px 32px);opacity:.9;pointer-events:none}' +
+    'body.xm .hero{position:relative;overflow:hidden;background:radial-gradient(ellipse at 50% 120%,#C9524A 0,#A33331 45%,#7E2223 100%);padding:26px 16px 46px}' +
+    'body.xm .hero>div{position:relative;z-index:2;text-align:center}' +
+    'body.xm .hero .mkw{position:relative;z-index:2}' +
+    'body.xm .hero .xmmc{display:block;margin-top:8px;font:italic 400 17px/1 "Cormorant Garamond",serif;letter-spacing:2px;color:#F3D38A}' +
+    'body.xm .hero .xmg{position:absolute;bottom:0;left:0;right:0;height:30px;z-index:3;background:url("data:image/svg+xml;utf8,' + encodeURIComponent(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="30" viewBox="0 0 120 30"><path d="M0 8 Q30 26 60 8 T120 8" fill="none" stroke="#1F5A3E" stroke-width="7" stroke-linecap="round"/><path d="M0 8 Q30 26 60 8 T120 8" fill="none" stroke="#2F7A52" stroke-width="3" stroke-dasharray="2 4" stroke-linecap="round"/><circle cx="18" cy="18" r="4.2" fill="#E8C15A"/><circle cx="44" cy="19" r="4.2" fill="#F4F1EA"/><circle cx="78" cy="18" r="4.2" fill="#E8C15A"/><circle cx="102" cy="19" r="4.2" fill="#F4F1EA"/><circle cx="17" cy="17" r="1.2" fill="#fff" opacity=".8"/><circle cx="77" cy="17" r="1.2" fill="#fff" opacity=".8"/></svg>') +
+      '") repeat-x bottom/120px 30px}' +
+    'body.xm .hero .xms,body.xm .hero .xmb{position:absolute;bottom:20px;z-index:1;pointer-events:none}' +
+    'body.xm .hero .xms{right:3%;height:124px}body.xm .hero .xmb{left:3%;height:86px}' +
+    '@media(max-width:699px){body.xm .hero .xms{height:74px;right:2px;bottom:22px}body.xm .hero .xmb{height:50px;left:2px;bottom:22px}body.xm .hero .wm{font-size:26px}body.xm .hero .mkw{height:44px}}' +
+    'body.xm #cb .xmh{position:absolute;top:4px;left:50%;width:20px;height:15px;transform:translateX(-62%) rotate(-12deg);pointer-events:none}' +
+    '#xmsnow{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:40}' +
+    'body.xm .c .im{position:relative}';
+  document.head.appendChild(css);
+  document.body.classList.add('xm');
+  var hero = document.querySelector('.hero');
+  if (hero) {
+    var t = hero.querySelector('.wm'); if (t && !hero.querySelector('.xmmc')) { var m = document.createElement('span'); m.className = 'xmmc'; m.textContent = 'Merry Christmas'; t.parentNode.appendChild(m); }
+    // 聖誕老公公(原創插圖)
+    hero.insertAdjacentHTML('beforeend',
+      '<svg class="xms" viewBox="0 0 120 140" aria-hidden="true">' +
+        '<path d="M30 58 Q36 14 74 10 Q100 10 104 36 L92 40 Q86 26 72 28 Q50 32 46 58 Z" fill="#D8403A"/>' +
+        '<circle cx="104" cy="38" r="9" fill="#FFFDF8"/>' +
+        '<rect x="24" y="54" width="70" height="14" rx="7" fill="#FFFDF8"/>' +
+        '<circle cx="59" cy="82" r="24" fill="#F6C9AE"/>' +
+        '<path d="M30 84 Q30 132 59 134 Q88 132 88 84 Q82 104 59 104 Q36 104 30 84 Z" fill="#FFFDF8"/>' +
+        '<path d="M44 98 Q52 92 59 98 Q66 92 74 98 Q66 104 59 101 Q52 104 44 98 Z" fill="#F2EEE6"/>' +
+        '<circle cx="50" cy="80" r="2.6" fill="#4B3B37"/><circle cx="68" cy="80" r="2.6" fill="#4B3B37"/>' +
+        '<path d="M45 73 Q50 70 55 73 M63 73 Q68 70 73 73" stroke="#FFFDF8" stroke-width="3" fill="none" stroke-linecap="round"/>' +
+        '<circle cx="59" cy="88" r="4.6" fill="#E89A86"/>' +
+        '<circle cx="44" cy="89" r="4" fill="#F2A99A" opacity=".55"/><circle cx="74" cy="89" r="4" fill="#F2A99A" opacity=".55"/>' +
+      '</svg>' +
+      // 禮物
+      '<svg class="xmb" viewBox="0 0 130 90" aria-hidden="true">' +
+        '<rect x="6" y="36" width="52" height="50" rx="3" fill="#2F7A52"/><rect x="28" y="36" width="8" height="50" fill="#E8C15A"/><rect x="2" y="28" width="60" height="12" rx="3" fill="#256845"/><rect x="28" y="28" width="8" height="12" fill="#E8C15A"/>' +
+        '<path d="M32 28 Q18 10 14 22 Q14 30 32 28 Q46 30 50 22 Q46 10 32 28Z" fill="none" stroke="#E8C15A" stroke-width="4"/>' +
+        '<rect x="64" y="52" width="40" height="34" rx="3" fill="#FFFDF8"/><rect x="80" y="52" width="7" height="34" fill="#D8403A"/><rect x="60" y="45" width="48" height="10" rx="3" fill="#F2EEE6"/><rect x="80" y="45" width="7" height="10" fill="#D8403A"/>' +
+        '<path d="M83 45 Q72 32 69 41 Q70 47 83 45 Q96 47 97 41 Q94 32 83 45Z" fill="none" stroke="#D8403A" stroke-width="3.5"/>' +
+        '<rect x="108" y="64" width="20" height="22" rx="2" fill="#E8C15A"/><rect x="116" y="64" width="5" height="22" fill="#2F7A52"/>' +
+      '</svg>' +
+      '<div class="xmg" aria-hidden="true"></div>');
+  }
+  var cb = document.getElementById('cb');
+  if (cb && !cb.querySelector('.xmh')) cb.insertAdjacentHTML('beforeend', '<svg class="xmh" viewBox="0 0 30 22" aria-hidden="true"><path d="M3 17 Q8 3 20 4 Q26 5 27 12 L22 13 Q20 9 16 10 Q10 12 9 17Z" fill="#D8403A"/><circle cx="26" cy="13" r="3" fill="#fff"/><rect x="1" y="15" width="12" height="5" rx="2.5" fill="#fff"/></svg>');
+  snow();
+}
+function snow() {
+  if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  var cv = document.createElement('canvas'); cv.id = 'xmsnow'; cv.setAttribute('aria-hidden', 'true'); document.body.appendChild(cv);
+  var cx = cv.getContext('2d'), W = 0, H = 0, R = Math.min(window.devicePixelRatio || 1, 2), F = [], run = true, last = 0;
+  function size() { W = innerWidth; H = innerHeight; cv.width = W * R; cv.height = H * R; cx.setTransform(R, 0, 0, R, 0, 0); var n = Math.round(Math.min(70, Math.max(28, W / 18))); while (F.length < n) F.push(mk(true)); F.length = n; }
+  function mk(any) { return { x: Math.random() * W, y: any ? Math.random() * H : -10, r: 1.2 + Math.random() * 2.6, s: .35 + Math.random() * .8, w: Math.random() * 6.28, a: .55 + Math.random() * .4 }; }
+  function tick(t) {
+    if (!run) return; var dt = Math.min(50, t - (last || t)); last = t;
+    cx.clearRect(0, 0, W, H);
+    for (var i = 0; i < F.length; i++) {
+      var f = F[i]; f.y += f.s * dt * .06; f.w += dt * .0015; f.x += Math.sin(f.w) * .35;
+      if (f.y > H + 6) { F[i] = mk(false); continue; }
+      cx.beginPath(); cx.arc(f.x, f.y, f.r, 0, 6.283); cx.fillStyle = 'rgba(255,255,255,' + f.a + ')'; cx.fill();
+      cx.lineWidth = .6; cx.strokeStyle = 'rgba(160,180,200,' + (f.a * .55) + ')'; cx.stroke();
+    }
+    requestAnimationFrame(tick);
+  }
+  addEventListener('resize', size); size();
+  document.addEventListener('visibilitychange', function () { run = !document.hidden; if (run) { last = 0; requestAnimationFrame(tick); } });
+  requestAnimationFrame(tick);
 }
 </script>
 </body>
