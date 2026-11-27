@@ -310,7 +310,10 @@ function closeAt_(v) {
 /** 關團時間的文字:「11/30 14:00」 */
 function closeTx_(v) { var m = /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{1,2}):(\d{2}))?$/.exec(String(v || '').trim()); return m ? (+m[2]) + '/' + (+m[3]) + ' ' + (m[4] === undefined ? '14:00' : ('0' + m[4]).slice(-2) + ':' + m[5]) : String(v || ''); }
 function closed_(p) { var t = closeAt_(p && p.關團日期); return !!t && Date.now() >= t; }
-function onSale_(p) { return !!p && p.上架 === 'Y' && !closed_(p); }
+function onSale0_(p) { return !!p && p.上架 === 'Y' && !closed_(p); }
+// 前台看得到、可以下單:上架中、沒關團;聖誕專區的商品要等後台按「開放聖誕專區＋通知客人」後才出現
+function onSale_(p) { return onSale0_(p) && !xmzHide_(p); }
+function xmzHide_(p) { return cs_(p.類別).some(function (c) { return c === '聖誕專區' || c.indexOf('聖誕專區/') === 0; }) && !String(settings_()['聖誕專區上線通知'] || ''); }
 function pub_(p) {
   var rd = rdyIs_(p) ? (RDYC_ || (RDYC_ = rdyAll_()))[String(p.商品ID)] : null;
   return {
@@ -531,7 +534,7 @@ function adminProducts_() {
     return {
       id: p.商品ID, name: p.名稱, cats: cs_(p.類別), type: p.銷售型態, price: Number(p.單價),
       stock: p.數量 === '' ? '' : Number(p.數量), arrival: p.到貨日期, desc: p.說明, tiers: String(p.階梯價 || ''),
-      img: String(p.圖片 || ''), on: p.上架 === 'Y', close: String(p.關團日期 || ''), closed: closed_(p), brand: String(p.品牌 || ''), vendor: String(i.廠商 || ''),
+      img: String(p.圖片 || ''), on: p.上架 === 'Y', close: String(p.關團日期 || ''), closed: closed_(p), xmzWait: p.上架 === 'Y' && xmzHide_(p), brand: String(p.品牌 || ''), vendor: String(i.廠商 || ''),
       cost: (i.成本 === undefined || i.成本 === '') ? '' : Number(i.成本), taxIncl: i.成本含稅 === 'Y',
       source: String(i.貨源 || ''), locked: i.鎖定 === 'Y', specs: specs_(p), specQty: specQty_(p), specImg: specImg_(p)
     };
@@ -858,14 +861,15 @@ function adminDeleteProduct(tk, id) {
 /** 商品批次上架 / 下架 / 刪除 */
 /* ---------- 聖誕專區上線通知 ----------
  * 客人在前台按「上線通知我」(要 LINE 登入)→ 記在設定「聖誕專區訂閱」(LINE ID 用逗號分開),並傳一則確認訊息。
- * 上架商品不會自動通知:全部上架好後,管理員在後台「設定 → 聖誕專區上線通知」按按鈕,才一次通知所有登記的客人(只能發一次)。
+ * 聖誕專區的商品上架後先不顯示在前台;全部上架好後,管理員在後台「設定」按「開放聖誕專區＋通知客人」,
+ * 商品才出現在前台,同時一次通知所有登記的客人(只能按一次)。
  * 「可以買的商品」= 上架中、沒關團、沒售完、品名沒有【測試】。 */
 var XMZ_CAT_ = '聖誕專區';
 function xmzSubs_() { return String(settings_()['聖誕專區訂閱'] || '').split(',').filter(function (x) { return /^U[0-9a-f]{32}$/.test(x); }); }
 function xmzLive_() { return xmzItems_().length > 0; }
 function xmzItems_() {
   return rows_('商品').filter(function (p) {
-    if (!onSale_(p) || String(p.名稱).indexOf('【測試】') >= 0) return false;
+    if (!onSale0_(p) || String(p.名稱).indexOf('【測試】') >= 0) return false;
     if (!cs_(p.類別).some(function (c) { return c === XMZ_CAT_ || c.indexOf(XMZ_CAT_ + '/') === 0; })) return false;
     return pub_(p).stock !== 0; // 跟前台「已售完」同一套判斷(含預購商品的現貨)
   });
@@ -888,9 +892,8 @@ function adminXmasNotify(tk, go) {
   return lk_(function () {
     var sent = String(settings_()['聖誕專區上線通知'] || ''), its = xmzItems_(), n = xmzSubs_().length;
     if (go) {
-      if (sent) throw new Error('已經通知過了(' + sent + '),不會重複發送');
-      if (!its.length) throw new Error('聖誕專區還沒有可以買的商品(要上架、沒售完、品名沒有【測試】),先上架再通知');
-      if (!n) throw new Error('目前沒有客人登記上線通知');
+      if (sent) throw new Error('聖誕專區已經開放了(' + sent + '),不會重複通知');
+      if (!its.length) throw new Error('聖誕專區還沒有可以買的商品(要上架、沒售完、品名沒有【測試】),先上架再開放');
       xmzLaunch_(u.acc); sent = String(settings_()['聖誕專區上線通知'] || '');
     }
     return { subs: n, items: its.map(function (p) { return String(p.名稱); }), sent: sent };
@@ -901,8 +904,8 @@ function xmzLaunch_(who) {
   if (String(settings_()['聖誕專區上線通知'] || '')) return;
   var its = xmzItems_(); if (!its.length) return;
   var subs = xmzSubs_();
-  setSet_('聖誕專區上線通知', now_() + ' 通知 ' + subs.length + ' 位');
-  log_(who || '系統', '聖誕專區上線通知', '', '專區有商品上架,通知已登記的 ' + subs.length + ' 位客人');
+  setSet_('聖誕專區上線通知', now_() + ' 開放,通知 ' + subs.length + ' 位');
+  log_(who || '系統', '開放聖誕專區', '', its.length + ' 項商品顯示在前台,通知已登記的 ' + subs.length + ' 位客人');
   if (!subs.length) return;
   var url = appUrl_() || 'https://coscoskr.github.io/shop/';
   var text = '🎄 coscos 聖誕專區上線囉!\n\n您登記的聖誕專區已經開放,數量有限,先逛先選 🎁\n\n' + its.slice(0, 5).map(function (p) { return '🎁 ' + p.名稱 + '  NT$' + Number(p.單價 || 0); }).join('\n') + (its.length > 5 ? '\n…還有 ' + (its.length - 5) + ' 項' : '') + '\n\n👉 ' + url + (url.indexOf('?') >= 0 ? '&' : '?') + 'c=' + encodeURIComponent(XMZ_CAT_);

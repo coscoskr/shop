@@ -27,8 +27,11 @@ x = run((I) => I.xmzItems_().length); ok(x.r === 0, 'no items for test/soldout/o
 x = run((I) => AD(I, true)); ok(!!x.err && /還沒有可以買/.test(x.err.message), 'no items -> error ' + (x.err && x.err.message));
 DB['商品'].push(P('G1', { name: '水水500元交換禮物' }));
 x = run((I) => AD(I, false)); ok(x.r.subs === 2 && x.r.items.length === 1 && !x.r.sent && x.pushes.length === 0, 'preview no push');
+const shopIds = () => run((I) => I.shopData_().products.map(p => p.id)).r;
+ok(!shopIds().includes('G1') && shopIds().includes('X'), 'xmas items hidden before open');
 x = run((I) => AD(I, true)); const js = JSON.stringify(x.pushes);
 ok(x.pushes.length === 1 && /multicast/.test(js) && js.includes(U1) && js.includes(U2) && js.includes('c=%E8%81%96') && js.includes('水水500元交換禮物  NT$500'), 'launch multicast');
-x = run((I) => AD(I, true)); ok(!!x.err && /已經通知過/.test(x.err.message) && x.pushes.length === 0, 'only once');
+ok(shopIds().includes('G1'), 'visible after open');
+x = run((I) => AD(I, true)); ok(!!x.err && /已經開放/.test(x.err.message) && x.pushes.length === 0, 'only once');
 x = run((I) => I.memberXmasSub(tok.A)); ok(x.r.live, 'after launch live flag');
 console.log(fails ? fails + ' FAILED' : 'ALL PASSED');
