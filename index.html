@@ -1313,6 +1313,37 @@ function xmasOn(d) {
   return String((d && d.deco) || '') === '聖誕節';
 }
 /* 聖誕貓咪(原創插圖):橘虎斑貓戴聖誕帽、掛鈴鐺項圈,從禮物盒後面探頭,尾巴會輕輕擺動 */
+function xmGift(cls) {
+  return '<svg class="' + cls + '" viewBox="0 0 130 90" aria-hidden="true">' +
+    '<rect x="6" y="36" width="52" height="50" rx="3" fill="#2F7A52"/><rect x="28" y="36" width="8" height="50" fill="#E8C15A"/><rect x="2" y="28" width="60" height="12" rx="3" fill="#256845"/><rect x="28" y="28" width="8" height="12" fill="#E8C15A"/>' +
+    '<path d="M32 28 Q18 10 14 22 Q14 30 32 28 Q46 30 50 22 Q46 10 32 28Z" fill="none" stroke="#E8C15A" stroke-width="4"/>' +
+    '<rect x="64" y="52" width="40" height="34" rx="3" fill="#FFFDF8"/><rect x="80" y="52" width="7" height="34" fill="#D8403A"/><rect x="60" y="45" width="48" height="10" rx="3" fill="#F2EEE6"/><rect x="80" y="45" width="7" height="10" fill="#D8403A"/>' +
+    '<path d="M83 45 Q72 32 69 41 Q70 47 83 45 Q96 47 97 41 Q94 32 83 45Z" fill="none" stroke="#D8403A" stroke-width="3.5"/>' +
+    '<rect x="108" y="64" width="20" height="22" rx="2" fill="#E8C15A"/><rect x="116" y="64" width="5" height="22" fill="#2F7A52"/>' +
+  '</svg>';
+}
+/* 走路的聖誕貓咪(原創,側面朝左):k = 'calico' 三花 / 'orange' 橘貓 / 'tabby' 虎斑;戴聖誕帽、圍圍巾 */
+function xmWalker(k) {
+  var C = { calico: ['#FFF8EE', '#E39A55', '#4B3B37'], orange: ['#EBA866', '#C97B3A', '#C97B3A'], tabby: ['#A89A8C', '#6E6259', '#6E6259'] }[k], b = C[0], s1 = C[1], s2 = C[2];
+  var marks = k === 'calico'
+    ? '<ellipse cx="38" cy="18" rx="7" ry="5" fill="' + s1 + '"/><ellipse cx="47" cy="23" rx="5" ry="4" fill="' + s2 + '"/><path d="M8 9 Q12 5 16 8 L15 13 Q10 13 8 9Z" fill="' + s1 + '"/>'
+    : '<path d="M28 14 v6 M34 13 v7 M40 13 v7 M46 15 v6" stroke="' + s1 + '" stroke-width="2.4" stroke-linecap="round"/><path d="M11 8 l1 3 M14 7 l0 3.4" stroke="' + s2 + '" stroke-width="1.6" stroke-linecap="round"/>';
+  var leg = function (x, c) { return '<rect class="' + c + '" x="' + x + '" y="24" width="4.4" height="12" rx="2.2" fill="' + b + '" stroke="#00000014" stroke-width=".6"/>'; };
+  return '<svg viewBox="0 -10 66 50" aria-hidden="true">' +
+    '<path class="xwt" d="M50 20 Q62 18 60 4" fill="none" stroke="' + (k === 'calico' ? s2 : b) + '" stroke-width="4.6" stroke-linecap="round"/>' +
+    leg(22, 'xwl2') + leg(44, 'xwl1') +
+    '<ellipse cx="35" cy="21" rx="17" ry="8.5" fill="' + b + '" stroke="#00000012" stroke-width=".6"/>' + marks +
+    leg(18, 'xwl1') + leg(40, 'xwl2') +
+    '<path d="M18 17 Q22 23 26 17 L25 21 Q22 26 19 21Z" fill="#C8403A"/>' +
+    '<path d="M6 4 L7.5 -6 L13 1Z M14 1 L19 -6 L20 4Z" fill="' + (k === 'calico' ? s1 : b) + '"/>' +
+    '<circle cx="13" cy="10" r="8.4" fill="' + b + '" stroke="#00000012" stroke-width=".6"/>' +
+    (k === 'calico' ? '<path d="M13 1.6 A8.4 8.4 0 0 1 21.2 8 L13 9Z" fill="' + s2 + '"/>' : '') +
+    '<ellipse cx="7.5" cy="12.5" rx="4" ry="3" fill="#FFF6EC"/><path d="M4.3 11.3 l1.6 0 l-.8 1.2Z" fill="#E38C86"/>' +
+    '<path d="M8.5 7.6 Q10 6.2 11.5 7.6" stroke="#4B3B37" stroke-width="1.5" fill="none" stroke-linecap="round"/>' +
+    '<path d="M6 13 l-6 -1 M6 14 l-6 1.5" stroke="#8A6A5A" stroke-width=".7" stroke-linecap="round" opacity=".7"/>' +
+    '<g transform="rotate(-20 14 0)"><path d="M6 1 Q10 -14 22 -11 Q18 -6 20 1Z" fill="#D8403A"/><circle cx="22.5" cy="-11" r="2.8" fill="#FFFDF8"/><rect x="4.5" y="-1" width="17" height="4.2" rx="2.1" fill="#FFFDF8"/></g>' +
+  '</svg>';
+}
 function xmCat(cls, w) {
   return '<svg class="' + cls + '" viewBox="0 -36 130 126"' + (w ? ' width="' + w + '"' : '') + ' aria-hidden="true">' +
     '<path class="xmt" d="M54 40 Q74 30 68 8 Q66 0 60 4" fill="none" stroke="#E39A55" stroke-width="7" stroke-linecap="round"/>' +
@@ -1354,10 +1385,18 @@ function xmas(d) {
       '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="30" viewBox="0 0 120 30"><path d="M0 8 Q30 26 60 8 T120 8" fill="none" stroke="#1F5A3E" stroke-width="7" stroke-linecap="round"/><path d="M0 8 Q30 26 60 8 T120 8" fill="none" stroke="#2F7A52" stroke-width="3" stroke-dasharray="2 4" stroke-linecap="round"/><circle cx="18" cy="18" r="4.2" fill="#E8C15A"/><circle cx="44" cy="19" r="4.2" fill="#F4F1EA"/><circle cx="78" cy="18" r="4.2" fill="#E8C15A"/><circle cx="102" cy="19" r="4.2" fill="#F4F1EA"/><circle cx="17" cy="17" r="1.2" fill="#fff" opacity=".8"/><circle cx="77" cy="17" r="1.2" fill="#fff" opacity=".8"/></svg>') +
       '") repeat-x bottom/120px 30px}' +
     'body.xm .hero .xms,body.xm .hero .xmb{position:absolute;bottom:20px;z-index:1;pointer-events:none}' +
-    'body.xm .hero .xms{right:3%;height:124px}body.xm .hero .xmb{left:3%;height:120px}' +
+    'body.xm .hero .xms{right:3%;height:124px}body.xm .hero .xmb{left:3%;height:86px}' +
+    'body.xm .hero .xmwk{position:absolute;z-index:1;bottom:14px;height:38px;left:calc(3% + 104px);right:calc(3% + 70px);pointer-events:none}' +
+    '.xwc{position:absolute;bottom:0;left:100%;width:52px;opacity:0;animation:xmwalk 15s linear infinite}.xwc svg{display:block;width:100%;animation:xwbob .26s ease-in-out infinite alternate}' +
+    '.xwc1{animation-delay:1.8s}.xwc2{animation-delay:3.6s}' +
+    '@keyframes xmwalk{0%{left:100%;opacity:0}4%{opacity:1}72%{opacity:1}78%{left:0;opacity:0}100%{left:0;opacity:0}}' +
+    '@keyframes xwbob{from{transform:translateY(0)}to{transform:translateY(-1.2px)}}' +
+    '.xwl1,.xwl2{transform-box:fill-box;transform-origin:50% 0;animation:xwleg .26s ease-in-out infinite alternate}.xwl2{animation-direction:alternate-reverse}' +
+    '@keyframes xwleg{from{transform:rotate(-22deg)}to{transform:rotate(22deg)}}' +
+    '.xwt{transform-box:fill-box;transform-origin:0% 100%;animation:xmtw 1.3s ease-in-out infinite}' +
     '.xmt{transform-box:fill-box;transform-origin:0% 100%;animation:xmtw 2.6s ease-in-out infinite}@keyframes xmtw{0%,100%{transform:rotate(0)}50%{transform:rotate(-14deg)}}' +
-    '@media (prefers-reduced-motion:reduce){.xmt{animation:none}}' +
-    '@media(max-width:699px){body.xm .hero .xms{height:74px;right:2px;bottom:22px}body.xm .hero .xmb{height:84px;left:2px;bottom:22px}body.xm .hero .wm{font-size:26px}body.xm .hero .mkw{height:44px}}' +
+    '@media (prefers-reduced-motion:reduce){.xmt,.xwt,.xwl1,.xwl2,.xwc svg{animation:none}.xwc{animation:none;opacity:1}.xwc0{left:20%}.xwc1{left:45%}.xwc2{left:70%}}' +
+    '@media(max-width:699px){body.xm .hero .xms{height:74px;right:2px;bottom:22px}body.xm .hero .xmb{height:50px;left:2px;bottom:22px}body.xm .hero .xmwk{left:66px;right:60px;bottom:20px;height:26px}.xwc{width:36px;animation-duration:12s}.xwc1{animation-delay:2.4s}.xwc2{animation-delay:4.8s}body.xm .hero .wm{font-size:26px}body.xm .hero .mkw{height:44px}}' +
     'body.xm #cb .xmh{position:absolute;top:4px;left:50%;width:20px;height:15px;transform:translateX(-62%) rotate(-12deg);pointer-events:none}' +
     '#xmsnow{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:40}' +
     'body.xm .c .im{position:relative}';
@@ -1381,7 +1420,9 @@ function xmas(d) {
         '<circle cx="44" cy="89" r="4" fill="#F2A99A" opacity=".55"/><circle cx="74" cy="89" r="4" fill="#F2A99A" opacity=".55"/>' +
       '</svg>' +
       // 禮物+聖誕貓咪(原創插圖)
-      xmCat('xmb') +
+      xmGift('xmb') +
+      // 三隻貓(三花、橘貓、虎斑)從聖誕老公公走到禮物
+      '<div class="xmwk" aria-hidden="true">' + ['calico', 'orange', 'tabby'].map(function (k, i) { return '<div class="xwc xwc' + i + '">' + xmWalker(k) + '</div>'; }).join('') + '</div>' +
       '<div class="xmg" aria-hidden="true"></div>');
   }
   var cb = document.getElementById('cb');
